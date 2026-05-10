@@ -1,0 +1,10 @@
+version: v2
+plugins:
+  - local: protoc-gen-pydantic
+    out: backend/app/generated/proto
+    opt:
+      - pydantic_v2=true
+  - remote: buf.build/bufbuild/es
+    out: extension/src/shared/proto
+    opt:
+      - target=ts

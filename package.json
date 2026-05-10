@@ -1,0 +1,16 @@
+{
+  "name": "findwith-monorepo",
+  "private": true,
+  "packageManager": "pnpm@9.1.0",
+  "scripts": {
+    "proto:lint": "buf lint",
+    "proto:breaking": "buf breaking --against .git#branch=main",
+    "proto:generate": "buf generate",
+    "ext:dev": "pnpm --filter extension dev",
+    "ext:build": "pnpm --filter extension build",
+    "ext:test": "pnpm --filter extension test",
+    "web:dev": "pnpm --filter web dev",
+    "web:build": "pnpm --filter web build",
+    "web:test": "pnpm --filter web test"
+  }
+}

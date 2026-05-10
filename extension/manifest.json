@@ -1,0 +1,48 @@
+{
+  "manifest_version": 3,
+  "name": "FindWith — AI Job Search Companion",
+  "version": "0.1.0",
+  "description": "Your AI career coach that helps you find, tailor, and land the right job.",
+  "permissions": [
+    "storage",
+    "sidePanel",
+    "alarms",
+    "activeTab",
+    "tabs"
+  ],
+  "host_permissions": [
+    "https://api.findwith.com/*",
+    "https://*.linkedin.com/*",
+    "https://mail.google.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "side_panel": {
+    "default_path": "src/sidepanel/index.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.linkedin.com/jobs/*"],
+      "js": ["cs-linkedin-job.js"]
+    },
+    {
+      "matches": ["https://www.linkedin.com/jobs/*/easy-apply/*", "https://www.linkedin.com/jobs/search/*"],
+      "js": ["cs-linkedin-apply.js"]
+    },
+    {
+      "matches": ["https://mail.google.com/*"],
+      "js": ["cs-gmail.js"]
+    }
+  ],
+  "externally_connectable": {
+    "matches": ["https://findwith.com/*", "http://localhost:3000/*"]
+  },
+  "action": {
+    "default_title": "FindWith"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  }
+}

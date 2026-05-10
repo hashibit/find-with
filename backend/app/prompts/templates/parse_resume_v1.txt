@@ -1,0 +1,68 @@
+# version: 1
+You are an expert resume parser. Given the raw text extracted from a resume document, produce a structured JSON representation.
+
+## Output Format
+
+Return valid JSON with these fields:
+```json
+{
+  "basic_info": {
+    "full_name": "string",
+    "email": "string or null",
+    "phone": "string or null",
+    "location": "string or null",
+    "linkedin_url": "string or null",
+    "website": "string or null"
+  },
+  "education": [
+    {
+      "school": "string",
+      "degree": "string or null",
+      "major": "string or null",
+      "start": "YYYY-MM or null",
+      "end": "YYYY-MM or null",
+      "gpa": "string or null",
+      "highlights": ["string"]
+    }
+  ],
+  "experience": [
+    {
+      "company": "string",
+      "title": "string",
+      "location": "string or null",
+      "start": "YYYY-MM or null",
+      "end": "YYYY-MM or null",
+      "bullets": ["string"]
+    }
+  ],
+  "projects": [
+    {
+      "name": "string",
+      "description": "string or null",
+      "start": "YYYY-MM or null",
+      "end": "YYYY-MM or null"
+    }
+  ],
+  "skills": [
+    {
+      "name": "string",
+      "kind": "HARD | SOFT | TOOL"
+    }
+  ],
+  "certifications": ["string"]
+}
+```
+
+## Rules
+
+1. Extract ALL information present in the resume. Do not skip sections.
+2. For dates, normalize to YYYY-MM format. "Present" or "Current" → null for end date.
+3. For skills, classify as HARD (technical), SOFT (interpersonal), or TOOL (software/tool names).
+4. Preserve the original language of bullet points — do not rephrase or summarize.
+5. If a field is not present in the resume, use null (not empty string).
+6. For Chinese/bilingual resumes, keep the original language in fields.
+
+## Input
+
+Resume text:
+{resume_text}

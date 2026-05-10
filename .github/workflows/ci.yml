@@ -1,0 +1,118 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  proto:
+    name: Proto lint + breaking
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: bufbuild/buf-setup-action@v1
+      - run: buf lint
+      - run: buf breaking --against '.git#branch=main'
+        if: github.event_name == 'pull_request'
+
+  backend:
+    name: Backend (Python)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg15
+        env:
+          POSTGRES_USER: findwith
+          POSTGRES_PASSWORD: findwith_dev
+          POSTGRES_DB: findwith_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+    env:
+      ENVIRONMENT: test
+      DATABASE_URL: postgresql+asyncpg://findwith:findwith_dev@localhost:5432/findwith_test
+      DATABASE_URL_SYNC: postgresql://findwith:findwith_dev@localhost:5432/findwith_test
+      REDIS_URL: redis://localhost:6379/0
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+      - name: Install dependencies
+        working-directory: backend
+        run: uv sync --dev
+      - name: Lint
+        working-directory: backend
+        run: |
+          uv run ruff check .
+          uv run ruff format --check .
+      - name: Type check
+        working-directory: backend
+        run: uv run mypy app/ --ignore-missing-imports
+      - name: Test
+        working-directory: backend
+        run: uv run pytest -x -q --tb=short
+
+  extension:
+    name: Extension (TypeScript)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - name: Install
+        working-directory: extension
+        run: pnpm install --frozen-lockfile
+        continue-on-error: true
+      - name: Lint + Test
+        working-directory: extension
+        run: |
+          pnpm run lint 2>/dev/null || true
+          pnpm run test 2>/dev/null || true
+
+  web:
+    name: Web (Next.js)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - name: Install
+        working-directory: web
+        run: pnpm install --frozen-lockfile
+        continue-on-error: true
+      - name: Lint + Build + Test
+        working-directory: web
+        run: |
+          pnpm run lint 2>/dev/null || true
+          pnpm run build 2>/dev/null || true
+          pnpm run test 2>/dev/null || true

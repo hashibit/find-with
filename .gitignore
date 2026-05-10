@@ -48,3 +48,21 @@ htmlcov/
 # engine/
 # framework/
 # apis/
+
+# Node
+node_modules/
+.next/
+.turbo/
+
+# Extension build
+extension/dist/
+
+# Generated proto
+backend/app/generated/
+extension/src/shared/proto/
+
+# pnpm
+.pnpm-store/
+
+# Docker
+docker-compose.override.yml

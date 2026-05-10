@@ -27,6 +27,11 @@ class Settings(BaseSettings):
     # Clerk
     clerk_secret_key: str = ""
     clerk_jwks_url: str = ""
+    clerk_webhook_secret: str = ""
+
+    # Stripe
+    stripe_secret_key: str = ""
+    stripe_webhook_secret: str = ""
 
     # Sentry
     sentry_dsn: str = ""

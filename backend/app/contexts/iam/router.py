@@ -34,9 +34,25 @@ async def get_quota(
 @router.post("/iam/webhooks/clerk")
 async def clerk_webhook(request: Request, session: AsyncSession = Depends(get_session)):
     """Clerk webhook handler — user.created / user.deleted events."""
-    body = await request.json()
-    event_type = body.get("type", "")
+    from svix.webhooks import Webhook, WebhookVerificationError
+    from app.config import settings
 
+    payload = await request.body()
+    headers = {
+        "svix-id": request.headers.get("svix-id", ""),
+        "svix-timestamp": request.headers.get("svix-timestamp", ""),
+        "svix-signature": request.headers.get("svix-signature", ""),
+    }
+    # Signature verification MUST happen before event_type dispatch to ensure
+    # all event types (including future user.updated / session.created / etc.)
+    # are protected. Do not move this into if/elif branches.
+    try:
+        wh = Webhook(settings.clerk_webhook_secret)
+        body = wh.verify(payload, headers)
+    except WebhookVerificationError:
+        raise HTTPException(status_code=401, detail="Invalid webhook signature")
+
+    event_type = body.get("type", "")
     svc = IAMService(session)
 
     if event_type == "user.created":

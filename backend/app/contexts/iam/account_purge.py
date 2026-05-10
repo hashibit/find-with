@@ -122,7 +122,7 @@ async def execute_purge_step(
             if sub and sub.stripe_customer_id:
                 import stripe
                 from app.config import settings
-                stripe.api_key = settings.clerk_secret_key
+                stripe.api_key = settings.stripe_secret_key
                 try:
                     stripe.Customer.delete(sub.stripe_customer_id)
                 except Exception:

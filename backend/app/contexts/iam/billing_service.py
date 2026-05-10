@@ -25,7 +25,7 @@ class BillingService:
     async def create_checkout(self, user_id: str, target_tier: str, success_url: str, cancel_url: str) -> dict:
         """Create Stripe Checkout Session."""
         import stripe
-        stripe.api_key = settings.clerk_secret_key  # TODO: use stripe_secret_key
+        stripe.api_key = settings.stripe_secret_key
 
         # Get or create Stripe customer
         sub = await self._get_subscription(user_id)
@@ -51,7 +51,7 @@ class BillingService:
     async def finalize_checkout(self, session_id: str) -> dict:
         """Finalize after Stripe Checkout success — sync subscription to DB."""
         import stripe
-        stripe.api_key = settings.clerk_secret_key
+        stripe.api_key = settings.stripe_secret_key
 
         session = stripe.checkout.Session.retrieve(session_id, expand=["subscription"])
         sub = session.subscription
@@ -96,7 +96,7 @@ class BillingService:
     async def create_portal(self, user_id: str, return_url: str) -> dict:
         """Create Stripe Customer Portal session."""
         import stripe
-        stripe.api_key = settings.clerk_secret_key
+        stripe.api_key = settings.stripe_secret_key
 
         sub = await self._get_subscription(user_id)
         if not sub or not sub.stripe_customer_id:
@@ -111,7 +111,7 @@ class BillingService:
     async def pause(self, user_id: str, reason: str = "OFFER_ACCEPTED") -> dict:
         """Pause subscription (farewell flow)."""
         import stripe
-        stripe.api_key = settings.clerk_secret_key
+        stripe.api_key = settings.stripe_secret_key
 
         sub = await self._get_subscription(user_id)
         if not sub or not sub.stripe_subscription_id:
@@ -142,7 +142,7 @@ class BillingService:
     async def resume(self, user_id: str) -> dict:
         """Resume paused subscription."""
         import stripe
-        stripe.api_key = settings.clerk_secret_key
+        stripe.api_key = settings.stripe_secret_key
 
         sub = await self._get_subscription(user_id)
         if not sub or not sub.stripe_subscription_id:
@@ -172,14 +172,19 @@ class BillingService:
     async def handle_webhook(self, raw_body: bytes, signature: str) -> dict:
         """Handle Stripe webhook with U-04 event tie-breaker."""
         import stripe
-        stripe.api_key = settings.clerk_secret_key
+        stripe.api_key = settings.stripe_secret_key
+
+        from fastapi import HTTPException
 
         try:
             event = stripe.Webhook.construct_event(
-                raw_body, signature, settings.clerk_secret_key,  # TODO: webhook secret
+                raw_body, signature, settings.stripe_webhook_secret,
             )
-        except Exception as e:
-            return {"error": str(e)}
+        except stripe.error.SignatureVerificationError as e:
+            logger.warning("Stripe webhook signature verification failed", extra={"err": str(e)})
+            raise HTTPException(status_code=401, detail="Invalid Stripe webhook signature")
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid payload")
 
         # Idempotency check
         from app.db.models.idempotency import IdempotencyKey

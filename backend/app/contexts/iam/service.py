@@ -28,7 +28,7 @@ class IAMService:
         if user:
             return user
 
-        from python_ulid import ULID
+        from ulid import ULID
         user = IamUser(
             id=str(ULID()),
             clerk_user_id=clerk_user_id,

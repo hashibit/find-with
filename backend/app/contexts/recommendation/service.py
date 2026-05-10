@@ -40,7 +40,7 @@ class RecoService:
 
     async def build_daily_reco(self, user_id: str) -> RecoRecommendation:
         """SerpAPI search, pgvector dedup, LLM rerank, create Recommendation."""
-        from python_ulid import ULID
+        from ulid import ULID
 
         # Fetch candidate profile keywords for search
         search_terms = await _build_search_terms(self.session, user_id)

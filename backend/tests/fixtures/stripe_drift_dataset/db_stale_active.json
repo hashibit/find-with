@@ -1,0 +1,7 @@
+{
+    "_comment": "DB shows ACTIVE but Stripe shows canceled",
+    "stripe_subscription_id": "sub_stale_fixture",
+    "db_state": "ACTIVE",
+    "stripe_status": "canceled",
+    "expected_kind": "DB_STALE_ACTIVE"
+}

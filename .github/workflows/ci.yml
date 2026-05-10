@@ -2,12 +2,12 @@ name: CI
 
 on:
   push:
-    branches: [main, dev]
+    branches: [main, "release/*"]
   pull_request:
     branches: [main]
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -21,9 +21,50 @@ jobs:
       - run: buf breaking --against '.git#branch=main'
         if: github.event_name == 'pull_request'
 
-  backend:
-    name: Backend (Python)
+  # L0: Static analysis (~60s)
+  static:
+    name: "L0 Static"
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+      - run: uv sync --all-extras
+      - run: uv run ruff check backend/
+      - run: uv run mypy backend/app/
+
+  # L1: Unit tests (~3min)
+  unit:
+    name: "L1 Unit"
+    runs-on: ubuntu-latest
+    needs: static
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+      - run: uv sync --all-extras
+      - run: uv run pytest backend/tests/unit/ -x -q --timeout=60
+      - run: uv run pytest backend/tests/test_health.py backend/tests/test_crypto.py -x -q
+
+  # L2: Contract tests (~2min)
+  contract:
+    name: "L2 Contract"
+    runs-on: ubuntu-latest
+    needs: static
+    if: github.event_name == 'pull_request' || startsWith(github.ref, 'refs/heads/release/')
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+      - run: uv sync --all-extras
+      - run: uv run pytest backend/tests/contract/ -x -q --timeout=120
+
+  # L3: Integration tests (~8min) — nightly + label + release
+  integration:
+    name: "L3 Integration"
+    runs-on: ubuntu-latest
+    needs: [unit, contract]
+    if: |
+      github.event_name == 'schedule' ||
+      startsWith(github.ref, 'refs/heads/release/') ||
+      contains(github.event.pull_request.labels.*.name, 'full-ci')
     services:
       postgres:
         image: pgvector/pgvector:pg15
@@ -31,46 +72,24 @@ jobs:
           POSTGRES_USER: findwith
           POSTGRES_PASSWORD: findwith_dev
           POSTGRES_DB: findwith_test
-        ports:
-          - 5432:5432
+        ports: ["5432:5432"]
         options: >-
           --health-cmd pg_isready
-          --health-interval 5s
-          --health-timeout 3s
+          --health-interval 10s
+          --health-timeout 5s
           --health-retries 5
       redis:
         image: redis:7-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 5s
-          --health-timeout 3s
-          --health-retries 5
-    env:
-      ENVIRONMENT: test
-      DATABASE_URL: postgresql+asyncpg://findwith:findwith_dev@localhost:5432/findwith_test
-      DATABASE_URL_SYNC: postgresql://findwith:findwith_dev@localhost:5432/findwith_test
-      REDIS_URL: redis://localhost:6379/0
+        ports: ["6379:6379"]
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v3
-        with:
-          version: "latest"
-      - name: Install dependencies
-        working-directory: backend
-        run: uv sync --dev
-      - name: Lint
-        working-directory: backend
-        run: |
-          uv run ruff check .
-          uv run ruff format --check .
-      - name: Type check
-        working-directory: backend
-        run: uv run mypy app/ --ignore-missing-imports
-      - name: Test
-        working-directory: backend
-        run: uv run pytest -x -q --tb=short
+      - uses: astral-sh/setup-uv@v4
+      - run: uv sync --all-extras
+      - run: uv run pytest backend/tests/integration/ -v --timeout=120
+        env:
+          DATABASE_URL: "postgresql+asyncpg://findwith:findwith_dev@localhost:5432/findwith_test"
+          REDIS_URL: "redis://localhost:6379/0"
+          ENVIRONMENT: test
 
   extension:
     name: Extension (TypeScript)

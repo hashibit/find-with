@@ -53,7 +53,7 @@ class ProfileService:
         data: bytes,
     ) -> ProfileResumeSource:
         """Upload resume to S3 and create a ResumeSource record, then enqueue parse_resume."""
-        from python_ulid import ULID
+        from ulid import ULID
         import aioboto3
         from app.config import settings
 
@@ -219,7 +219,7 @@ class ProfileService:
         return [_row_to_dict(r) for r in result.scalars().all()]
 
     async def create_base_resume(self, user_id: str, name: str) -> dict[str, Any]:
-        from python_ulid import ULID
+        from ulid import ULID
 
         resume = ProfileBaseResume(
             id=str(ULID()),

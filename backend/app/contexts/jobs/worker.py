@@ -56,7 +56,7 @@ async def parse_jd(ctx: dict, capture_id: str) -> None:
             logger.exception("parse_jd: LLM failed for capture_id=%s: %s", capture_id, exc)
             return
 
-        from python_ulid import ULID
+        from ulid import ULID
 
         jd = JobParsedJd(
             id=str(ULID()),
@@ -131,7 +131,7 @@ async def build_company_brief(ctx: dict, company: str) -> None:
             existing.generated_at = now
             existing.ttl_expires = ttl_expires
         else:
-            from python_ulid import ULID
+            from ulid import ULID
             brief = JobCompanyBrief(
                 id=str(ULID()),
                 company=company,
@@ -185,7 +185,7 @@ async def compute_match(ctx: dict, parsed_jd_id: str, user_id: str) -> None:
         # Compute scores using LLM
         scores = await _compute_scores(jd, top_materials)
 
-        from python_ulid import ULID
+        from ulid import ULID
         match = JobMatchResult(
             id=str(ULID()),
             parsed_jd_id=parsed_jd_id,

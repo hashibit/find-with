@@ -57,7 +57,7 @@ class JobsService:
         idempotency_key: str | None = None,
     ) -> dict[str, Any]:
         """Create a JobCapture + RadarItem(BROWSED), enqueue parse_jd + build_company_brief."""
-        from python_ulid import ULID
+        from ulid import ULID
 
         # Idempotency check
         if idempotency_key:

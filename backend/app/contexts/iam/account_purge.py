@@ -39,7 +39,7 @@ SAGA_STEPS = [
 
 async def start_purge_saga(user_id: str, email: str, session: AsyncSession) -> dict:
     """Initiate account purge — step 1 (soft delete + 24h grace)."""
-    from python_ulid import ULID
+    from ulid import ULID
 
     # Step 1: Soft delete
     result = await session.execute(select(IamUser).where(IamUser.id == user_id))
@@ -176,7 +176,7 @@ async def gdpr_purge_worker(session: AsyncSession) -> dict:
 
     Separate from AccountPurgeSaga — this is the final cleanup.
     """
-    from python_ulid import ULID
+    from ulid import ULID
     cutoff = datetime.now(timezone.utc) - timedelta(days=30)
 
     result = await session.execute(

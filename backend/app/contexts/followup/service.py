@@ -42,7 +42,7 @@ class FollowupService:
         capture_data: dict,
     ) -> FollowupEmail:
         """Create FollowupEmail with encrypted body_text, enqueue classification."""
-        from python_ulid import ULID
+        from ulid import ULID
 
         subject = capture_data.get("subject", "")[:500]
         from_addr = capture_data.get("from_addr", "")[:255]
@@ -126,7 +126,7 @@ class FollowupService:
         intent: str,
     ) -> FollowupDraft:
         """LLM-generated reply draft based on intent."""
-        from python_ulid import ULID
+        from ulid import ULID
 
         result = await self.session.execute(
             select(FollowupEmail).where(

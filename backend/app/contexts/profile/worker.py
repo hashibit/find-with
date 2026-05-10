@@ -63,7 +63,7 @@ async def parse_resume(ctx: dict, resume_id: str) -> None:
             record.parse_error = None
 
             # 7. Publish outbox event
-            from python_ulid import ULID
+            from ulid import ULID
             outbox = OutboxEvent(
                 id=str(ULID()),
                 event_type="ProfileParsed",
@@ -188,7 +188,7 @@ async def _write_profile(
     raw_text: str,
 ) -> None:
     """Write parsed profile data into DB tables."""
-    from python_ulid import ULID
+    from ulid import ULID
 
     # Upsert ProfileProfile
     result = await session.execute(

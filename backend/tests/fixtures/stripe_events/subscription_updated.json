@@ -1,0 +1,16 @@
+{
+    "id": "evt_fixture_sub_updated",
+    "type": "customer.subscription.updated",
+    "created": 1735689600,
+    "data": {
+        "object": {
+            "id": "sub_fixture_1",
+            "status": "active",
+            "metadata": {"user_id": "user_fixture_1"},
+            "current_period_end": 1738368000,
+            "items": {
+                "data": [{"price": {"id": "price_pro_monthly"}}]
+            }
+        }
+    }
+}

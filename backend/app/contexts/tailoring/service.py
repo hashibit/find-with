@@ -28,7 +28,7 @@ class TailoringService:
         base_resume_id: str,
     ) -> dict:
         """Quota check, enqueue generate_tailored_resume, create GAP_MINING conversation."""
-        from python_ulid import ULID
+        from ulid import ULID
         from app.contexts.quota.service import QuotaService
 
         # Quota gate (read-only check — actual consume happens at export)
@@ -266,7 +266,7 @@ class TailoringService:
         if not consumed:
             raise ValueError("quota_exceeded")
 
-        from python_ulid import ULID
+        from ulid import ULID
 
         blob_uri_pdf: str | None = None
         plain_text: str | None = None

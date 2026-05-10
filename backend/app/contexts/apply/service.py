@@ -25,7 +25,7 @@ class ApplyService:
         page_signals: dict,
     ) -> ApplyFillPlan:
         """Generate FillPlan with field mappings from page signals + profile data."""
-        from python_ulid import ULID
+        from ulid import ULID
         from app.db.models.profile import ProfileProfile, ProfileWorkExperience
 
         # Verify radar item ownership
@@ -110,7 +110,7 @@ class ApplyService:
         resume_snapshot_id: str | None,
     ) -> ApplyApplication:
         """Create Application record, update RadarItem to SUBMITTED, schedule followup."""
-        from python_ulid import ULID
+        from ulid import ULID
 
         # Verify radar item ownership
         result = await self.session.execute(

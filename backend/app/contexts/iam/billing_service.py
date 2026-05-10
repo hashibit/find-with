@@ -59,7 +59,7 @@ class BillingService:
         user_id = session.metadata.get("user_id", "")
         target_tier = session.metadata.get("target_tier", "PRO")
 
-        from python_ulid import ULID
+        from ulid import ULID
         db_sub = await self._get_subscription(user_id)
 
         if db_sub:
@@ -126,7 +126,7 @@ class BillingService:
         sub.paused_reason = reason
 
         # Outbox
-        from python_ulid import ULID
+        from ulid import ULID
         from app.db.models.outbox import OutboxEvent
         outbox = OutboxEvent(
             id=str(ULID()),
@@ -156,7 +156,7 @@ class BillingService:
         sub.state = "ACTIVE"
         sub.paused_reason = None
 
-        from python_ulid import ULID
+        from ulid import ULID
         from app.db.models.outbox import OutboxEvent
         outbox = OutboxEvent(
             id=str(ULID()),
@@ -220,7 +220,7 @@ class BillingService:
                         db_sub.period_end = datetime.fromtimestamp(stripe_sub.current_period_end, tz=timezone.utc)
 
         # Record idempotency
-        from python_ulid import ULID
+        from ulid import ULID
         idem = IdempotencyKey(key=event.id, key_type="stripe_event")
         self.session.add(idem)
 

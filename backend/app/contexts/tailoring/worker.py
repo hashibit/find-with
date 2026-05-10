@@ -21,7 +21,7 @@ async def generate_tailored_resume(ctx: dict, tailored_resume_id: str) -> None:
     from app.db.models.jobs import JobParsedJd
     from app.llm.client import LLMClient
     from app.llm.provider import LLMMessage
-    from python_ulid import ULID
+    from ulid import ULID
 
     engine = create_async_engine(settings.database_url, echo=False)
     SessionLocal = async_sessionmaker(engine, expire_on_commit=False)

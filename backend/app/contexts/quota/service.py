@@ -79,7 +79,7 @@ class QuotaService:
 
     async def consume_on_export(self, user_id: str, tailored_resume_id: str) -> bool:
         """Consume quota on PDF/txt export. FOR UPDATE + UNIQUE prevents double-charge."""
-        from python_ulid import ULID
+        from ulid import ULID
 
         # Check if already consumed (idempotent)
         existing = await self.session.execute(

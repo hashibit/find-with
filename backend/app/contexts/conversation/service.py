@@ -33,7 +33,7 @@ class ConversationService:
         anchor_id: str | None = None,
     ) -> dict[str, Any]:
         """Create a new conversation."""
-        from python_ulid import ULID
+        from ulid import ULID
 
         conv = ConvConversation(
             id=str(ULID()),
@@ -56,7 +56,7 @@ class ConversationService:
         token_usage: dict | None = None,
     ) -> dict[str, Any]:
         """Append a message to the conversation."""
-        from python_ulid import ULID
+        from ulid import ULID
 
         token_usage = token_usage or {}
         msg = ConvMessage(

@@ -110,6 +110,7 @@ async def test_stripe_valid_signature_updates_billing(client, db, signed_stripe_
     assert r.status_code == 200  # core assertion
 
     from sqlalchemy import select
+    db.expire_all()
     row = await db.scalar(
         select(BillingSubscription).where(
             BillingSubscription.stripe_subscription_id == "sub_stripe_valid"

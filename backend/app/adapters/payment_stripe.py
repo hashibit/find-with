@@ -82,11 +82,24 @@ class StripePaymentGateway(PaymentGateway):
 
         if event.type in ("customer.subscription.updated", "customer.subscription.deleted"):
             obj = event.data.object
-            wh.user_id = dict(obj.metadata).get("user_id", "") if obj.metadata else ""
-            wh.subscription_id = obj.id
-            wh.customer_id = obj.customer
-            wh.status = "CANCELED" if event.type.endswith("deleted") else (obj.status.upper() if obj.status else "ACTIVE")
-            if obj.current_period_end:
-                wh.period_end = datetime.fromtimestamp(obj.current_period_end, tz=timezone.utc)
+            metadata = getattr(obj, "metadata", None)
+            user_id = ""
+            if metadata is not None and "user_id" in metadata:
+                user_id = metadata["user_id"]
+            wh.user_id = user_id
+            wh.subscription_id = getattr(obj, "id", None)
+            wh.customer_id = getattr(obj, "customer", None)
+            status = getattr(obj, "status", None)
+            wh.status = "CANCELED" if event.type.endswith("deleted") else (status.upper() if status else "ACTIVE")
+            cpe = getattr(obj, "current_period_end", None)
+            if not cpe:
+                items = getattr(obj, "items", None)
+                data = getattr(items, "data", None) if items is not None else None
+                if data:
+                    first = data[0] if len(data) > 0 else None
+                    if first is not None:
+                        cpe = getattr(first, "current_period_end", None)
+            if cpe:
+                wh.period_end = datetime.fromtimestamp(cpe, tz=timezone.utc)
 
         return wh

@@ -1,0 +1,56 @@
+syntax = "proto3";
+package findwith.profile.v1;
+
+import "findwith/common/v1/common.proto";
+import "google/protobuf/timestamp.proto";
+
+message BasicInfo {
+  string full_name = 1; string email = 2; string phone = 3;
+  string location = 4; string linkedin_url = 5; string website = 6;
+}
+
+message Education {
+  findwith.common.v1.Id id = 1;
+  string school = 2; string degree = 3; string major = 4;
+  string start = 5; string end = 6;       // ISO YYYY-MM
+  string gpa = 7; repeated string highlights = 8;
+}
+
+message WorkExperience {
+  findwith.common.v1.Id id = 1;
+  string company = 2; string title = 3;
+  string location = 4; string start = 5; string end = 6;
+  repeated string bullets = 7;             // 原文 bullets
+  repeated findwith.common.v1.Id linked_material_ids = 8;
+}
+
+message Project {
+  findwith.common.v1.Id id = 1;
+  string name = 2; string description = 3;
+  string start = 4; string end = 5;
+  repeated findwith.common.v1.Id linked_material_ids = 6;
+}
+
+message Skill { string name = 1; SkillKind kind = 2; }
+enum SkillKind { SKILL_UNSPECIFIED = 0; SKILL_HARD = 1; SKILL_SOFT = 2; SKILL_TOOL = 3; }
+
+message Profile {
+  findwith.common.v1.Id user_id = 1;
+  BasicInfo basic = 2;
+  repeated Education education = 3;
+  repeated WorkExperience experience = 4;
+  repeated Project projects = 5;
+  repeated Skill skills = 6;
+  repeated string certifications = 7;
+  google.protobuf.Timestamp last_resume_uploaded_at = 8;
+}
+
+message ResumeSource {
+  findwith.common.v1.Id id = 1;
+  string filename = 2;
+  string content_type = 3;          // application/pdf | docx
+  string blob_uri = 4;               // s3://...
+  string parse_status = 5;           // PENDING | PARSED | FAILED
+  string parse_error = 6;
+  google.protobuf.Timestamp uploaded_at = 7;
+}

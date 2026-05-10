@@ -1,0 +1,55 @@
+syntax = "proto3";
+package findwith.conversation.v1;
+
+import "findwith/common/v1/common.proto";
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/duration.proto";
+
+enum Density { DENSITY_UNSPECIFIED=0; ENGAGED=1; BALANCED=2; QUIET=3; }
+
+enum ConversationKind {
+  CONV_UNSPECIFIED = 0;
+  CONV_ONBOARDING = 1;          // 深度档案
+  CONV_JOB_ANALYSIS = 2;
+  CONV_GAP_MINING = 3;          // 缺口挖掘（关联 JD）
+  CONV_TAILOR_EDIT = 4;
+  CONV_FOLLOWUP = 5;            // 邮件解读
+  CONV_FREE_CHAT = 6;
+}
+
+message Conversation {
+  findwith.common.v1.Id id = 1;
+  findwith.common.v1.Id user_id = 2;
+  ConversationKind kind = 3;
+  findwith.common.v1.Id anchor_id = 4;       // job/material/email 锚点
+  Density effective_density = 5;             // 临时切换后的有效值
+  google.protobuf.Timestamp last_activity = 6;
+  string rolling_summary = 7;                // 长对话压缩摘要
+}
+
+enum Role { ROLE_UNSPECIFIED=0; USER=1; ASSISTANT=2; SYSTEM=3; TOOL=4; }
+
+message Message {
+  findwith.common.v1.Id id = 1;
+  findwith.common.v1.Id conversation_id = 2;
+  Role role = 3;
+  string text = 4;                            // 文本内容（含 markdown）
+  repeated ToolCall tool_calls = 5;           // assistant 调用工具
+  ToolResult tool_result = 6;                 // role=TOOL 时填
+  TokenUsage token = 7;
+  google.protobuf.Timestamp created_at = 8;
+}
+message TokenUsage { int32 prompt = 1; int32 completion = 2; string model = 3; double cost_usd = 4; }
+
+// 临时密度切换：F-905。Quinn 在用户表达"今天少打扰"或"想深聊"时，
+// 主动调此 tool 修改 effective_density（不持久化到 iam_settings.density 默认值）。
+service DensityService {
+  rpc SetConversationDensity (SetDensityRequest) returns (SetDensityResponse);
+}
+message SetDensityRequest {
+  findwith.common.v1.Id conversation_id = 1;
+  Density density = 2;
+  string reason = 3;            // "user said: 今天太忙"
+  google.protobuf.Duration ttl = 4;  // null = 至会话结束；否则到点回弹默认值
+}
+message SetDensityResponse { Density effective = 1; }

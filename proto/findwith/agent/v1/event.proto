@@ -1,0 +1,23 @@
+// SSE 流的 envelope
+syntax = "proto3";
+package findwith.agent.v1;
+
+import "findwith/conversation/v1/conversation.proto";
+
+message AgentEvent {
+  string event_id = 1;
+  oneof payload {
+    TextDelta text = 2;
+    ToolCallEvent tool_call = 3;
+    ToolResultEvent tool_result = 4;
+    StateChange state = 5;
+    Error error = 6;
+    Done done = 7;
+  }
+}
+message TextDelta { string conversation_id=1; string message_id=2; string delta=3; }
+message ToolCallEvent { string name=1; string arguments_json=2; string call_id=3; }
+message ToolResultEvent { string call_id=1; string result_json=2; bool ok=3; string error=4; }
+message StateChange { string key=1; string value=2; }   // e.g. "tailoring.match=68→83"
+message Error { string code=1; string message=2; }
+message Done { int32 prompt_tokens=1; int32 completion_tokens=2; string finish_reason=3; }

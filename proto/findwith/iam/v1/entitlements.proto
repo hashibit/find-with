@@ -1,0 +1,20 @@
+// 产品端只读视图
+syntax = "proto3";
+package findwith.iam.v1;
+
+import "findwith/common/v1/common.proto";
+import "google/protobuf/timestamp.proto";
+
+enum Tier { TIER_UNSPECIFIED=0; FREE=1; PRO=2; PRO_PLUS=3; }
+enum SubscriptionState { STATE_UNSPECIFIED=0; ACTIVE=1; PAUSED=2; CANCELED=3; PAST_DUE=4; GRACE=5; }
+
+message Entitlements {
+  findwith.common.v1.Id user_id = 1;
+  Tier tier = 2;                   // 名义上的购买档
+  Tier effective_tier = 3;         // 真实可用档（PAUSED 中 PRO 仍可用至 period_end）
+  SubscriptionState state = 4;
+  google.protobuf.Timestamp period_end = 5;
+  map<string, bool> feature_flags = 6;
+  string etag = 7;                 // HTTP ETag 复用
+  google.protobuf.Timestamp fetched_at = 8;
+}

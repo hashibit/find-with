@@ -1,0 +1,19 @@
+syntax = "proto3";
+package findwith.quota.v1;
+
+import "findwith/common/v1/common.proto";
+import "google/protobuf/timestamp.proto";
+
+// 免费档"3 个完整定制岗位"的最小可证明单位
+message UsageCounter {
+  findwith.common.v1.Id user_id = 1;
+  int32 tailoring_completed = 2;        // 严格 = 已生成 PDF/纯文本 一次
+  int32 tailoring_limit = 3;            // free=3, pro=∞
+  google.protobuf.Timestamp window_start = 4;
+}
+
+message QuotaCheckResponse {
+  bool allowed = 1;
+  int32 remaining = 2;
+  string upgrade_prompt = 3;            // 文案预渲染
+}

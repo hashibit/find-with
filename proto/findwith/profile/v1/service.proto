@@ -1,0 +1,29 @@
+syntax = "proto3";
+package findwith.profile.v1;
+
+import "findwith/profile/v1/profile.proto";
+import "findwith/profile/v1/material.proto";
+import "findwith/common/v1/common.proto";
+
+service ProfileService {
+  rpc UploadResume          (UploadResumeRequest)         returns (UploadResumeResponse);
+  rpc GetParseStatus        (GetParseStatusRequest)       returns (ResumeSource);
+  rpc GetProfile            (GetProfileRequest)           returns (Profile);
+  rpc UpdateProfile         (UpdateProfileRequest)        returns (Profile);
+
+  rpc ListMaterials         (ListMaterialsRequest)        returns (ListMaterialsResponse);
+  rpc UpsertMaterial        (UpsertMaterialRequest)       returns (MaterialItem);
+  rpc ConfirmMaterial       (ConfirmMaterialRequest)      returns (MaterialItem);
+  rpc DeleteMaterial        (DeleteMaterialRequest)       returns (Empty);
+
+  rpc ListBaseResumes       (ListBaseResumesRequest)      returns (ListBaseResumesResponse);
+  rpc CreateBaseResume      (CreateBaseResumeRequest)     returns (BaseResume);
+
+  rpc ExportProfile         (ExportProfileRequest)        returns (ExportProfileResponse); // GDPR
+}
+
+message UploadResumeRequest {
+  string filename = 1; string content_type = 2; bytes data = 3;
+  // 大文件改用 PUT presigned URL；v0.1 < 5MB 直传
+}
+message UploadResumeResponse { findwith.common.v1.Id resume_id = 1; }

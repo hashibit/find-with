@@ -1,0 +1,125 @@
+syntax = "proto3";
+package findwith.jobs.v1;
+
+import "findwith/common/v1/common.proto";
+import "findwith/profile/v1/material.proto";
+import "google/protobuf/timestamp.proto";
+
+// 由 content script 上报的"原始 JD 抓取结果"
+message JobCapture {
+  findwith.common.v1.Id id = 1;
+  string source = 2;                    // "linkedin" | "indeed" | "careers"
+  string source_url = 3;
+  string source_job_id = 4;             // 如 LinkedIn 的 currentJobId
+  string captured_html = 5;             // sanitized HTML（带 <h>, <li> 结构）
+  string captured_text = 6;
+  CaptureMeta meta = 7;
+  google.protobuf.Timestamp captured_at = 8;
+}
+message CaptureMeta {
+  string title = 1; string company = 2; string location = 3;
+  string remote_mode = 4;                // remote/hybrid/onsite/unspecified
+  string salary_text = 5;
+}
+
+// 解析后的结构化 JD
+message ParsedJd {
+  findwith.common.v1.Id id = 1;
+  findwith.common.v1.Id capture_id = 2;
+  string title = 3; string company = 4; string location = 5;
+
+  repeated Requirement hard_skills = 6;
+  repeated Requirement soft_skills = 7;
+  Experience experience = 8;
+  Education education_required = 9;
+  repeated string hidden_signals = 10;   // "fast-paced × 3 → 高强度加班"
+  repeated string nice_to_have = 11;
+  string buzzword_translation = 12;      // "200 个 buzzword 翻译成人话"
+
+  google.protobuf.Timestamp parsed_at = 20;
+}
+message Requirement { string text = 1; bool is_must = 2; double weight = 3; }
+message Experience { int32 min_years = 1; string industry = 2; }
+message Education { string degree_min = 1; bool is_must = 2; }
+
+message CompanyBrief {
+  string company = 1;
+  string what_they_do = 2;
+  string size_stage = 3;                 // "Series C, ~3000 ppl"
+  repeated string recent_news = 4;       // 三条以内
+  RiskSignals risks = 5;
+  double glassdoor_rating = 6;
+  google.protobuf.Timestamp generated_at = 10;
+}
+message RiskSignals {
+  bool layoffs_recent = 1;
+  bool low_glassdoor = 2;
+  repeated string flags = 3;
+}
+
+// 三层匹配
+message MatchResult {
+  findwith.common.v1.Id id = 1;
+  findwith.common.v1.Id parsed_jd_id = 2;
+  double surface_score = 3;             // 关键词层
+  double deep_score = 4;                // 含素材库
+  repeated Gap gaps = 5;                // 缺口
+  repeated MatchedHit hits_surface = 6;
+  repeated MatchedHit hits_deep = 7;    // 素材库命中
+  string overall_advice = 8;            // "建议投" | "不建议" | "谨慎"
+  string advice_rationale = 9;
+}
+message Gap {
+  string requirement = 1;
+  GapKind kind = 2;
+  string mining_question = 3;           // Quinn 的挖掘问题
+}
+enum GapKind {
+  GAP_UNSPECIFIED = 0;
+  GAP_NOT_IN_RESUME_BUT_HAS_MATERIAL = 1; // 提一下就能补
+  GAP_NEEDS_MINING = 2;                  // 用户档案里都没有
+  GAP_HARD_BLOCK = 3;                    // 硬性不满足，建议不投
+}
+message MatchedHit {
+  string requirement = 1;
+  oneof evidence {
+    findwith.profile.v1.MaterialItem material = 2;
+    string resume_excerpt = 3;
+  }
+}
+
+// 求职雷达
+enum JobStatus {
+  STATUS_UNSPECIFIED = 0;
+  STATUS_BROWSED = 1;
+  STATUS_ANALYZED = 2;
+  STATUS_DECLINED = 3;        // 用户分析后决定不投
+  STATUS_TAILORING = 4;
+  STATUS_SUBMITTED = 5;
+  STATUS_WAITING = 6;
+  STATUS_INTERVIEWING = 7;
+  STATUS_REJECTED = 8;        // 公司拒了
+  STATUS_OFFER = 9;            // 中间态：拿到 offer 但用户未做决定
+  STATUS_OFFER_ACCEPTED = 10;
+  STATUS_OFFER_DECLINED = 11;
+}
+// 状态机转换（合法迁移）：
+//   BROWSED → ANALYZED → {DECLINED, TAILORING}
+//   TAILORING → SUBMITTED → WAITING → {INTERVIEWING, REJECTED}
+//   INTERVIEWING → {REJECTED, OFFER}
+//   OFFER → {OFFER_ACCEPTED, OFFER_DECLINED}    # 用户做决定即出 OFFER 中间态
+//   OFFER_ACCEPTED → (终止；触发 farewell + Subscription.PAUSED)
+//   OFFER_DECLINED → (终止；不影响订阅)
+// 任何非法转换在 PATCH /v1/jobs/radar/{id}/status 时 422 拒绝。
+
+message RadarItem {
+  findwith.common.v1.Id id = 1;
+  findwith.common.v1.Id user_id = 2;
+  findwith.common.v1.Id capture_id = 3;
+  findwith.common.v1.Id parsed_jd_id = 4;
+  findwith.common.v1.Id match_id = 5;
+  findwith.common.v1.Id resume_snapshot_id = 6;
+  JobStatus status = 7;
+  google.protobuf.Timestamp last_status_at = 8;
+  string user_decision_note = 9;
+}

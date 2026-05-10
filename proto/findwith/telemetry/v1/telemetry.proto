@@ -1,0 +1,22 @@
+syntax = "proto3";
+package findwith.telemetry.v1;
+
+import "google/protobuf/timestamp.proto";
+
+message ClientEvent {
+  string event_id = 1;                  // ULID, idempotent
+  string user_id = 2;
+  string session_id = 3;
+  string surface = 4;                   // "extension.sidepanel" | "extension.cs.linkedin" | "marketing.web"
+  string name = 5;                      // "job_capture.click" | "tailoring.export.pdf"
+  map<string,string> props = 6;
+  google.protobuf.Timestamp ts = 7;
+  string ext_version = 8;
+  string app_build = 9;
+}
+
+service TelemetryService {
+  rpc IngestBatch(IngestBatchRequest) returns (IngestBatchResponse);
+}
+message IngestBatchRequest { repeated ClientEvent events = 1; }
+message IngestBatchResponse { int32 accepted = 1; int32 deduped = 2; }

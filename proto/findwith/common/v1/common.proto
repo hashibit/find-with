@@ -1,0 +1,25 @@
+syntax = "proto3";
+package findwith.common.v1;
+
+import "google/protobuf/timestamp.proto";
+
+// 全局 ID 用 ULID（字典序、时间有序、URL safe）
+message Id { string ulid = 1; }
+
+message Audit {
+  google.protobuf.Timestamp created_at = 1;
+  google.protobuf.Timestamp updated_at = 2;
+  string created_by_user_id = 3;
+}
+
+enum Locale { LOCALE_UNSPECIFIED = 0; LOCALE_EN_US = 1; LOCALE_ZH_CN = 2; }
+
+message PageRequest { int32 page_size = 1; string page_token = 2; }
+message PageResponse { string next_page_token = 1; int32 total_size = 2; }
+
+message Error {
+  string code = 1;          // FW.PROFILE.NOT_FOUND
+  string message = 2;       // human-readable
+  string trace_id = 3;
+  map<string, string> meta = 4;
+}

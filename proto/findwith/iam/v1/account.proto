@@ -1,0 +1,29 @@
+// 官网独占：账号操作
+syntax = "proto3";
+package findwith.iam.v1;
+
+import "findwith/common/v1/common.proto";
+import "google/protobuf/timestamp.proto";
+
+service AccountService {
+  rpc ExportAccount (ExportAccountRequest) returns (ExportAccountResponse);
+  rpc DeleteAccount (DeleteAccountRequest) returns (DeleteAccountResponse);
+  rpc CancelDeletion(CancelDeletionRequest) returns (DeleteAccountResponse);
+}
+
+message ExportAccountRequest { findwith.common.v1.Id user_id = 1; }
+message ExportAccountResponse {
+  string download_url = 1;           // signed S3 URL，24h 有效
+  google.protobuf.Timestamp expires_at = 2;
+}
+
+message DeleteAccountRequest {
+  findwith.common.v1.Id user_id = 1;
+  string email_confirm = 2;          // 防误删，必须等于当前 email
+}
+message DeleteAccountResponse {
+  string saga_id = 1;
+  google.protobuf.Timestamp scheduled_purge_at = 2;   // 24h 后
+}
+
+message CancelDeletionRequest { findwith.common.v1.Id user_id = 1; string saga_id = 2; }

@@ -1,0 +1,62 @@
+// 官网独占：订阅计费
+syntax = "proto3";
+package findwith.billing.v1;
+
+import "findwith/common/v1/common.proto";
+import "google/protobuf/timestamp.proto";
+
+enum Tier { TIER_UNSPECIFIED=0; FREE=1; PRO=2; PRO_PLUS=3; }
+enum SubscriptionState {
+  STATE_UNSPECIFIED=0;
+  ACTIVE=1;
+  PAUSED=2;       // farewell 期，effective_tier 维持到 period_end
+  CANCELED=3;     // 用户主动取消，period_end 后失效
+  PAST_DUE=4;     // Stripe 重试中
+  GRACE=5;        // period_end 过了但宽限 7 天
+}
+
+message Subscription {
+  findwith.common.v1.Id user_id = 1;
+  Tier tier = 2;
+  SubscriptionState state = 3;
+  string stripe_customer_id = 4;
+  string stripe_subscription_id = 5;
+  google.protobuf.Timestamp period_end = 6;
+  string paused_reason = 7;          // "OFFER_ACCEPTED" | "USER_REQUESTED"
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp updated_at = 9;
+}
+
+service BillingService {
+  rpc CreateCheckout    (CreateCheckoutRequest)    returns (CreateCheckoutResponse);
+  rpc FinalizeCheckout  (FinalizeCheckoutRequest)  returns (Subscription);
+  rpc CreatePortal      (CreatePortalRequest)      returns (CreatePortalResponse);
+  rpc PauseSubscription (PauseSubscriptionRequest) returns (Subscription);
+  rpc ResumeSubscription(ResumeSubscriptionRequest)returns (Subscription);
+  rpc HandleWebhook     (StripeWebhookRequest)     returns (StripeWebhookResponse);
+}
+
+message CreateCheckoutRequest {
+  findwith.common.v1.Id user_id = 1;
+  Tier target_tier = 2;
+  string success_url = 3;            // findwith.com/billing/success
+  string cancel_url = 4;
+}
+message CreateCheckoutResponse { string hosted_url = 1; string session_id = 2; }
+
+message FinalizeCheckoutRequest { string session_id = 1; }
+
+message CreatePortalRequest {
+  findwith.common.v1.Id user_id = 1;
+  string return_url = 2;
+}
+message CreatePortalResponse { string hosted_url = 1; }
+
+message PauseSubscriptionRequest {
+  findwith.common.v1.Id user_id = 1;
+  string reason = 2;                 // "OFFER_ACCEPTED"
+}
+message ResumeSubscriptionRequest { findwith.common.v1.Id user_id = 1; }
+
+message StripeWebhookRequest { bytes raw_body = 1; string signature = 2; }
+message StripeWebhookResponse { bool processed = 1; bool deduped = 2; }

@@ -1,0 +1,43 @@
+syntax = "proto3";
+package findwith.followup.v1;
+
+import "findwith/common/v1/common.proto";
+import "google/protobuf/timestamp.proto";
+
+message EmailCapture {
+  findwith.common.v1.Id id = 1;
+  string source = 2;                  // "gmail-web"
+  string subject = 3;
+  string from_addr = 4;
+  string body_text = 5;               // 由 content script 抽取的纯文本
+  google.protobuf.Timestamp received_at = 6;
+}
+
+enum EmailKind {
+  EK_UNSPECIFIED=0;
+  EK_INTERVIEW_INVITE=1;
+  EK_REJECTION_TEMPLATED=2;
+  EK_REJECTION_PERSONAL=3;
+  EK_HR_FOLLOWUP=4;
+  EK_OFFER=5;
+  EK_OTHER=6;
+}
+
+message EmailParsed {
+  findwith.common.v1.Id capture_id = 1;
+  EmailKind kind = 2;
+  InterviewDetails interview = 3;        // 仅 EK_INTERVIEW_INVITE
+  string suggested_next_step = 4;
+  string radar_status_change = 5;        // "STATUS_INTERVIEWING"
+}
+message InterviewDetails {
+  string when_text = 1; google.protobuf.Timestamp when_ts = 2;
+  string where = 3; repeated string interviewers = 4;
+  string round_name = 5; string preparation_hint = 6;
+}
+
+message ReplyDraft {
+  findwith.common.v1.Id id = 1;
+  string text = 2;
+  string intent = 3;                    // "accept_interview" | "ask_reschedule"
+}

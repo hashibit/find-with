@@ -1,0 +1,33 @@
+syntax = "proto3";
+package findwith.apply.v1;
+
+import "findwith/common/v1/common.proto";
+import "google/protobuf/timestamp.proto";
+
+message FillPlan {
+  findwith.common.v1.Id id = 1;
+  findwith.common.v1.Id radar_item_id = 2;
+  repeated FillField fields = 3;          // 一项 = 一个表单字段
+  string preview_summary = 4;             // Quinn 在对话里展示的"我打算这样填"
+  bool user_approved = 5;
+}
+message FillField {
+  string selector = 1;                    // CSS selector / aria-label
+  string label = 2;
+  FieldKind kind = 3;
+  string value = 4;
+  string source = 5;                      // "profile.basic.email" | "ai_drafted"
+  bool requires_user_review = 6;
+}
+enum FieldKind {
+  FIELD_UNSPECIFIED=0; FIELD_TEXT=1; FIELD_LONGTEXT=2; FIELD_SELECT=3;
+  FIELD_FILE_RESUME=4; FIELD_NUMBER=5; FIELD_BOOLEAN=6;
+}
+
+message Application {
+  findwith.common.v1.Id id = 1;
+  findwith.common.v1.Id radar_item_id = 2;
+  findwith.common.v1.Id resume_snapshot_id = 3;
+  google.protobuf.Timestamp submitted_at = 4;
+  // 不存 Submit token：Submit 由用户亲自点
+}

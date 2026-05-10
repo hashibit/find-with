@@ -1,0 +1,48 @@
+syntax = "proto3";
+package findwith.tailoring.v1;
+
+import "findwith/common/v1/common.proto";
+import "findwith/profile/v1/material.proto";
+import "google/protobuf/timestamp.proto";
+
+message TailoredBullet {
+  findwith.common.v1.Id id = 1;
+  string text = 2;
+  BulletState state = 3;
+  findwith.profile.v1.Provenance trace = 4;     // 必须能溯源
+  repeated findwith.common.v1.Id source_material_ids = 5;
+  string user_edit_request = 6;                  // 最近一次自然语言编辑
+}
+enum BulletState {
+  BULLET_UNSPECIFIED=0;
+  BULLET_TRACED=1;        // 自动从已有 material 溯源完成
+  BULLET_PENDING=2;       // 缺素材，等用户挖掘 / 补量化
+  BULLET_USER_EDITED=3;   // 用户自然语言改写过
+  BULLET_CONFIRMED=4;     // 用户对 PENDING 完成 confirm/补充后落定
+}
+// 状态转换：
+//   TRACED ──user_edit──▶ USER_EDITED
+//   PENDING ──user_confirm──▶ CONFIRMED
+//   PENDING ──user_edit──▶ USER_EDITED
+//   CONFIRMED ──user_edit──▶ USER_EDITED
+// 渲染门禁：PDF/纯文本导出仅允许 state ∈ {TRACED, USER_EDITED, CONFIRMED}。
+// state==PENDING 必须先收敛，否则 export 拒绝。
+
+message TailoredResume {
+  findwith.common.v1.Id id = 1;
+  findwith.common.v1.Id user_id = 2;
+  findwith.common.v1.Id base_resume_id = 3;
+  findwith.common.v1.Id parsed_jd_id = 4;
+  repeated TailoredSection sections = 5;
+  double match_before = 6;
+  double match_after = 7;
+}
+message TailoredSection { string title=1; repeated TailoredBullet bullets=2; }
+
+message ResumeSnapshot {
+  findwith.common.v1.Id id = 1;
+  findwith.common.v1.Id tailored_resume_id = 2;
+  string blob_uri_pdf = 3;
+  string plain_text = 4;
+  google.protobuf.Timestamp frozen_at = 5;
+}

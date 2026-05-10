@@ -31,6 +31,8 @@ jobs:
       - run: uv sync --all-extras
       - run: uv run ruff check backend/
       - run: uv run mypy backend/app/
+      - run: uv run alembic -c backend/alembic.ini check
+        continue-on-error: true  # non-blocking until alembic.ini is fully wired
 
   # L1: Unit tests (~3min)
   unit:
@@ -65,30 +67,13 @@ jobs:
       github.event_name == 'schedule' ||
       startsWith(github.ref, 'refs/heads/release/') ||
       contains(github.event.pull_request.labels.*.name, 'full-ci')
-    services:
-      postgres:
-        image: pgvector/pgvector:pg15
-        env:
-          POSTGRES_USER: findwith
-          POSTGRES_PASSWORD: findwith_dev
-          POSTGRES_DB: findwith_test
-        ports: ["5432:5432"]
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-      redis:
-        image: redis:7-alpine
-        ports: ["6379:6379"]
+    # No GitHub services needed — testcontainers in conftest.py are self-contained.
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v4
       - run: uv sync --all-extras
       - run: uv run pytest backend/tests/integration/ -v --timeout=120
         env:
-          DATABASE_URL: "postgresql+asyncpg://findwith:findwith_dev@localhost:5432/findwith_test"
-          REDIS_URL: "redis://localhost:6379/0"
           ENVIRONMENT: test
 
   extension:

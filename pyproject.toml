@@ -84,3 +84,15 @@ markers = [
     "e2e: L4/L5 end-to-end tests",
     "slow: tests that take > 30s",
 ]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "pytest-timeout>=2.4.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["backend/app"]

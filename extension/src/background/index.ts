@@ -15,7 +15,7 @@ chrome.runtime.onMessage.addListener((msg: BgMsg, sender, sendResponse) => {
 // External messages: website → SW (U-03 nonce flow)
 chrome.runtime.onMessageExternal.addListener((msg, sender, sendResponse) => {
   // Origin check
-  if (sender.origin !== 'https://findwith.com' && sender.origin !== 'http://localhost:3000') {
+  if (sender.origin !== 'https://findwith.com' && sender.origin !== 'http://localhost:14666') {
     return;
   }
 

@@ -31,7 +31,7 @@ async function handleJobCapture(payload: any) {
   const idempotencyKey = await digestMessage(`${payload.source_url}|${new Date().toISOString().slice(0, 10)}`);
 
   try {
-    const resp = await fetch('http://localhost:8000/v1/jobs/captures', {
+    const resp = await fetch('http://localhost:14667/v1/jobs/captures', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -52,7 +52,7 @@ async function handleEmailCapture(payload: any) {
   if (!token) return { error: 'not_authenticated' };
 
   try {
-    const resp = await fetch('http://localhost:8000/v1/followup/emails', {
+    const resp = await fetch('http://localhost:14667/v1/followup/emails', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

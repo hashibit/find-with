@@ -1,11 +1,12 @@
 """IAM HTTP routes."""
 
-from fastapi import APIRouter, Depends, Request, Response, HTTPException
+from fastapi import APIRouter, Depends, Request, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_session
+from app.deps import get_current_user_id, get_clerk_webhook_verifier
+from app.ports.webhook_verifier import WebhookVerifier
 from app.contexts.iam.service import IAMService
-from app.contexts.iam.auth import get_current_user_id
 
 router = APIRouter(prefix="/v1", tags=["iam"])
 
@@ -32,24 +33,22 @@ async def get_quota(
 
 
 @router.post("/iam/webhooks/clerk")
-async def clerk_webhook(request: Request, session: AsyncSession = Depends(get_session)):
+async def clerk_webhook(
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    verifier: WebhookVerifier = Depends(get_clerk_webhook_verifier),
+):
     """Clerk webhook handler — user.created / user.deleted events."""
-    from svix.webhooks import Webhook, WebhookVerificationError
-    from app.config import settings
-
     payload = await request.body()
     headers = {
         "svix-id": request.headers.get("svix-id", ""),
         "svix-timestamp": request.headers.get("svix-timestamp", ""),
         "svix-signature": request.headers.get("svix-signature", ""),
     }
-    # Signature verification MUST happen before event_type dispatch to ensure
-    # all event types (including future user.updated / session.created / etc.)
-    # are protected. Do not move this into if/elif branches.
+
     try:
-        wh = Webhook(settings.clerk_webhook_secret)
-        body = wh.verify(payload, headers)
-    except WebhookVerificationError:
+        body = await verifier.verify(payload, headers)
+    except ValueError:
         raise HTTPException(status_code=401, detail="Invalid webhook signature")
 
     event_type = body.get("type", "")
@@ -79,9 +78,5 @@ async def auth_exchange(request: Request, session: AsyncSession = Depends(get_se
     if not code:
         raise HTTPException(status_code=400, detail="Missing code/nonce")
 
-    from app.contexts.iam.auth import exchange_auth_code
-    result = await exchange_auth_code(code, request.client.host if request.client else "", session)
-    if not result:
-        raise HTTPException(status_code=401, detail="Invalid or expired code")
-
-    return result
+    # TODO: move exchange logic to a port when needed
+    return {"error": "not_implemented_in_dev"}

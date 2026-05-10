@@ -49,6 +49,13 @@ class IAMService:
         await self.session.commit()
         return user
 
+    async def get_user_by_id(self, user_id: str) -> IamUser | None:
+        """Look up user by internal ID."""
+        result = await self.session.execute(
+            select(IamUser).where(IamUser.id == user_id)
+        )
+        return result.scalar_one_or_none()
+
     async def get_user_by_clerk_id(self, clerk_user_id: str) -> IamUser | None:
         result = await self.session.execute(
             select(IamUser).where(IamUser.clerk_user_id == clerk_user_id)

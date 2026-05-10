@@ -19,7 +19,7 @@ async def test_stripe_wrong_secret_returns_401_not_200(client, signed_stripe_eve
     This prevents the `except Exception` silent swallow regression.
     """
     payload, sig_header = signed_stripe_event(
-        {"id": "evt_1", "type": "customer.subscription.updated",
+        {"id": "evt_1", "object": "event", "type": "customer.subscription.updated",
          "data": {"object": {"id": "sub_x", "status": "canceled",
                              "metadata": {"user_id": "u1"},
                              "current_period_end": 1735689600}}},
@@ -43,7 +43,7 @@ async def test_stripe_malformed_payload_returns_400(client):
     assert r.status_code in (400, 401)  # core assertion
 
 
-async def test_stripe_missing_signature_header(client):
+async def test_stripe_missing_signature_header(client, stripe_test_whsec):
     """No Stripe-Signature header -> 401."""
     r = await client.post(
         "/v1/billing/webhooks/stripe",
@@ -60,34 +60,13 @@ async def test_stripe_api_key_uses_stripe_secret_not_clerk(monkeypatch):
     monkeypatch.setattr(settings, "stripe_secret_key", "sk_test_stripe_correct")
     monkeypatch.setattr(settings, "clerk_secret_key", "sk_clerk_DIFFERENT")
 
-    # Import and instantiate BillingService to trigger stripe.api_key assignment
-    from app.contexts.iam.billing_service import BillingService
-    from unittest.mock import AsyncMock, MagicMock
+    # Instantiate StripePaymentGateway — its __init__ sets stripe.api_key
+    from app.adapters.payment_stripe import StripePaymentGateway
 
-    mock_session = AsyncMock()
-    svc = BillingService(mock_session)
-
-    # Mock Stripe API calls so we don't hit real Stripe
-    mock_customer = MagicMock()
-    mock_customer.id = "cus_test"
-    monkeypatch.setattr("stripe.Customer.create", lambda **kw: mock_customer)
-
-    mock_checkout = MagicMock()
-    mock_checkout.url = "https://checkout.stripe.com/test"
-    mock_checkout.id = "cs_test"
-    monkeypatch.setattr("stripe.checkout.Session.create", lambda **kw: mock_checkout)
-
-    mock_session.execute = AsyncMock(return_value=MagicMock(scalar_one_or_none=lambda: None))
-
-    try:
-        await svc.create_checkout(
-            user_id="u1",
-            target_tier="PRO",
-            success_url="https://findwith.com/success",
-            cancel_url="https://findwith.com/cancel",
-        )
-    except Exception:
-        pass  # We only care about stripe.api_key being set
+    StripePaymentGateway(
+        secret_key=settings.stripe_secret_key,
+        webhook_secret=settings.stripe_webhook_secret,
+    )
 
     assert stripe.api_key == "sk_test_stripe_correct"  # core assertion
 
@@ -107,10 +86,11 @@ async def test_stripe_valid_signature_updates_billing(client, db, signed_stripe_
         stripe_subscription_id="sub_stripe_valid",
     )
     db.add(sub)
-    await db.flush()
+    await db.commit()
 
     payload, sig = signed_stripe_event({
         "id": "evt_valid_1",
+        "object": "event",
         "type": "customer.subscription.updated",
         "created": 1735689600,
         "data": {
@@ -153,10 +133,11 @@ async def test_stripe_duplicate_event_deduped(client, db, signed_stripe_event):
         stripe_subscription_id="sub_dedup",
     )
     db.add(sub)
-    await db.flush()
+    await db.commit()
 
     event = {
         "id": "evt_dedup_1",
+        "object": "event",
         "type": "customer.subscription.updated",
         "created": 1735689600,
         "data": {

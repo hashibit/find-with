@@ -28,7 +28,7 @@ async def test_reconcile_detects_db_stale_active(db, sentry_mock, tmp_path):
         stripe_subscription_id="sub_stale",
     )
     db.add(sub)
-    await db.flush()
+    await db.commit()
 
     # Mock Stripe API to return canceled
     from backend.scripts.reconcile_stripe_subscriptions import ReconcileRunner
@@ -103,7 +103,7 @@ async def test_reconcile_no_drift_clean(db, tmp_path):
         stripe_subscription_id="sub_clean",
     )
     db.add(sub)
-    await db.flush()
+    await db.commit()
 
     from backend.scripts.reconcile_stripe_subscriptions import ReconcileRunner
 
@@ -139,7 +139,7 @@ async def test_reconcile_dry_run_no_writes(db, tmp_path):
         stripe_subscription_id="sub_dryrun",
     )
     db.add(sub)
-    await db.flush()
+    await db.commit()
 
     from backend.scripts.reconcile_stripe_subscriptions import ReconcileRunner
 
@@ -167,3 +167,17 @@ async def test_reconcile_dry_run_no_writes(db, tmp_path):
         )
     )
     assert row.state == "ACTIVE"  # core assertion (not mutated by dry run)
+
+
+async def test_reconcile_non_dry_run_raises_not_implemented(db, tmp_path):
+    """Non-dry-run mode is not yet implemented — must raise explicitly."""
+    from backend.scripts.reconcile_stripe_subscriptions import ReconcileRunner
+
+    runner = ReconcileRunner(
+        db_session=db,
+        stripe_subscriptions={"sub_x": {"id": "sub_x", "status": "active"}},
+        dry_run=False,
+        out_dir=tmp_path,
+    )
+    with pytest.raises(NotImplementedError, match="Write-back mode not implemented"):
+        await runner.run()

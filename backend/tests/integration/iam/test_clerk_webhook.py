@@ -14,7 +14,7 @@ from svix.webhooks import Webhook
 pytestmark = pytest.mark.integration
 
 
-async def test_clerk_unsigned_rejected_no_db_write(client, db, db_table_snapshot):
+async def test_clerk_unsigned_rejected_no_db_write(client, db, db_table_snapshot, svix_test_secret):
     """U-11 Attack B — curl forged user.deleted must be 401, DB zero diff."""
     snap = await db_table_snapshot("iam_users")
     r = await client.post(
@@ -25,7 +25,7 @@ async def test_clerk_unsigned_rejected_no_db_write(client, db, db_table_snapshot
     assert await db_table_snapshot("iam_users") == snap  # core assertion (zero change)
 
 
-async def test_clerk_missing_headers_rejected(client):
+async def test_clerk_missing_headers_rejected(client, svix_test_secret):
     """No svix-* headers at all -> 401."""
     r = await client.post(
         "/v1/iam/webhooks/clerk",
@@ -76,7 +76,7 @@ async def test_clerk_valid_signature_deletes_user(client, db, signed_clerk_webho
         email="del@test.com",
     )
     db.add(user)
-    await db.flush()
+    await db.commit()
 
     body, headers = signed_clerk_webhook(
         data={"id": "user_del"},
@@ -85,9 +85,12 @@ async def test_clerk_valid_signature_deletes_user(client, db, signed_clerk_webho
     r = await client.post("/v1/iam/webhooks/clerk", content=body, headers=headers)
     assert r.status_code == 200
 
-    from sqlalchemy import select
-    refreshed = await db.scalar(select(IamUser).where(IamUser.clerk_user_id == "user_del"))
-    assert refreshed.deleted_at is not None  # core assertion
+    from sqlalchemy import select, text
+    # Re-read from DB (bypass identity map) to see the app's committed changes
+    row = (await db.execute(
+        text("SELECT deleted_at FROM iam_users WHERE clerk_user_id = 'user_del'")
+    )).first()
+    assert row is not None and row.deleted_at is not None  # core assertion
 
 
 async def test_clerk_timestamp_outside_window_rejected(client, svix_test_secret):
@@ -111,29 +114,37 @@ async def test_clerk_timestamp_outside_window_rejected(client, svix_test_secret)
     assert r.status_code == 401  # core assertion (replay prevention)
 
 
-async def test_clerk_verify_called_before_event_dispatch(client, monkeypatch, signed_clerk_webhook):
-    """Whitebox: signature verification MUST happen before body['type'] is read."""
-    call_order = []
+async def test_clerk_invalid_sig_with_destructive_type_does_not_dispatch(
+    client, db, svix_test_secret, monkeypatch
+):
+    """Blackbox: invalid signature + destructive event type must NOT trigger dispatch.
 
-    original_verify = Webhook.verify
-    def tracking_verify(self, payload, headers):
-        call_order.append("verify")
-        return original_verify(self, payload, headers)
-
-    monkeypatch.setattr(Webhook, "verify", tracking_verify)
-
+    This is the real invariant: if sig is wrong, no event handler runs — regardless
+    of how the router code is structured internally. Survives refactors.
+    """
+    from unittest.mock import AsyncMock
     from app.contexts.iam.service import IAMService
-    original_get_or_create = IAMService.get_or_create_user
-    async def tracking_dispatch(**kwargs):
-        call_order.append("dispatch")
-        return await original_get_or_create(IAMService.__new__(IAMService), **kwargs)
 
-    monkeypatch.setattr(IAMService, "get_or_create_user", tracking_dispatch)
-
-    body, headers = signed_clerk_webhook(
-        data={"id": "u_order", "email_addresses": [{"email_address": "order@test.com"}]},
-        type_="user.created",
+    dispatched = []
+    monkeypatch.setattr(
+        IAMService, "soft_delete_user",
+        AsyncMock(side_effect=lambda *a, **kw: dispatched.append("delete")),
     )
-    await client.post("/v1/iam/webhooks/clerk", content=body, headers=headers)
+    monkeypatch.setattr(
+        IAMService, "get_or_create_user",
+        AsyncMock(side_effect=lambda *a, **kw: dispatched.append("create")),
+    )
 
-    assert call_order[0] == "verify"  # core assertion (order must not be reversed)
+    # Send user.deleted with bad signature — must not trigger soft_delete_user
+    body = json.dumps({"type": "user.deleted", "data": {"id": "u_attack"}}).encode()
+    r = await client.post(
+        "/v1/iam/webhooks/clerk",
+        content=body,
+        headers={
+            "svix-id": "msg_fake",
+            "svix-timestamp": str(int(datetime.now(timezone.utc).timestamp())),
+            "svix-signature": "v1,forged_signature",
+        },
+    )
+    assert r.status_code == 401  # core assertion
+    assert dispatched == []  # core assertion: sig wrong → zero dispatch

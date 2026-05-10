@@ -3,8 +3,10 @@
 Compares billing_subscriptions table against Stripe API to detect drift.
 Runs weekly via APScheduler (Mon 02:00 UTC) in prod, or manually via CLI.
 
-Usage:
-    python -m backend.scripts.reconcile_stripe_subscriptions --dry-run --output=/tmp/drift.csv
+Usage (from project root):
+    PYTHONPATH=backend uv run python -m backend.scripts.reconcile_stripe_subscriptions \\
+        --output=/tmp
+    # Add --no-dry-run to enable write-back (not yet implemented).
 """
 
 from __future__ import annotations
@@ -97,7 +99,16 @@ class ReconcileRunner:
         }
 
     async def run(self) -> ReconcileResult:
-        """Execute reconciliation. Returns result with drift details."""
+        """Execute reconciliation. Returns result with drift details.
+
+        When dry_run=True (default), only reports drift via CSV + Sentry.
+        When dry_run=False, would apply corrections — not yet implemented.
+        """
+        if not self.dry_run:
+            raise NotImplementedError(
+                "Write-back mode not implemented yet. Use --dry-run (default)."
+            )
+
         stripe_subs = await self._fetch_stripe_subscriptions()
         db_subs = await self._fetch_db_subscriptions()
         drifts: list[DriftRow] = []
@@ -182,7 +193,8 @@ class ReconcileRunner:
 
 async def main():
     parser = argparse.ArgumentParser(description="Reconcile Stripe subscriptions")
-    parser.add_argument("--dry-run", action="store_true", default=True)
+    parser.add_argument("--no-dry-run", dest="dry_run", action="store_false", default=True,
+                        help="Disable dry-run to enable write-back (not yet implemented)")
     parser.add_argument("--output", type=str, default="/tmp")
     parser.add_argument("--stripe-key", type=str, default=None)
     args = parser.parse_args()

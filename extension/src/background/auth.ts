@@ -1,4 +1,4 @@
-const API_BASE = 'http://localhost:8000'; // dev; prod: https://api.findwith.com
+const API_BASE = 'http://localhost:14667'; // dev; prod: https://api.findwith.com
 
 export async function getToken(): Promise<string | null> {
   const data = await chrome.storage.local.get(['token', 'expires_at']);

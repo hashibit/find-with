@@ -1,4 +1,9 @@
-"""Factory Boy factories for test data generation."""
+"""Factory Boy factories for test data generation.
+
+TODO: Wire into L3 integration tests when expanding beyond webhook coverage.
+Currently returns dict (not ORM instances) — suitable for building test payloads.
+Convert to SQLAlchemyModelFactory when L3 tests need persisted entities.
+"""
 
 from datetime import datetime, timezone
 

@@ -78,19 +78,22 @@ async def user_with_tier(request, db):
     )
     db.add(settings)
 
-    # Create billing subscription if not FREE without subscription
+    # Create billing subscription if state is set.
+    # PENDING_UPGRADE: Stripe has already charged (tier=PRO in DB) but the webhook
+    # hasn't arrived yet, so effective_tier is computed at runtime by
+    # IAMService.get_entitlements — not by this fixture. We just store the DB row.
     if state is not None:
         from app.db.models.billing import BillingSubscription
         from datetime import datetime, timezone, timedelta
 
-        effective_tier = tier.value
-        if state == SubscriptionState.PENDING_UPGRADE:
-            effective_tier = "FREE"  # Not yet upgraded
+        # For PENDING_UPGRADE, DB tier is PRO (Stripe charged) but product-side
+        # hasn't flipped entitlements yet. For all others, tier matches the param.
+        db_tier = "PRO" if state == SubscriptionState.PENDING_UPGRADE else tier.value
 
         sub = BillingSubscription(
             id=str(ULID()),
             user_id=user_id,
-            tier=effective_tier if state != SubscriptionState.PENDING_UPGRADE else "PRO",
+            tier=db_tier,
             state=state.value,
             stripe_customer_id=f"cus_{user_id[:10]}",
             stripe_subscription_id=f"sub_{user_id[:10]}",
@@ -110,5 +113,5 @@ async def user_with_tier(request, db):
         )
         db.add(counter)
 
-    await db.flush()
+    await db.commit()
     yield user_id, tier, state, quota_sub

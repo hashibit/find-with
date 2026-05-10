@@ -1,7 +1,7 @@
 """Encryption round-trip tests."""
 
 import pytest
-from app.security.crypto import encrypt_field, decrypt_field, generate_dek_kek_pair, _unwrap_dek
+from app.security.crypto import encrypt_field, decrypt_field, generate_dek_kek_pair
 
 
 class TestEncryption:

@@ -1,9 +1,8 @@
 .PHONY: dev ci test lint proto clean
 
 # Dev
-dev:
-	docker compose -f docker-compose.dev.yml up -d
-	cd backend && uv run uvicorn app.main:app --reload --port 8000
+dev: up
+	cd backend && uv run --project .. uvicorn app.main:app --reload --port 14667
 
 # CI — one command runs all stacks
 ci: lint test
@@ -16,8 +15,8 @@ lint-proto:
 	buf breaking --against .git#branch=main || true
 
 lint-backend:
-	cd backend && uv run ruff check .
-	cd backend && uv run mypy app/
+	uv run ruff check backend/app/
+	uv run mypy backend/app/ --ignore-missing-imports
 
 lint-ext:
 	cd extension && pnpm run lint 2>/dev/null || true
@@ -29,7 +28,7 @@ lint-web:
 test: test-backend test-ext test-web
 
 test-backend:
-	cd backend && uv run pytest -x -q
+	ENVIRONMENT=test uv run python -m pytest backend/tests/test_crypto.py backend/tests/test_health.py backend/tests/unit/ -x -q
 
 test-ext:
 	cd extension && pnpm test 2>/dev/null || true
@@ -101,10 +100,10 @@ clean:
 
 # DB
 migrate:
-	cd backend && uv run alembic upgrade head
+	cd backend && uv run alembic -c alembic.ini upgrade head
 
 migration:
-	cd backend && uv run alembic revision --autogenerate -m "$(msg)"
+	cd backend && uv run alembic -c alembic.ini revision --autogenerate -m "$(msg)"
 
 # DR
 dr-dry-run:

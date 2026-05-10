@@ -38,9 +38,7 @@ class LLMClient:
         fallback: LLMProvider | None = None,
     ):
         if primary is None:
-            if settings.environment == "test":
-                primary = FakeProvider()
-            elif settings.openai_api_key:
+            if settings.openai_api_key:
                 primary = OpenAIProvider(settings.openai_api_key)
             else:
                 primary = FakeProvider()

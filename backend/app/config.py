@@ -44,7 +44,7 @@ class Settings(BaseSettings):
     cors_origins: list[str] = [
         "chrome-extension://*",
         "https://findwith.com",
-        "http://localhost:3000",
+        "http://localhost:14666",
     ]
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}

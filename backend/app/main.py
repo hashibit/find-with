@@ -19,10 +19,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     init_sentry()
     init_otel()
 
-    # Verify encryption keys (fail-fast if KEK is wrong)
-    if settings.environment != "test":
-        from app.security.crypto import verify_encryption_keys
-        verify_encryption_keys()
+    # Verify encryption keys — delegates to injected FieldCrypto
+    from app.deps import get_field_crypto
+    get_field_crypto().verify()
 
     yield
 
@@ -75,16 +74,19 @@ async def ready():
     except Exception:
         checks["redis"] = "fail"
 
-    # LLM (HEAD probe to OpenAI)
-    try:
-        import httpx
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            r = await client.get("https://api.openai.com/v1/models", headers={"Authorization": f"Bearer {settings.openai_api_key}"})
-            checks["llm"] = "ok" if r.status_code < 500 else "fail"
-    except Exception:
-        checks["llm"] = "fail"
+    # LLM (HEAD probe to OpenAI — skip if no key configured)
+    if settings.openai_api_key:
+        try:
+            import httpx
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                r = await client.get("https://api.openai.com/v1/models", headers={"Authorization": f"Bearer {settings.openai_api_key}"})
+                checks["llm"] = "ok" if r.status_code < 500 else "fail"
+        except Exception:
+            checks["llm"] = "fail"
+    else:
+        checks["llm"] = "skip"
 
-    all_ok = all(v == "ok" for v in checks.values())
+    all_ok = all(v in ("ok", "skip") for v in checks.values())
     return JSONResponse(content=checks, status_code=200 if all_ok else 503)
 
 

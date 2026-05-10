@@ -37,7 +37,7 @@
     }
   ],
   "externally_connectable": {
-    "matches": ["https://findwith.com/*", "http://localhost:3000/*"]
+    "matches": ["https://findwith.com/*", "http://localhost:14666/*"]
   },
   "action": {
     "default_title": "FindWith"

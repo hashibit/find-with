@@ -66,3 +66,12 @@ extension/src/shared/proto/
 
 # Docker
 docker-compose.override.yml
+
+# Claude Code harness session state (auto-generated, not product code).
+# cccombat/ccissue/memory/agent-memory are intentionally tracked.
+.claude/logs/
+.claude/sessions/.last_inbox_check
+.claude/state/session.json
+.claude/state/session.events.jsonl
+.claude/state/tool-failure-counter.txt
+backend/.claude/

@@ -94,8 +94,13 @@ class QuotaService:
         )
         usage = counter.scalar_one_or_none()
         if not usage:
-            # Create counter
-            usage = QuotaUsageCounter(user_id=user_id)
+            # Create counter — set defaults explicitly so the in-memory check
+            # below (tailoring_completed >= tailoring_limit) works before flush.
+            usage = QuotaUsageCounter(
+                user_id=user_id,
+                tailoring_completed=0,
+                tailoring_limit=3,
+            )
             self.session.add(usage)
 
         if usage.tailoring_completed >= usage.tailoring_limit:

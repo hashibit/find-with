@@ -139,16 +139,31 @@ async def execute_purge_step(
             return True
 
         elif step == "hard_delete_data":
-            # Cascade delete all domain data
+            # Cascade delete all domain data.
+            # Some tables don't have user_id and must be scoped via a parent.
+            # Delete these BEFORE their parents so the subqueries still resolve.
+            scoped_deletes = [
+                # (table, parent_fk, parent_table)
+                ("jobs_parsed_jds",     "capture_id",          "jobs_captures"),
+                ("conv_messages",       "conversation_id",     "conv_conversations"),
+                ("tailoring_snapshots", "tailored_resume_id",  "tailoring_resumes"),
+            ]
+            for tbl, fk, parent in scoped_deletes:
+                await session.execute(
+                    text(
+                        f"DELETE FROM {tbl} "
+                        f"WHERE {fk} IN (SELECT id FROM {parent} WHERE user_id = :uid)"
+                    ),
+                    {"uid": user_id},
+                )
+
             tables = [
                 "profile_materials", "profile_skills", "profile_projects",
                 "profile_work_experiences", "profile_education",
                 "profile_resume_sources", "profile_base_resumes", "profile_profiles",
                 "jobs_match_results", "jobs_radar_items", "jobs_captures",
-                "jobs_parsed_jds",
-                "conv_messages",  # Must delete before conversations (FK-like)
                 "conv_conversations",
-                "tailoring_snapshots", "tailoring_resumes",
+                "tailoring_resumes",
                 "apply_applications", "apply_fill_plans",
                 "followup_drafts", "followup_emails",
                 "reco_recommendations",

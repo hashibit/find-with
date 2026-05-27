@@ -2,16 +2,16 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Observable, Subject } from 'rxjs';
-import { ConvMessage } from '../database/entities/conversation/message.entity';
-import { ConvConversation } from '../database/entities/conversation/conversation.entity';
-import { LlmService, MODEL_WRITE, ToolDef, LLMMessage } from '../llm/llm.service';
-import { ContextBuilderService } from './context-builder.service';
-import { SearchCompanyTool } from './tools/search-company.tool';
-import { MineShiningPointTool } from './tools/mine-shining-point.tool';
-import { DraftMotivationTool } from './tools/draft-motivation.tool';
-import { ClassifyEmailTool } from './tools/classify-email.tool';
-import { DraftReplyTool } from './tools/draft-reply.tool';
-import { SetConversationDensityTool } from './tools/set-conversation-density.tool';
+import { ConvMessage } from '../database/entities/conversation/message.entity.js';
+import { ConvConversation } from '../database/entities/conversation/conversation.entity.js';
+import { LlmService, MODEL_WRITE, ToolDef, LLMMessage } from '../llm/llm.service.js';
+import { ContextBuilderService } from './context-builder.service.js';
+import { SearchCompanyTool } from './tools/search-company.tool.js';
+import { MineShiningPointTool } from './tools/mine-shining-point.tool.js';
+import { DraftMotivationTool } from './tools/draft-motivation.tool.js';
+import { ClassifyEmailTool } from './tools/classify-email.tool.js';
+import { DraftReplyTool } from './tools/draft-reply.tool.js';
+import { SetConversationDensityTool } from './tools/set-conversation-density.tool.js';
 import { ulid } from 'ulid';
 
 export interface AgentSseEvent {

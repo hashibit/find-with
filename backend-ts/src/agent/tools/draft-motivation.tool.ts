@@ -2,8 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Type } from '@sinclair/typebox';
-import { JobParsedJd } from '../../database/entities/jobs/parsed-jd.entity';
-import { LlmService, MODEL_WRITE } from '../../llm/llm.service';
+import { JobParsedJd } from '../../database/entities/jobs/parsed-jd.entity.js';
+import { LlmService, MODEL_WRITE } from '../../llm/llm.service.js';
 
 export const DRAFT_MOTIVATION_TOOL_NAME = 'draft_motivation';
 

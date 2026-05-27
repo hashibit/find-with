@@ -1,5 +1,5 @@
 import { Column, Entity, Index } from 'typeorm';
-import { BaseEntity } from '../base.entity';
+import { BaseEntity } from '../base.entity.js';
 
 @Entity('reco_recommendations')
 export class RecoRecommendation extends BaseEntity {

@@ -1,5 +1,5 @@
 import { Column, Entity, Index } from 'typeorm';
-import { BaseEntity } from '../base.entity';
+import { BaseEntity } from '../base.entity.js';
 
 @Entity('profile_base_resumes')
 export class ProfileBaseResume extends BaseEntity {

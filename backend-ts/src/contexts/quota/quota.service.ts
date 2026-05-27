@@ -1,8 +1,8 @@
 import { Injectable, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { QuotaUsageCounter } from '../../database/entities/quota/quota-counter.entity';
-import { QuotaConsumeLog } from '../../database/entities/quota/quota-log.entity';
+import { QuotaUsageCounter } from '../../database/entities/quota/quota-counter.entity.js';
+import { QuotaConsumeLog } from '../../database/entities/quota/quota-log.entity.js';
 import { ulid } from 'ulid';
 
 @Injectable()

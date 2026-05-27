@@ -3,10 +3,10 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
-import { JobCapture } from '../../database/entities/jobs/job-capture.entity';
-import { JobParsedJd } from '../../database/entities/jobs/parsed-jd.entity';
-import { JobMatchResult } from '../../database/entities/jobs/match-result.entity';
-import { JobRadarItem } from '../../database/entities/jobs/radar-item.entity';
+import { JobCapture } from '../../database/entities/jobs/job-capture.entity.js';
+import { JobParsedJd } from '../../database/entities/jobs/parsed-jd.entity.js';
+import { JobMatchResult } from '../../database/entities/jobs/match-result.entity.js';
+import { JobRadarItem } from '../../database/entities/jobs/radar-item.entity.js';
 import { ulid } from 'ulid';
 
 export const JOB_ANALYZE_QUEUE = 'JOB_ANALYZE';

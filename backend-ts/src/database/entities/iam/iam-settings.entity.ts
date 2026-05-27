@@ -1,5 +1,5 @@
 import { Column, Entity } from 'typeorm';
-import { UserOwnedSingletonEntity } from '../base.entity';
+import { UserOwnedSingletonEntity } from '../base.entity.js';
 
 @Entity('iam_settings')
 export class IamSettings extends UserOwnedSingletonEntity {

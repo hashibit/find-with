@@ -1,21 +1,21 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
-import { IamController } from './iam.controller';
-import { IamService } from './iam.service';
-import { BillingController } from './billing.controller';
-import { BillingService } from './billing.service';
-import { IamUser } from '../../database/entities/iam/iam-user.entity';
-import { IamSettings } from '../../database/entities/iam/iam-settings.entity';
-import { BillingSubscription } from '../../database/entities/billing/subscription.entity';
-import { QuotaUsageCounter } from '../../database/entities/quota/quota-counter.entity';
-import { PAYMENT_GATEWAY } from '../../adapters/payment/payment.interface';
-import { StripePaymentAdapter } from '../../adapters/payment/stripe-payment.adapter';
-import { StubPaymentAdapter } from '../../adapters/payment/stub-payment.adapter';
-import { AppConfig } from '../../config/configuration';
-import { AUTH_VERIFIER } from '../../adapters/auth/auth.interface';
-import { ClerkAuthAdapter } from '../../adapters/auth/clerk-auth.adapter';
-import { DevAuthAdapter } from '../../adapters/auth/dev-auth.adapter';
+import { IamController } from './iam.controller.js';
+import { IamService } from './iam.service.js';
+import { BillingController } from './billing.controller.js';
+import { BillingService } from './billing.service.js';
+import { IamUser } from '../../database/entities/iam/iam-user.entity.js';
+import { IamSettings } from '../../database/entities/iam/iam-settings.entity.js';
+import { BillingSubscription } from '../../database/entities/billing/subscription.entity.js';
+import { QuotaUsageCounter } from '../../database/entities/quota/quota-counter.entity.js';
+import { PAYMENT_GATEWAY } from '../../adapters/payment/payment.interface.js';
+import { StripePaymentAdapter } from '../../adapters/payment/stripe-payment.adapter.js';
+import { StubPaymentAdapter } from '../../adapters/payment/stub-payment.adapter.js';
+import { AppConfig } from '../../config/configuration.js';
+import { AUTH_VERIFIER } from '../../adapters/auth/auth.interface.js';
+import { ClerkAuthAdapter } from '../../adapters/auth/clerk-auth.adapter.js';
+import { DevAuthAdapter } from '../../adapters/auth/dev-auth.adapter.js';
 
 @Module({
   imports: [

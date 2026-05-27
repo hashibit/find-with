@@ -1,9 +1,9 @@
 import { Body, Controller, Get, Patch, Post, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { IsOptional, IsString, IsIn } from 'class-validator';
-import { ClerkAuthGuard } from '../../common/guards/clerk-auth.guard';
-import { CurrentUser, AuthenticatedUser } from '../../common/decorators/current-user.decorator';
-import { IamService } from './iam.service';
+import { ClerkAuthGuard } from '../../common/guards/clerk-auth.guard.js';
+import { CurrentUser, AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
+import { IamService } from './iam.service.js';
 
 class UpsertUserDto {
   @IsString()

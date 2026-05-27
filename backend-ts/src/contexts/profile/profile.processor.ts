@@ -5,14 +5,14 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as pdfParse from 'pdf-parse';
 import * as mammoth from 'mammoth';
-import { ProfileResumeSource } from '../../database/entities/profile/resume-source.entity';
-import { ProfileProfile } from '../../database/entities/profile/profile.entity';
-import { ProfileEducation } from '../../database/entities/profile/education.entity';
-import { ProfileWorkExperience } from '../../database/entities/profile/work-experience.entity';
-import { ProfileSkill } from '../../database/entities/profile/skill.entity';
-import { STORAGE, Storage } from '../../adapters/storage/storage.interface';
-import { LlmService, MODEL_PARSE } from '../../llm/llm.service';
-import { RESUME_PARSE_QUEUE } from './profile.service';
+import { ProfileResumeSource } from '../../database/entities/profile/resume-source.entity.js';
+import { ProfileProfile } from '../../database/entities/profile/profile.entity.js';
+import { ProfileEducation } from '../../database/entities/profile/education.entity.js';
+import { ProfileWorkExperience } from '../../database/entities/profile/work-experience.entity.js';
+import { ProfileSkill } from '../../database/entities/profile/skill.entity.js';
+import { STORAGE, Storage } from '../../adapters/storage/storage.interface.js';
+import { LlmService, MODEL_PARSE } from '../../llm/llm.service.js';
+import { RESUME_PARSE_QUEUE } from './profile.service.js';
 import { ulid } from 'ulid';
 
 interface ParsedResume {

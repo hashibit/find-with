@@ -5,10 +5,10 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
 import { IsOptional, IsString, IsArray, IsIn } from 'class-validator';
-import { ClerkAuthGuard } from '../../common/guards/clerk-auth.guard';
-import { CurrentUser, AuthenticatedUser } from '../../common/decorators/current-user.decorator';
-import { ProfileService } from './profile.service';
-import { STORAGE, Storage } from '../../adapters/storage/storage.interface';
+import { ClerkAuthGuard } from '../../common/guards/clerk-auth.guard.js';
+import { CurrentUser, AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
+import { ProfileService } from './profile.service.js';
+import { STORAGE, Storage } from '../../adapters/storage/storage.interface.js';
 import { Inject } from '@nestjs/common';
 import { ulid } from 'ulid';
 

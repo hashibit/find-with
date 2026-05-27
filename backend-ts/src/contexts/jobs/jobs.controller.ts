@@ -1,9 +1,9 @@
 import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { IsIn, IsOptional, IsString } from 'class-validator';
-import { ClerkAuthGuard } from '../../common/guards/clerk-auth.guard';
-import { CurrentUser, AuthenticatedUser } from '../../common/decorators/current-user.decorator';
-import { JobsService } from './jobs.service';
+import { ClerkAuthGuard } from '../../common/guards/clerk-auth.guard.js';
+import { CurrentUser, AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
+import { JobsService } from './jobs.service.js';
 
 class CaptureJobDto {
   @IsString() source: string;

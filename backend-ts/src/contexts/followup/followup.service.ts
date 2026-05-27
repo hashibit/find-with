@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { FollowupEmail } from '../../database/entities/followup/followup-email.entity';
-import { FollowupDraft } from '../../database/entities/followup/followup-draft.entity';
-import { FIELD_CRYPTO, FieldCrypto } from '../../common/crypto/crypto.interface';
+import { FollowupEmail } from '../../database/entities/followup/followup-email.entity.js';
+import { FollowupDraft } from '../../database/entities/followup/followup-draft.entity.js';
+import { FIELD_CRYPTO, FieldCrypto } from '../../common/crypto/crypto.interface.js';
 import { Inject } from '@nestjs/common';
 import { ulid } from 'ulid';
 

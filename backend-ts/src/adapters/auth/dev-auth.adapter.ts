@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { AuthVerifier, VerifiedToken } from './auth.interface';
+import { AuthVerifier, VerifiedToken } from './auth.interface.js';
 
 /**
  * Dev-only: treats the raw token string as the userId.

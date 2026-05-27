@@ -1,5 +1,5 @@
 import { Column, Entity, Index } from 'typeorm';
-import { BaseEntity } from '../base.entity';
+import { BaseEntity } from '../base.entity.js';
 
 @Entity('telemetry_events')
 export class TelemetryEvent extends BaseEntity {

@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
-import { AppConfig } from '../config/configuration';
+import { AppConfig } from '../config/configuration.js';
 
 export const MODEL_PARSE = 'gpt-4.1-mini';
 export const MODEL_WRITE = 'gpt-4.1';

@@ -2,8 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Type } from '@sinclair/typebox';
-import { JobCompanyBrief } from '../../database/entities/jobs/company-brief.entity';
-import { LlmService, MODEL_PARSE } from '../../llm/llm.service';
+import { JobCompanyBrief } from '../../database/entities/jobs/company-brief.entity.js';
+import { LlmService, MODEL_PARSE } from '../../llm/llm.service.js';
 import { ulid } from 'ulid';
 
 export const SEARCH_COMPANY_TOOL_NAME = 'search_company';

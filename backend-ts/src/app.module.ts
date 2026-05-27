@@ -3,21 +3,21 @@ import { ConfigService } from '@nestjs/config';
 import { BullModule } from '@nestjs/bullmq';
 import { LoggerModule } from 'nestjs-pino';
 import { ThrottlerModule } from '@nestjs/throttler';
-import { AppConfigModule } from './config/config.module';
-import { DatabaseModule } from './database/database.module';
-import { RedisModule } from './redis/redis.module';
-import { LlmModule } from './llm/llm.module';
-import { QuotaModule } from './contexts/quota/quota.module';
-import { IamModule } from './contexts/iam/iam.module';
-import { ProfileModule } from './contexts/profile/profile.module';
-import { JobsModule } from './contexts/jobs/jobs.module';
-import { ConversationModule } from './contexts/conversation/conversation.module';
-import { TailoringModule } from './contexts/tailoring/tailoring.module';
-import { ApplyModule } from './contexts/apply/apply.module';
-import { FollowupModule } from './contexts/followup/followup.module';
-import { RecommendationModule } from './contexts/recommendation/recommendation.module';
-import { InfraModule } from './contexts/infra/infra.module';
-import { AppConfig } from './config/configuration';
+import { AppConfigModule } from './config/config.module.js';
+import { DatabaseModule } from './database/database.module.js';
+import { RedisModule } from './redis/redis.module.js';
+import { LlmModule } from './llm/llm.module.js';
+import { QuotaModule } from './contexts/quota/quota.module.js';
+import { IamModule } from './contexts/iam/iam.module.js';
+import { ProfileModule } from './contexts/profile/profile.module.js';
+import { JobsModule } from './contexts/jobs/jobs.module.js';
+import { ConversationModule } from './contexts/conversation/conversation.module.js';
+import { TailoringModule } from './contexts/tailoring/tailoring.module.js';
+import { ApplyModule } from './contexts/apply/apply.module.js';
+import { FollowupModule } from './contexts/followup/followup.module.js';
+import { RecommendationModule } from './contexts/recommendation/recommendation.module.js';
+import { InfraModule } from './contexts/infra/infra.module.js';
+import { AppConfig } from './config/configuration.js';
 
 @Module({
   imports: [

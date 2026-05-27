@@ -1,14 +1,14 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
-import { FollowupController } from './followup.controller';
-import { FollowupService } from './followup.service';
-import { FollowupEmail } from '../../database/entities/followup/followup-email.entity';
-import { FollowupDraft } from '../../database/entities/followup/followup-draft.entity';
-import { FIELD_CRYPTO } from '../../common/crypto/crypto.interface';
-import { EnvelopeCryptoService } from '../../common/crypto/envelope-crypto.service';
-import { EphemeralCryptoService } from '../../common/crypto/ephemeral-crypto.service';
-import { AppConfig } from '../../config/configuration';
+import { FollowupController } from './followup.controller.js';
+import { FollowupService } from './followup.service.js';
+import { FollowupEmail } from '../../database/entities/followup/followup-email.entity.js';
+import { FollowupDraft } from '../../database/entities/followup/followup-draft.entity.js';
+import { FIELD_CRYPTO } from '../../common/crypto/crypto.interface.js';
+import { EnvelopeCryptoService } from '../../common/crypto/envelope-crypto.service.js';
+import { EphemeralCryptoService } from '../../common/crypto/ephemeral-crypto.service.js';
+import { AppConfig } from '../../config/configuration.js';
 
 @Module({
   imports: [TypeOrmModule.forFeature([FollowupEmail, FollowupDraft])],

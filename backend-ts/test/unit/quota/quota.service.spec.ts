@@ -1,24 +1,25 @@
+import { vi } from 'vitest';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { ForbiddenException } from '@nestjs/common';
-import { QuotaService } from '../../../src/contexts/quota/quota.service';
-import { QuotaUsageCounter } from '../../../src/database/entities/quota/quota-counter.entity';
-import { QuotaConsumeLog } from '../../../src/database/entities/quota/quota-log.entity';
+import { QuotaService } from '../../../src/contexts/quota/quota.service.js';
+import { QuotaUsageCounter } from '../../../src/database/entities/quota/quota-counter.entity.js';
+import { QuotaConsumeLog } from '../../../src/database/entities/quota/quota-log.entity.js';
 
 const mockCounter = (override: Partial<QuotaUsageCounter> = {}): QuotaUsageCounter =>
   ({ userId: 'user_01', tailoringCompleted: 0, tailoringLimit: 3, windowStart: new Date(), ...override } as QuotaUsageCounter);
 
 const mockRepo = (entity: unknown) => ({
-  findOne: jest.fn(),
-  create: jest.fn().mockImplementation((data) => data),
-  save: jest.fn().mockImplementation((e) => Promise.resolve(e)),
-  upsert: jest.fn().mockResolvedValue(undefined),
+  findOne: vi.fn(),
+  create: vi.fn().mockImplementation((data) => data),
+  save: vi.fn().mockImplementation((e) => Promise.resolve(e)),
+  upsert: vi.fn().mockResolvedValue(undefined),
   manager: {
-    transaction: jest.fn().mockImplementation((cb: (em: unknown) => Promise<void>) =>
+    transaction: vi.fn().mockImplementation((cb: (em: unknown) => Promise<void>) =>
       cb({
-        increment: jest.fn().mockResolvedValue(undefined),
-        save: jest.fn().mockResolvedValue(undefined),
-        create: jest.fn().mockReturnValue({}),
+        increment: vi.fn().mockResolvedValue(undefined),
+        save: vi.fn().mockResolvedValue(undefined),
+        create: vi.fn().mockReturnValue({}),
       }),
     ),
   },

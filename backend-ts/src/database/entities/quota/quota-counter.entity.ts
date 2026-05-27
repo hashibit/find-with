@@ -1,5 +1,5 @@
 import { Column, Entity } from 'typeorm';
-import { UserOwnedSingletonEntity } from '../base.entity';
+import { UserOwnedSingletonEntity } from '../base.entity.js';
 
 @Entity('quota_usage_counters')
 export class QuotaUsageCounter extends UserOwnedSingletonEntity {

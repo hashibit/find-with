@@ -2,9 +2,9 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Type } from '@sinclair/typebox';
-import { ProfileMaterial } from '../../database/entities/profile/material.entity';
-import { LlmService, MODEL_WRITE } from '../../llm/llm.service';
-import { FIELD_CRYPTO, FieldCrypto } from '../../common/crypto/crypto.interface';
+import { ProfileMaterial } from '../../database/entities/profile/material.entity.js';
+import { LlmService, MODEL_WRITE } from '../../llm/llm.service.js';
+import { FIELD_CRYPTO, FieldCrypto } from '../../common/crypto/crypto.interface.js';
 import { Inject } from '@nestjs/common';
 import { ulid } from 'ulid';
 

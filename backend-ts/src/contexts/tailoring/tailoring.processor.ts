@@ -3,12 +3,12 @@ import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { TailoringResume } from '../../database/entities/tailoring/tailoring-resume.entity';
-import { JobParsedJd } from '../../database/entities/jobs/parsed-jd.entity';
-import { ProfileBaseResume } from '../../database/entities/profile/base-resume.entity';
-import { ProfileMaterial } from '../../database/entities/profile/material.entity';
-import { LlmService, MODEL_WRITE } from '../../llm/llm.service';
-import { TAILORING_QUEUE } from './tailoring.service';
+import { TailoringResume } from '../../database/entities/tailoring/tailoring-resume.entity.js';
+import { JobParsedJd } from '../../database/entities/jobs/parsed-jd.entity.js';
+import { ProfileBaseResume } from '../../database/entities/profile/base-resume.entity.js';
+import { ProfileMaterial } from '../../database/entities/profile/material.entity.js';
+import { LlmService, MODEL_WRITE } from '../../llm/llm.service.js';
+import { TAILORING_QUEUE } from './tailoring.service.js';
 import { ulid } from 'ulid';
 
 @Processor(TAILORING_QUEUE)

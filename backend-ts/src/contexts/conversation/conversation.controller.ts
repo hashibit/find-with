@@ -10,10 +10,10 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Observable, map } from 'rxjs';
-import { ClerkAuthGuard } from '../../common/guards/clerk-auth.guard';
-import { CurrentUser, AuthenticatedUser } from '../../common/decorators/current-user.decorator';
-import { ConversationService } from './conversation.service';
-import { AgentService } from '../../agent/agent.service';
+import { ClerkAuthGuard } from '../../common/guards/clerk-auth.guard.js';
+import { CurrentUser, AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
+import { ConversationService } from './conversation.service.js';
+import { AgentService } from '../../agent/agent.service.js';
 import { IsOptional, IsString, IsIn } from 'class-validator';
 
 class CreateConversationDto {

@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 import { DataSource } from 'typeorm';
-import { ALL_ENTITIES } from './database.module';
+import { ALL_ENTITIES } from './database.module.js';
 
 // Used by TypeORM CLI for migrations
 export const AppDataSource = new DataSource({

@@ -6,10 +6,10 @@ import Stripe from 'stripe';
 import { Webhook } from 'svix';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { TelemetryEvent } from '../../database/entities/telemetry/telemetry-event.entity';
-import { IamService } from '../iam/iam.service';
-import { BillingService } from '../iam/billing.service';
-import { AppConfig } from '../../config/configuration';
+import { TelemetryEvent } from '../../database/entities/telemetry/telemetry-event.entity.js';
+import { IamService } from '../iam/iam.service.js';
+import { BillingService } from '../iam/billing.service.js';
+import { AppConfig } from '../../config/configuration.js';
 import { ulid } from 'ulid';
 
 @ApiTags('infra')

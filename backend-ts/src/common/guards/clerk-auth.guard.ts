@@ -6,7 +6,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Request } from 'express';
-import { AUTH_VERIFIER, AuthVerifier } from '../../adapters/auth/auth.interface';
+import { AUTH_VERIFIER, AuthVerifier } from '../../adapters/auth/auth.interface.js';
 
 @Injectable()
 export class ClerkAuthGuard implements CanActivate {

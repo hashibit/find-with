@@ -3,14 +3,14 @@ import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { JobCapture } from '../../database/entities/jobs/job-capture.entity';
-import { JobParsedJd } from '../../database/entities/jobs/parsed-jd.entity';
-import { JobCompanyBrief } from '../../database/entities/jobs/company-brief.entity';
-import { JobMatchResult } from '../../database/entities/jobs/match-result.entity';
-import { JobRadarItem } from '../../database/entities/jobs/radar-item.entity';
-import { ProfileMaterial } from '../../database/entities/profile/material.entity';
-import { LlmService, MODEL_PARSE } from '../../llm/llm.service';
-import { JOB_ANALYZE_QUEUE } from './jobs.service';
+import { JobCapture } from '../../database/entities/jobs/job-capture.entity.js';
+import { JobParsedJd } from '../../database/entities/jobs/parsed-jd.entity.js';
+import { JobCompanyBrief } from '../../database/entities/jobs/company-brief.entity.js';
+import { JobMatchResult } from '../../database/entities/jobs/match-result.entity.js';
+import { JobRadarItem } from '../../database/entities/jobs/radar-item.entity.js';
+import { ProfileMaterial } from '../../database/entities/profile/material.entity.js';
+import { LlmService, MODEL_PARSE } from '../../llm/llm.service.js';
+import { JOB_ANALYZE_QUEUE } from './jobs.service.js';
 import { ulid } from 'ulid';
 
 @Processor(JOB_ANALYZE_QUEUE)

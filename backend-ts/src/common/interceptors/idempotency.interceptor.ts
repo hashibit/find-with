@@ -8,8 +8,8 @@ import { Request, Response } from 'express';
 import { Observable, tap } from 'rxjs';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { IdempotencyKey } from '../../database/entities/idempotency/idempotency-key.entity';
-import { AuthenticatedUser } from '../decorators/current-user.decorator';
+import { IdempotencyKey } from '../../database/entities/idempotency/idempotency-key.entity.js';
+import { AuthenticatedUser } from '../decorators/current-user.decorator.js';
 import { ulid } from 'ulid';
 
 const TTL_MS = 24 * 60 * 60 * 1000; // 24 hours

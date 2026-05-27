@@ -1,8 +1,8 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { ConvConversation } from '../../database/entities/conversation/conversation.entity';
-import { ConvMessage } from '../../database/entities/conversation/message.entity';
+import { ConvConversation } from '../../database/entities/conversation/conversation.entity.js';
+import { ConvMessage } from '../../database/entities/conversation/message.entity.js';
 import { ulid } from 'ulid';
 
 @Injectable()

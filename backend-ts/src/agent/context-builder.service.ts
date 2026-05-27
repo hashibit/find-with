@@ -1,12 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { ConvMessage } from '../database/entities/conversation/message.entity';
-import { ConvConversation } from '../database/entities/conversation/conversation.entity';
-import { ProfileProfile } from '../database/entities/profile/profile.entity';
-import { ProfileMaterial } from '../database/entities/profile/material.entity';
-import { LLMMessage } from '../llm/llm.service';
-import { FIELD_CRYPTO, FieldCrypto } from '../common/crypto/crypto.interface';
+import { ConvMessage } from '../database/entities/conversation/message.entity.js';
+import { ConvConversation } from '../database/entities/conversation/conversation.entity.js';
+import { ProfileProfile } from '../database/entities/profile/profile.entity.js';
+import { ProfileMaterial } from '../database/entities/profile/material.entity.js';
+import { LLMMessage } from '../llm/llm.service.js';
+import { FIELD_CRYPTO, FieldCrypto } from '../common/crypto/crypto.interface.js';
 import { Inject } from '@nestjs/common';
 
 const QUINN_SYSTEM_PROMPT = `You are Quinn, an AI job search companion built into the FindWith Chrome extension. The user is a job seeker in North America.

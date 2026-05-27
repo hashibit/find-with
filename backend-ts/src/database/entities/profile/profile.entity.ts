@@ -1,5 +1,5 @@
 import { Column, Entity } from 'typeorm';
-import { UserOwnedSingletonEntity } from '../base.entity';
+import { UserOwnedSingletonEntity } from '../base.entity.js';
 
 @Entity('profile_profiles')
 export class ProfileProfile extends UserOwnedSingletonEntity {

@@ -1,10 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { IamUser } from '../../database/entities/iam/iam-user.entity';
-import { IamSettings } from '../../database/entities/iam/iam-settings.entity';
-import { QuotaUsageCounter } from '../../database/entities/quota/quota-counter.entity';
-import { BillingSubscription } from '../../database/entities/billing/subscription.entity';
+import { IamUser } from '../../database/entities/iam/iam-user.entity.js';
+import { IamSettings } from '../../database/entities/iam/iam-settings.entity.js';
+import { QuotaUsageCounter } from '../../database/entities/quota/quota-counter.entity.js';
+import { BillingSubscription } from '../../database/entities/billing/subscription.entity.js';
 import { ulid } from 'ulid';
 
 @Injectable()

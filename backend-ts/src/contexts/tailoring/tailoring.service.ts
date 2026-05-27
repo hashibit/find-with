@@ -3,9 +3,9 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
-import { TailoringResume } from '../../database/entities/tailoring/tailoring-resume.entity';
-import { TailoringSnapshot } from '../../database/entities/tailoring/tailoring-snapshot.entity';
-import { QuotaService } from '../quota/quota.service';
+import { TailoringResume } from '../../database/entities/tailoring/tailoring-resume.entity.js';
+import { TailoringSnapshot } from '../../database/entities/tailoring/tailoring-snapshot.entity.js';
+import { QuotaService } from '../quota/quota.service.js';
 import { ulid } from 'ulid';
 
 export const TAILORING_QUEUE = 'TAILORING';

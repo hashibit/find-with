@@ -75,3 +75,4 @@ docker-compose.override.yml
 .claude/state/session.events.jsonl
 .claude/state/tool-failure-counter.txt
 backend/.claude/
+.claude

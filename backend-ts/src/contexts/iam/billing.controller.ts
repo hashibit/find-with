@@ -1,9 +1,9 @@
 import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { IsString } from 'class-validator';
-import { ClerkAuthGuard } from '../../common/guards/clerk-auth.guard';
-import { CurrentUser, AuthenticatedUser } from '../../common/decorators/current-user.decorator';
-import { BillingService } from './billing.service';
+import { ClerkAuthGuard } from '../../common/guards/clerk-auth.guard.js';
+import { CurrentUser, AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
+import { BillingService } from './billing.service.js';
 
 class CreateCheckoutDto {
   @IsString() priceId: string;

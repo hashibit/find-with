@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Type, Static } from '@sinclair/typebox';
-import { ConvConversation } from '../../database/entities/conversation/conversation.entity';
+import { ConvConversation } from '../../database/entities/conversation/conversation.entity.js';
 
 export const SET_CONVERSATION_DENSITY_TOOL_NAME = 'set_conversation_density';
 

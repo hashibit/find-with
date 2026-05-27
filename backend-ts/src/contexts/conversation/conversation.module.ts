@@ -1,10 +1,10 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { ConversationController } from './conversation.controller';
-import { ConversationService } from './conversation.service';
-import { ConvConversation } from '../../database/entities/conversation/conversation.entity';
-import { ConvMessage } from '../../database/entities/conversation/message.entity';
-import { AgentModule } from '../../agent/agent.module';
+import { ConversationController } from './conversation.controller.js';
+import { ConversationService } from './conversation.service.js';
+import { ConvConversation } from '../../database/entities/conversation/conversation.entity.js';
+import { ConvMessage } from '../../database/entities/conversation/message.entity.js';
+import { AgentModule } from '../../agent/agent.module.js';
 
 @Module({
   imports: [

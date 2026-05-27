@@ -2,9 +2,9 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Type } from '@sinclair/typebox';
-import { FollowupEmail } from '../../database/entities/followup/followup-email.entity';
-import { LlmService, MODEL_PARSE } from '../../llm/llm.service';
-import { FIELD_CRYPTO, FieldCrypto } from '../../common/crypto/crypto.interface';
+import { FollowupEmail } from '../../database/entities/followup/followup-email.entity.js';
+import { LlmService, MODEL_PARSE } from '../../llm/llm.service.js';
+import { FIELD_CRYPTO, FieldCrypto } from '../../common/crypto/crypto.interface.js';
 import { Inject } from '@nestjs/common';
 
 export const CLASSIFY_EMAIL_TOOL_NAME = 'classify_email';

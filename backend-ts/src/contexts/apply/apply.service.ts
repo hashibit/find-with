@@ -1,11 +1,11 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { ApplyFillPlan } from '../../database/entities/apply/fill-plan.entity';
-import { ApplyApplication } from '../../database/entities/apply/application.entity';
-import { JobRadarItem } from '../../database/entities/jobs/radar-item.entity';
-import { JobParsedJd } from '../../database/entities/jobs/parsed-jd.entity';
-import { LlmService, MODEL_WRITE } from '../../llm/llm.service';
+import { ApplyFillPlan } from '../../database/entities/apply/fill-plan.entity.js';
+import { ApplyApplication } from '../../database/entities/apply/application.entity.js';
+import { JobRadarItem } from '../../database/entities/jobs/radar-item.entity.js';
+import { JobParsedJd } from '../../database/entities/jobs/parsed-jd.entity.js';
+import { LlmService, MODEL_WRITE } from '../../llm/llm.service.js';
 import { ulid } from 'ulid';
 
 @Injectable()

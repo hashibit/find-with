@@ -1,8 +1,8 @@
 import { Injectable, NotFoundException, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { BillingSubscription } from '../../database/entities/billing/subscription.entity';
-import { PAYMENT_GATEWAY, PaymentGateway } from '../../adapters/payment/payment.interface';
+import { BillingSubscription } from '../../database/entities/billing/subscription.entity.js';
+import { PAYMENT_GATEWAY, PaymentGateway } from '../../adapters/payment/payment.interface.js';
 
 @Injectable()
 export class BillingService {

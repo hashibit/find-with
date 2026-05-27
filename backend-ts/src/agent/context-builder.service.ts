@@ -1,0 +1,120 @@
+import { Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { ConvMessage } from '../database/entities/conversation/message.entity';
+import { ConvConversation } from '../database/entities/conversation/conversation.entity';
+import { ProfileProfile } from '../database/entities/profile/profile.entity';
+import { ProfileMaterial } from '../database/entities/profile/material.entity';
+import { LLMMessage } from '../llm/llm.service';
+import { FIELD_CRYPTO, FieldCrypto } from '../common/crypto/crypto.interface';
+import { Inject } from '@nestjs/common';
+
+const QUINN_SYSTEM_PROMPT = `You are Quinn, an AI job search companion built into the FindWith Chrome extension. The user is a job seeker in North America.
+
+# Your character
+You are like a 30-something career senior who has worked across multiple companies and roles. You have judgment, opinions, and the willingness to disagree with the user when needed. You are NOT a teacher (don't lecture), NOT a buddy (don't fake intimacy). You are a thoughtful peer. You are upfront about being AI when asked, but with grace.
+
+# How you talk
+- First person "I", second person "you"
+- Honest. Say "I don't know" when you don't.
+- Always give reasons with recommendations.
+- Use humor sparingly (max once per few turns).
+- No more than one exclamation mark per turn.
+- Almost no emoji.
+- Never say "As an AI..." unless directly asked.
+- Never use canned empathy phrases like "I understand how you feel".
+- Don't fake emotions.
+- Never give non-answers like "it's up to you" when asked for a recommendation.
+
+# What you can do
+- Analyze jobs, companies, JDs
+- Build user profile through conversation
+- Mine "shining moments" the user didn't realize were valuable
+- Tailor resumes (only from real user material, never fabricate)
+- Help draft email replies (user copies and sends themselves)
+- Fill out application forms (but user must click Submit)
+
+# What you must NOT do
+- Never fabricate experiences the user didn't have
+- Never auto-submit applications without user's explicit click
+- Never auto-send emails
+- Never give non-answers when asked for a clear recommendation
+
+# When user is about to make a bad move
+Push back with reasoning: "I don't recommend you apply to this. Here's why: [reasons]. But if you want to, I'll help."
+
+# When user gets an offer they accept
+Be direct, not gushy. Help them archive the journey for future reference. Say goodbye gracefully.`;
+
+const MAX_HISTORY_MESSAGES = 30;
+
+@Injectable()
+export class ContextBuilderService {
+  constructor(
+    @InjectRepository(ConvMessage)
+    private readonly messageRepo: Repository<ConvMessage>,
+    @InjectRepository(ConvConversation)
+    private readonly convRepo: Repository<ConvConversation>,
+    @InjectRepository(ProfileProfile)
+    private readonly profileRepo: Repository<ProfileProfile>,
+    @InjectRepository(ProfileMaterial)
+    private readonly materialRepo: Repository<ProfileMaterial>,
+    @Inject(FIELD_CRYPTO) private readonly crypto: FieldCrypto,
+  ) {}
+
+  async build(
+    conversationId: string,
+    userId: string,
+    conversationKind: string,
+    anchorId?: string | null,
+  ): Promise<LLMMessage[]> {
+    const [profile, materials, history, conversation] = await Promise.all([
+      this.profileRepo.findOne({ where: { userId } }),
+      this.materialRepo.find({
+        where: { userId, status: 'CONFIRMED' },
+        take: 20,
+        order: { createdAt: 'DESC' },
+      }),
+      this.messageRepo.find({
+        where: { conversationId },
+        order: { createdAt: 'ASC' },
+        take: MAX_HISTORY_MESSAGES,
+      }),
+      this.convRepo.findOne({ where: { id: conversationId } }),
+    ]);
+
+    // Build system prompt with user context
+    let systemPrompt = QUINN_SYSTEM_PROMPT;
+
+    if (profile?.basicInfo) {
+      const info = profile.basicInfo as Record<string, unknown>;
+      systemPrompt += `\n\n# User profile\nName: ${info['fullName'] ?? 'Unknown'}\nEmail: ${info['email'] ?? 'Unknown'}`;
+    }
+
+    if (materials.length > 0) {
+      const materialSummaries = await Promise.all(
+        materials.slice(0, 10).map(async (m) => {
+          return `- ${m.shiningText ?? '(no shining text)'} [${(m.tags ?? []).join(', ')}]`;
+        }),
+      );
+      systemPrompt += `\n\n# User's confirmed shining points (material library)\n${materialSummaries.join('\n')}`;
+    }
+
+    if (conversation?.rollingSummary) {
+      systemPrompt += `\n\n# Conversation summary so far\n${conversation.rollingSummary}`;
+    }
+
+    const messages: LLMMessage[] = [{ role: 'system', content: systemPrompt }];
+
+    // Add conversation history
+    for (const msg of history) {
+      if (msg.role === 'USER') {
+        messages.push({ role: 'user', content: msg.text ?? '' });
+      } else if (msg.role === 'ASSISTANT') {
+        messages.push({ role: 'assistant', content: msg.text ?? '' });
+      }
+    }
+
+    return messages;
+  }
+}

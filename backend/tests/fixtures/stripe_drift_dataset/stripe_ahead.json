@@ -1,6 +1,0 @@
-{
-    "_comment": "Stripe has subscription but DB does not",
-    "stripe_subscription_id": "sub_orphan_fixture",
-    "stripe_status": "active",
-    "expected_kind": "DB_MISSING"
-}

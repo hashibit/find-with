@@ -1,6 +1,6 @@
 import { Global, Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { configuration, validationSchema } from './configuration.js';
+import { configuration, validateEnv } from './configuration.js';
 
 @Global()
 @Module({
@@ -8,8 +8,7 @@ import { configuration, validationSchema } from './configuration.js';
     ConfigModule.forRoot({
       isGlobal: true,
       load: [configuration],
-      validationSchema,
-      validationOptions: { abortEarly: false },
+      validate: validateEnv,
     }),
   ],
 })

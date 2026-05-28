@@ -1,4 +1,29 @@
-import * as Joi from 'joi';
+import { z } from 'zod';
+
+const envSchema = z.object({
+  PORT: z.coerce.number().default(3000),
+  NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+  DATABASE_URL: z.string().url(),
+  REDIS_URL: z.string().url(),
+  S3_BUCKET: z.string().min(1),
+  S3_ACCESS_KEY_ID: z.string().min(1),
+  S3_SECRET_ACCESS_KEY: z.string().min(1),
+  S3_REGION: z.string().default('us-east-1'),
+  S3_ENDPOINT: z.string().url().optional(),
+  OPENAI_API_KEY: z.string().min(1),
+  ANTHROPIC_API_KEY: z.string().min(1),
+  CLERK_SECRET_KEY: z.string().min(1),
+  CLERK_JWKS_URL: z.string().url(),
+  STRIPE_SECRET_KEY: z.string().min(1),
+  STRIPE_WEBHOOK_SECRET: z.string().min(1),
+  SVIX_SIGNING_SECRET: z.string().min(1),
+  SENTRY_DSN: z.string().optional(),
+  CRYPTO_KEK: z.string().min(1),
+  CRYPTO_DEK_CIPHERTEXT: z.string().min(1),
+  CORS_ORIGINS: z.string().default('http://localhost:3000'),
+});
+
+type Env = z.infer<typeof envSchema>;
 
 export interface AppConfig {
   port: number;
@@ -21,60 +46,51 @@ export interface AppConfig {
   cors: { origins: string[] };
 }
 
-export const configuration = (): AppConfig => ({
-  port: parseInt(process.env.PORT ?? '3000', 10),
-  env: (process.env.NODE_ENV as AppConfig['env']) ?? 'development',
-  database: { url: process.env.DATABASE_URL! },
-  redis: { url: process.env.REDIS_URL! },
-  s3: {
-    bucket: process.env.S3_BUCKET!,
-    accessKeyId: process.env.S3_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.S3_SECRET_ACCESS_KEY!,
-    region: process.env.S3_REGION ?? 'us-east-1',
-    endpoint: process.env.S3_ENDPOINT,
-  },
-  llm: {
-    openaiApiKey: process.env.OPENAI_API_KEY!,
-    anthropicApiKey: process.env.ANTHROPIC_API_KEY!,
-  },
-  clerk: {
-    secretKey: process.env.CLERK_SECRET_KEY!,
-    jwksUrl: process.env.CLERK_JWKS_URL!,
-  },
-  stripe: {
-    secretKey: process.env.STRIPE_SECRET_KEY!,
-    webhookSecret: process.env.STRIPE_WEBHOOK_SECRET!,
-  },
-  svix: { signingSecret: process.env.SVIX_SIGNING_SECRET! },
-  sentry: { dsn: process.env.SENTRY_DSN },
-  crypto: {
-    kek: process.env.CRYPTO_KEK!,
-    dekCiphertext: process.env.CRYPTO_DEK_CIPHERTEXT!,
-  },
-  cors: {
-    origins: (process.env.CORS_ORIGINS ?? 'http://localhost:3000').split(','),
-  },
-});
+export function validateEnv(raw: Record<string, unknown>): Env {
+  const result = envSchema.safeParse(raw);
+  if (!result.success) {
+    const messages = result.error.issues
+      .map((i) => `${i.path.join('.')}: ${i.message}`)
+      .join('\n');
+    throw new Error(`Environment validation failed:\n${messages}`);
+  }
+  return result.data;
+}
 
-export const validationSchema = Joi.object({
-  PORT: Joi.number().default(3000),
-  NODE_ENV: Joi.string().valid('development', 'production', 'test').default('development'),
-  DATABASE_URL: Joi.string().uri().required(),
-  REDIS_URL: Joi.string().uri().required(),
-  S3_BUCKET: Joi.string().required(),
-  S3_ACCESS_KEY_ID: Joi.string().required(),
-  S3_SECRET_ACCESS_KEY: Joi.string().required(),
-  S3_REGION: Joi.string().default('us-east-1'),
-  S3_ENDPOINT: Joi.string().uri().optional(),
-  OPENAI_API_KEY: Joi.string().required(),
-  ANTHROPIC_API_KEY: Joi.string().required(),
-  CLERK_SECRET_KEY: Joi.string().required(),
-  CLERK_JWKS_URL: Joi.string().uri().required(),
-  STRIPE_SECRET_KEY: Joi.string().required(),
-  STRIPE_WEBHOOK_SECRET: Joi.string().required(),
-  SVIX_SIGNING_SECRET: Joi.string().required(),
-  SENTRY_DSN: Joi.string().optional().allow(''),
-  CRYPTO_KEK: Joi.string().required(),
-  CRYPTO_DEK_CIPHERTEXT: Joi.string().required(),
-  CORS_ORIGINS: Joi.string().default('http://localhost:3000'),
-});
+export const configuration = (): AppConfig => {
+  const env = envSchema.parse(process.env);
+  return {
+    port: env.PORT,
+    env: env.NODE_ENV,
+    database: { url: env.DATABASE_URL },
+    redis: { url: env.REDIS_URL },
+    s3: {
+      bucket: env.S3_BUCKET,
+      accessKeyId: env.S3_ACCESS_KEY_ID,
+      secretAccessKey: env.S3_SECRET_ACCESS_KEY,
+      region: env.S3_REGION,
+      endpoint: env.S3_ENDPOINT,
+    },
+    llm: {
+      openaiApiKey: env.OPENAI_API_KEY,
+      anthropicApiKey: env.ANTHROPIC_API_KEY,
+    },
+    clerk: {
+      secretKey: env.CLERK_SECRET_KEY,
+      jwksUrl: env.CLERK_JWKS_URL,
+    },
+    stripe: {
+      secretKey: env.STRIPE_SECRET_KEY,
+      webhookSecret: env.STRIPE_WEBHOOK_SECRET,
+    },
+    svix: { signingSecret: env.SVIX_SIGNING_SECRET },
+    sentry: { dsn: env.SENTRY_DSN },
+    crypto: {
+      kek: env.CRYPTO_KEK,
+      dekCiphertext: env.CRYPTO_DEK_CIPHERTEXT,
+    },
+    cors: {
+      origins: env.CORS_ORIGINS.split(','),
+    },
+  };
+};

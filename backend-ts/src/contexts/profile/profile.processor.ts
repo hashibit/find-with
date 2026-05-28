@@ -3,7 +3,7 @@ import { Logger, Inject } from '@nestjs/common';
 import { Job } from 'bullmq';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import * as pdfParse from 'pdf-parse';
+import { extractText } from 'unpdf';
 import * as mammoth from 'mammoth';
 import { ProfileResumeSource } from '../../database/entities/profile/resume-source.entity.js';
 import { ProfileProfile } from '../../database/entities/profile/profile.entity.js';
@@ -56,8 +56,8 @@ export class ProfileProcessor extends WorkerHost {
       // Extract text
       let text = '';
       if (source.contentType === 'application/pdf') {
-        const parsed = await pdfParse(buffer);
-        text = parsed.text;
+        const { text: pages } = await extractText(new Uint8Array(buffer), { mergePages: true });
+        text = pages.join('\n');
       } else if (source.contentType.includes('word') || source.filename.endsWith('.docx')) {
         const result = await mammoth.extractRawText({ buffer });
         text = result.value;

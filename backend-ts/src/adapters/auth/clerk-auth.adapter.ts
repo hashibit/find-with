@@ -1,49 +1,31 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import * as jwt from 'jsonwebtoken';
-import JwksRsa from 'jwks-rsa';
+import { createRemoteJWKSet, jwtVerify } from 'jose';
 import { AppConfig } from '../../config/configuration.js';
 import { AuthVerifier, VerifiedToken } from './auth.interface.js';
 
 @Injectable()
 export class ClerkAuthAdapter implements AuthVerifier {
-  private readonly client: JwksRsa.JwksClient;
+  private readonly jwks: ReturnType<typeof createRemoteJWKSet>;
 
   constructor(private readonly config: ConfigService<AppConfig>) {
-    const clerkConfig = this.config.get('clerk', { infer: true })!;
-    this.client = JwksRsa({
-      jwksUri: clerkConfig.jwksUrl,
-      cache: true,
-      cacheMaxAge: 3600000, // 1 hour
-      rateLimit: true,
+    const { jwksUrl } = this.config.get('clerk', { infer: true })!;
+    this.jwks = createRemoteJWKSet(new URL(jwksUrl), {
+      cacheMaxAge: 3_600_000, // 1 hour
     });
   }
 
   async verify(token: string): Promise<VerifiedToken> {
-    return new Promise((resolve, reject) => {
-      jwt.verify(
-        token,
-        (header, callback) => {
-          this.client.getSigningKey(header.kid, (err, key) => {
-            if (err) return callback(err);
-            callback(null, key?.getPublicKey());
-          });
-        },
-        { algorithms: ['RS256'] },
-        (err, decoded) => {
-          if (err || !decoded) {
-            return reject(new UnauthorizedException('Invalid token'));
-          }
-          const payload = decoded as jwt.JwtPayload;
-          // Clerk stores the internal user ID in `sub`
-          const userId = payload['sub'] as string;
-          const email = payload['email'] as string | undefined;
-          if (!userId) {
-            return reject(new UnauthorizedException('Missing sub claim'));
-          }
-          resolve({ userId, email });
-        },
-      );
-    });
+    try {
+      const { payload } = await jwtVerify(token, this.jwks, {
+        algorithms: ['RS256'],
+      });
+      const userId = payload.sub;
+      if (!userId) throw new UnauthorizedException('Missing sub claim');
+      return { userId, email: payload['email'] as string | undefined };
+    } catch (err) {
+      if (err instanceof UnauthorizedException) throw err;
+      throw new UnauthorizedException('Invalid token');
+    }
   }
 }

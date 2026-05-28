@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Type } from '@sinclair/typebox';
 import { ProfileMaterial } from '../../database/entities/profile/material.entity.js';
-import { LlmService, MODEL_WRITE } from '../../llm/llm.service.js';
+import { LlmService } from '../../llm/llm.service.js';
 import { FIELD_CRYPTO, FieldCrypto } from '../../common/crypto/crypto.interface.js';
 import { Inject } from '@nestjs/common';
 import { ulid } from 'ulid';
@@ -44,10 +44,10 @@ Return JSON with:
 
 Example shiningText: "Redesigned onboarding process within first 60 days, reducing new-hire ramp time by 30%"`;
 
-    const raw = await this.llm.complete(MODEL_WRITE, [
-      { role: 'system', content: 'You are a career coach who extracts professional achievements. Respond only with valid JSON.' },
-      { role: 'user', content: prompt },
-    ]);
+    const raw = await this.llm.completeContext({
+      systemPrompt: 'You are a career coach who extracts professional achievements. Respond only with valid JSON.',
+      messages: [{ role: 'user', content: prompt }],
+    });
 
     let parsed: { shiningText?: string; rationale?: string; tags?: string[] } = {};
     try {

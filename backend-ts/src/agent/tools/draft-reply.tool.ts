@@ -4,7 +4,7 @@ import { Repository } from 'typeorm';
 import { Type, Static } from '@sinclair/typebox';
 import { FollowupEmail } from '../../database/entities/followup/followup-email.entity.js';
 import { FollowupDraft } from '../../database/entities/followup/followup-draft.entity.js';
-import { LlmService, MODEL_WRITE } from '../../llm/llm.service.js';
+import { LlmService } from '../../llm/llm.service.js';
 import { FIELD_CRYPTO, FieldCrypto } from '../../common/crypto/crypto.interface.js';
 import { Inject } from '@nestjs/common';
 import { ulid } from 'ulid';
@@ -62,15 +62,12 @@ export class DraftReplyTool {
       request_info: 'Ask for more information about the role, process, or next steps.',
     };
 
-    const draft = await this.llm.complete(MODEL_WRITE, [
-      {
-        role: 'system',
-        content: `You write professional email replies for job seekers. Quinn's style: direct, no fluff, authentic. ${intentPrompts[params.intent] ?? ''}`,
-      },
-      {
+    const draft = await this.llm.completeContext({
+      systemPrompt: `You write professional email replies for job seekers. Quinn's style: direct, no fluff, authentic. ${intentPrompts[params.intent] ?? ''}`,
+      messages: [{
         role: 'user',
         content: `Write a reply to this email:\n\nSubject: ${email.subject}\nFrom: ${email.fromAddr}\n\n${originalBody.slice(0, 1500)}\n\nIntent: ${params.intent}`,
-      },
+      }],
     ]);
 
     const saved = this.draftRepo.create({

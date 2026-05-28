@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Type } from '@sinclair/typebox';
 import { JobCompanyBrief } from '../../database/entities/jobs/company-brief.entity.js';
-import { LlmService, MODEL_PARSE } from '../../llm/llm.service.js';
+import { LlmService } from '../../llm/llm.service.js';
 import { ulid } from 'ulid';
 
 export const SEARCH_COMPANY_TOOL_NAME = 'search_company';
@@ -45,10 +45,10 @@ export class SearchCompanyTool {
 
 Respond as JSON with keys: whatTheyDo, sizeStage, recentNews (array), risks (object with: layoffs, regulatory, culture), glassdoorRating (number or null)`;
 
-    const raw = await this.llm.complete(MODEL_PARSE, [
-      { role: 'system', content: 'You are a company research assistant. Respond only with valid JSON.' },
-      { role: 'user', content: prompt },
-    ]);
+    const raw = await this.llm.completeContext({
+      systemPrompt: 'You are a company research assistant. Respond only with valid JSON.',
+      messages: [{ role: 'user', content: prompt }],
+    });
 
     let parsed: Record<string, unknown> = {};
     try {

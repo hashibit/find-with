@@ -1,13 +1,12 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { type Context } from '@earendil-works/pi-ai';
 import { ConvMessage } from '../database/entities/conversation/message.entity.js';
 import { ConvConversation } from '../database/entities/conversation/conversation.entity.js';
 import { ProfileProfile } from '../database/entities/profile/profile.entity.js';
 import { ProfileMaterial } from '../database/entities/profile/material.entity.js';
-import { LLMMessage } from '../llm/llm.service.js';
 import { FIELD_CRYPTO, FieldCrypto } from '../common/crypto/crypto.interface.js';
-import { Inject } from '@nestjs/common';
 
 const QUINN_SYSTEM_PROMPT = `You are Quinn, an AI job search companion built into the FindWith Chrome extension. The user is a job seeker in North America.
 
@@ -67,7 +66,7 @@ export class ContextBuilderService {
     userId: string,
     conversationKind: string,
     anchorId?: string | null,
-  ): Promise<LLMMessage[]> {
+  ): Promise<Context> {
     const [profile, materials, history, conversation] = await Promise.all([
       this.profileRepo.findOne({ where: { userId } }),
       this.materialRepo.find({
@@ -83,7 +82,6 @@ export class ContextBuilderService {
       this.convRepo.findOne({ where: { id: conversationId } }),
     ]);
 
-    // Build system prompt with user context
     let systemPrompt = QUINN_SYSTEM_PROMPT;
 
     if (profile?.basicInfo) {
@@ -92,29 +90,22 @@ export class ContextBuilderService {
     }
 
     if (materials.length > 0) {
-      const materialSummaries = await Promise.all(
-        materials.slice(0, 10).map(async (m) => {
-          return `- ${m.shiningText ?? '(no shining text)'} [${(m.tags ?? []).join(', ')}]`;
-        }),
-      );
-      systemPrompt += `\n\n# User's confirmed shining points (material library)\n${materialSummaries.join('\n')}`;
+      const materialLines = materials
+        .slice(0, 10)
+        .map((m) => `- ${m.shiningText ?? '(no shining text)'} [${(m.tags ?? []).join(', ')}]`);
+      systemPrompt += `\n\n# User's confirmed shining points (material library)\n${materialLines.join('\n')}`;
     }
 
     if (conversation?.rollingSummary) {
       systemPrompt += `\n\n# Conversation summary so far\n${conversation.rollingSummary}`;
     }
 
-    const messages: LLMMessage[] = [{ role: 'system', content: systemPrompt }];
+    const messages: Context['messages'] = history.map((msg) => ({
+      role: msg.role === 'USER' ? ('user' as const) : ('assistant' as const),
+      content: msg.text ?? '',
+      timestamp: msg.createdAt.getTime(),
+    }));
 
-    // Add conversation history
-    for (const msg of history) {
-      if (msg.role === 'USER') {
-        messages.push({ role: 'user', content: msg.text ?? '' });
-      } else if (msg.role === 'ASSISTANT') {
-        messages.push({ role: 'assistant', content: msg.text ?? '' });
-      }
-    }
-
-    return messages;
+    return { systemPrompt, messages };
   }
 }

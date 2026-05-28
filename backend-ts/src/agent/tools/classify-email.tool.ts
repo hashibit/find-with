@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Type } from '@sinclair/typebox';
 import { FollowupEmail } from '../../database/entities/followup/followup-email.entity.js';
-import { LlmService, MODEL_PARSE } from '../../llm/llm.service.js';
+import { LlmService } from '../../llm/llm.service.js';
 import { FIELD_CRYPTO, FieldCrypto } from '../../common/crypto/crypto.interface.js';
 import { Inject } from '@nestjs/common';
 
@@ -52,10 +52,10 @@ Return JSON with:
 - keyInfo: object with relevant fields (e.g., interviewDate, interviewFormat, nextSteps)
 - summary: 1-2 sentence plain-English summary`;
 
-    const raw = await this.llm.complete(MODEL_PARSE, [
-      { role: 'system', content: 'You classify recruitment emails. Respond only with valid JSON.' },
-      { role: 'user', content: prompt },
-    ]);
+    const raw = await this.llm.completeContext({
+      systemPrompt: 'You classify recruitment emails. Respond only with valid JSON.',
+      messages: [{ role: 'user', content: prompt }],
+    });
 
     let parsed: { kind?: string; keyInfo?: Record<string, unknown>; summary?: string } = {};
     try {

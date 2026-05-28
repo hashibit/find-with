@@ -1,86 +1,43 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { getModel, stream, complete, type Context } from '@earendil-works/pi-ai';
 import OpenAI from 'openai';
-import Anthropic from '@anthropic-ai/sdk';
 import { AppConfig } from '../config/configuration.js';
 
 export const MODEL_PARSE = 'gpt-4.1-mini';
 export const MODEL_WRITE = 'gpt-4.1';
-
-export interface LLMMessage {
-  role: 'system' | 'user' | 'assistant' | 'tool';
-  content: string;
-  toolCallId?: string;
-  name?: string;
-  toolCalls?: Array<{ id: string; type: 'function'; function: { name: string; arguments: string } }>;
-}
-
-export interface ToolDef {
-  name: string;
-  description: string;
-  parameters: Record<string, unknown>;
-}
-
-export interface StreamEvent {
-  kind: 'text_delta' | 'tool_call' | 'done' | 'error';
-  delta?: string;
-  toolName?: string;
-  toolArgs?: string;
-  toolCallId?: string;
-  promptTokens?: number;
-  completionTokens?: number;
-  finishReason?: string;
-  error?: string;
-}
-
-interface ProviderError {
-  count: number;
-  lastAt: number;
-}
+export const MODEL_WRITE_FALLBACK = 'claude-sonnet-4-6-20250514';
 
 const FAILOVER_THRESHOLD = 5;
 const FAILOVER_WINDOW_MS = 60_000;
 
 @Injectable()
 export class LlmService {
-  private readonly logger = new Logger(LlmService.name);
+  // openai kept solely for embeddings — pi-ai does not cover the embeddings API
   private readonly openai: OpenAI;
-  private readonly anthropic: Anthropic;
-  private readonly errors: ProviderError = { count: 0, lastAt: 0 };
+  private errorCount = 0;
+  private errorLastAt = 0;
 
-  constructor(private readonly config: ConfigService<AppConfig>) {
-    const llm = this.config.get('llm', { infer: true })!;
-    this.openai = new OpenAI({ apiKey: llm.openaiApiKey });
-    this.anthropic = new Anthropic({ apiKey: llm.anthropicApiKey });
+  constructor(config: ConfigService<AppConfig>) {
+    const { openaiApiKey } = config.get('llm', { infer: true })!;
+    this.openai = new OpenAI({ apiKey: openaiApiKey });
+    // pi-ai reads OPENAI_API_KEY + ANTHROPIC_API_KEY from process.env automatically
   }
 
-  async *stream(
-    model: string,
-    messages: LLMMessage[],
-    tools?: ToolDef[],
-  ): AsyncGenerator<StreamEvent> {
-    const useAnthropic = this.shouldFailover();
-
-    if (useAnthropic) {
-      yield* this.streamAnthropic(messages, tools);
-    } else {
-      try {
-        yield* this.streamOpenAI(model, messages, tools);
-        this.errors.count = 0;
-      } catch (err) {
-        this.recordError();
-        this.logger.warn(`OpenAI error, falling over to Anthropic: ${String(err)}`);
-        yield* this.streamAnthropic(messages, tools);
-      }
-    }
+  /** Returns a pi-ai stream. Caller iterates events and calls .result() for the final message. */
+  streamContext(context: Context): ReturnType<typeof stream> {
+    const model = this.shouldFailover()
+      ? getModel('anthropic', MODEL_WRITE_FALLBACK)
+      : getModel('openai', MODEL_WRITE);
+    return stream(model, context);
   }
 
-  async complete(model: string, messages: LLMMessage[]): Promise<string> {
-    const resp = await this.openai.chat.completions.create({
-      model,
-      messages: messages as OpenAI.ChatCompletionMessageParam[],
-    });
-    return resp.choices[0]?.message?.content ?? '';
+  /** One-shot completion — used by tools for structured JSON extraction. */
+  async completeContext(context: Context): Promise<string> {
+    const model = getModel('openai', MODEL_PARSE);
+    const msg = await complete(model, context);
+    const block = msg.content.find((b) => b.type === 'text');
+    return block?.type === 'text' ? block.text : '';
   }
 
   async embed(text: string): Promise<number[]> {
@@ -91,120 +48,20 @@ export class LlmService {
     return resp.data[0]!.embedding;
   }
 
-  private async *streamOpenAI(
-    model: string,
-    messages: LLMMessage[],
-    tools?: ToolDef[],
-  ): AsyncGenerator<StreamEvent> {
-    const params: OpenAI.Chat.ChatCompletionCreateParamsStreaming = {
-      model,
-      messages: messages as OpenAI.ChatCompletionMessageParam[],
-      stream: true,
-      ...(tools?.length
-        ? {
-            tools: tools.map((t) => ({
-              type: 'function' as const,
-              function: { name: t.name, description: t.description, parameters: t.parameters },
-            })),
-          }
-        : {}),
-    };
-
-    const stream = await this.openai.chat.completions.create(params);
-    const toolCallAccumulator: Record<string, { name: string; args: string }> = {};
-
-    let promptTokens = 0;
-    let completionTokens = 0;
-    let finishReason = '';
-
-    for await (const chunk of stream) {
-      const delta = chunk.choices[0]?.delta;
-      if (!delta) continue;
-
-      if (delta.content) {
-        yield { kind: 'text_delta', delta: delta.content };
-      }
-
-      if (delta.tool_calls) {
-        for (const tc of delta.tool_calls) {
-          const idx = String(tc.index);
-          if (!toolCallAccumulator[idx]) {
-            toolCallAccumulator[idx] = { name: tc.function?.name ?? '', args: '' };
-          }
-          toolCallAccumulator[idx]!.args += tc.function?.arguments ?? '';
-          if (tc.function?.name) toolCallAccumulator[idx]!.name = tc.function.name;
-        }
-      }
-
-      if (chunk.usage) {
-        promptTokens = chunk.usage.prompt_tokens;
-        completionTokens = chunk.usage.completion_tokens;
-      }
-
-      finishReason = chunk.choices[0]?.finish_reason ?? '';
-    }
-
-    for (const [idx, tc] of Object.entries(toolCallAccumulator)) {
-      yield { kind: 'tool_call', toolName: tc.name, toolArgs: tc.args, toolCallId: idx };
-    }
-
-    yield { kind: 'done', promptTokens, completionTokens, finishReason };
+  recordError(): void {
+    const now = Date.now();
+    if (now - this.errorLastAt > FAILOVER_WINDOW_MS) this.errorCount = 0;
+    this.errorCount++;
+    this.errorLastAt = now;
   }
 
-  private async *streamAnthropic(
-    messages: LLMMessage[],
-    tools?: ToolDef[],
-  ): AsyncGenerator<StreamEvent> {
-    const systemMsg = messages.find((m) => m.role === 'system');
-    const userMsgs = messages
-      .filter((m) => m.role !== 'system')
-      .map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content }));
-
-    const stream = await this.anthropic.messages.stream({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 4096,
-      system: systemMsg?.content,
-      messages: userMsgs,
-      ...(tools?.length
-        ? {
-            tools: tools.map((t) => ({
-              name: t.name,
-              description: t.description,
-              input_schema: t.parameters as Anthropic.Tool['input_schema'],
-            })),
-          }
-        : {}),
-    });
-
-    for await (const event of stream) {
-      if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
-        yield { kind: 'text_delta', delta: event.delta.text };
-      }
-    }
-
-    const final = await stream.finalMessage();
-    yield {
-      kind: 'done',
-      promptTokens: final.usage.input_tokens,
-      completionTokens: final.usage.output_tokens,
-      finishReason: final.stop_reason ?? '',
-    };
+  clearErrors(): void {
+    this.errorCount = 0;
   }
 
   private shouldFailover(): boolean {
     const now = Date.now();
-    if (now - this.errors.lastAt > FAILOVER_WINDOW_MS) {
-      this.errors.count = 0;
-    }
-    return this.errors.count >= FAILOVER_THRESHOLD;
-  }
-
-  private recordError(): void {
-    const now = Date.now();
-    if (now - this.errors.lastAt > FAILOVER_WINDOW_MS) {
-      this.errors.count = 0;
-    }
-    this.errors.count++;
-    this.errors.lastAt = now;
+    if (now - this.errorLastAt > FAILOVER_WINDOW_MS) this.errorCount = 0;
+    return this.errorCount >= FAILOVER_THRESHOLD;
   }
 }

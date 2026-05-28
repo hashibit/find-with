@@ -2,9 +2,10 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Observable, Subject } from 'rxjs';
+import { type Context, type Tool } from '@earendil-works/pi-ai';
 import { ConvMessage } from '../database/entities/conversation/message.entity.js';
 import { ConvConversation } from '../database/entities/conversation/conversation.entity.js';
-import { LlmService, MODEL_WRITE, ToolDef, LLMMessage } from '../llm/llm.service.js';
+import { LlmService } from '../llm/llm.service.js';
 import { ContextBuilderService } from './context-builder.service.js';
 import { SearchCompanyTool } from './tools/search-company.tool.js';
 import { MineShiningPointTool } from './tools/mine-shining-point.tool.js';
@@ -23,10 +24,11 @@ interface ToolExecutor {
   readonly name: string;
   readonly description: string;
   readonly parameters: unknown;
-  execute(toolCallId: string, params: Record<string, unknown>, context: ToolContext): Promise<{
-    content: Array<{ type: string; text: string }>;
-    details: Record<string, unknown>;
-  }>;
+  execute(
+    toolCallId: string,
+    params: Record<string, unknown>,
+    context: ToolContext,
+  ): Promise<{ content: Array<{ type: string; text: string }>; details: Record<string, unknown> }>;
 }
 
 interface ToolContext {
@@ -34,14 +36,10 @@ interface ToolContext {
   conversationId: string;
 }
 
-// Tool scene mapping (mirrors Python ToolRegistry)
+// Scene → allowed tools (mirrors Python ToolRegistry)
 const TOOL_SCENES: Record<string, string[]> = {
   search_company: ['JOB_ANALYSIS'],
   mine_shining_point: ['ONBOARDING', 'GAP_MINING'],
-  generate_tailored_resume: ['TAILOR_EDIT'],
-  edit_bullet: ['TAILOR_EDIT'],
-  re_apply_material_to_tailoring: ['GAP_MINING', 'TAILOR_EDIT'],
-  recompute_match: ['TAILOR_EDIT'],
   draft_motivation: ['TAILOR_EDIT'],
   classify_email: ['FOLLOWUP'],
   draft_reply: ['FOLLOWUP'],
@@ -54,10 +52,8 @@ export class AgentService {
   private readonly toolMap: Map<string, ToolExecutor>;
 
   constructor(
-    @InjectRepository(ConvMessage)
-    private readonly messageRepo: Repository<ConvMessage>,
-    @InjectRepository(ConvConversation)
-    private readonly convRepo: Repository<ConvConversation>,
+    @InjectRepository(ConvMessage) private readonly messageRepo: Repository<ConvMessage>,
+    @InjectRepository(ConvConversation) private readonly convRepo: Repository<ConvConversation>,
     private readonly llm: LlmService,
     private readonly contextBuilder: ContextBuilderService,
     private readonly searchCompanyTool: SearchCompanyTool,
@@ -77,10 +73,6 @@ export class AgentService {
     ]);
   }
 
-  /**
-   * Process a user message and return an Observable that emits SSE events.
-   * Mirrors Python AgentOrchestrator.respond() but as an Observable stream.
-   */
   respond(
     conversationId: string,
     userId: string,
@@ -89,15 +81,7 @@ export class AgentService {
     anchorId?: string | null,
   ): Observable<AgentSseEvent> {
     const subject = new Subject<AgentSseEvent>();
-
-    void this.runAgentLoop(subject, {
-      conversationId,
-      userId,
-      userMessage,
-      conversationKind,
-      anchorId,
-    });
-
+    void this.runAgentLoop(subject, { conversationId, userId, userMessage, conversationKind, anchorId });
     return subject.asObservable();
   }
 
@@ -111,114 +95,111 @@ export class AgentService {
       anchorId?: string | null;
     },
   ): Promise<void> {
-    const { conversationId, userId, userMessage, conversationKind, anchorId } = opts;
+    const { conversationId, userId, userMessage, conversationKind } = opts;
     const toolCtx: ToolContext = { userId, conversationId };
 
     try {
       // 1. Persist user message
-      const userMsgEntity = this.messageRepo.create({
-        id: ulid(),
-        conversationId,
-        role: 'USER',
-        text: userMessage,
-      });
-      await this.messageRepo.save(userMsgEntity);
+      await this.messageRepo.save(
+        this.messageRepo.create({ id: ulid(), conversationId, role: 'USER', text: userMessage }),
+      );
 
-      // 2. Build context messages
-      const messages = await this.contextBuilder.build(conversationId, userId, conversationKind, anchorId);
-      messages.push({ role: 'user', content: userMessage });
+      // 2. Build pi-ai Context (system prompt + history)
+      const context: Context = await this.contextBuilder.build(
+        conversationId, userId, conversationKind, opts.anchorId,
+      );
 
-      // 3. Get tools for this scene
-      const toolDefs = this.getToolsForScene(conversationKind);
+      // Attach scene-filtered tools for the LLM to see
+      context.tools = this.getToolsForScene(conversationKind);
 
-      // 4. Stream LLM response
+      // Add the current user turn
+      context.messages.push({ role: 'user', content: userMessage, timestamp: Date.now() });
+
+      // 3. Stream first LLM turn
       let fullText = '';
-      const pendingToolCalls: Array<{ name: string; args: string; callId: string }> = [];
       let promptTokens = 0;
       let completionTokens = 0;
-      let finishReason = '';
 
-      for await (const event of this.llm.stream(MODEL_WRITE, messages, toolDefs)) {
-        if (event.kind === 'text_delta') {
-          fullText += event.delta!;
+      const s = this.llm.streamContext(context);
+
+      for await (const event of s) {
+        if (event.type === 'text_delta') {
+          fullText += event.delta;
           subject.next({ data: JSON.stringify({ kind: 'text_delta', delta: event.delta, conversationId }) });
-        } else if (event.kind === 'tool_call') {
-          pendingToolCalls.push({
-            name: event.toolName!,
-            args: event.toolArgs!,
-            callId: event.toolCallId!,
-          });
-          subject.next({ data: JSON.stringify({ kind: 'tool_call', name: event.toolName, callId: event.toolCallId }) });
-        } else if (event.kind === 'done') {
-          promptTokens = event.promptTokens ?? 0;
-          completionTokens = event.completionTokens ?? 0;
-          finishReason = event.finishReason ?? '';
-        } else if (event.kind === 'error') {
-          subject.next({ data: JSON.stringify({ kind: 'error', message: event.error }) });
+        } else if (event.type === 'toolcall_end') {
+          subject.next({ data: JSON.stringify({ kind: 'tool_call', name: event.toolCall.name, callId: event.toolCall.id }) });
+        } else if (event.type === 'error') {
+          this.llm.recordError();
+          subject.next({ data: JSON.stringify({ kind: 'error', message: String(event.error) }) });
           subject.complete();
           return;
         }
       }
 
-      // 5. Execute tool calls sequentially
-      for (const tc of pendingToolCalls) {
-        const result = await this.executeTool(tc.name, tc.args, tc.callId, toolCtx);
+      const finalMessage = await s.result();
+      context.messages.push(finalMessage);
+      promptTokens += finalMessage.usage.input;
+      completionTokens += finalMessage.usage.output;
+      this.llm.clearErrors();
+
+      // 4. Execute tool calls and stream continuation
+      const toolCalls = finalMessage.content.filter((b) => b.type === 'toolCall');
+
+      for (const call of toolCalls) {
+        if (call.type !== 'toolCall') continue;
+
+        const result = await this.executeTool(call.name, call.arguments as Record<string, unknown>, call.id, toolCtx);
 
         subject.next({
-          data: JSON.stringify({
-            kind: 'tool_result',
-            callId: tc.callId,
-            ok: result.ok,
-            data: result.data,
-            error: result.error,
-          }),
+          data: JSON.stringify({ kind: 'tool_result', callId: call.id, ok: result.ok, data: result.data, error: result.error }),
         });
 
-        if (result.ok && result.mode === 'SYNC') {
-          // Append tool exchange to messages and get LLM continuation
-          const updatedMessages: LLMMessage[] = [
-            ...messages,
-            {
-              role: 'assistant',
-              content: fullText,
-              toolCalls: [{ id: tc.callId, type: 'function', function: { name: tc.name, arguments: tc.args } }],
-            },
-            { role: 'tool', content: JSON.stringify(result.data), toolCallId: tc.callId, name: tc.name },
-          ];
-
-          fullText = '';
-          for await (const contEvent of this.llm.stream(MODEL_WRITE, updatedMessages, toolDefs)) {
-            if (contEvent.kind === 'text_delta') {
-              fullText += contEvent.delta!;
-              subject.next({ data: JSON.stringify({ kind: 'text_delta', delta: contEvent.delta, conversationId }) });
-            } else if (contEvent.kind === 'done') {
-              promptTokens += contEvent.promptTokens ?? 0;
-              completionTokens += contEvent.completionTokens ?? 0;
-            }
-          }
-        } else if (result.mode === 'ASYNC') {
-          subject.next({ data: JSON.stringify({ kind: 'state_change', key: 'generating', value: result.taskId ?? '' }) });
-        }
+        // Add tool result to context and get continuation
+        context.messages.push({
+          role: 'toolResult',
+          toolCallId: call.id,
+          toolName: call.name,
+          content: [{ type: 'text', text: result.ok ? JSON.stringify(result.data) : result.error }],
+          isError: !result.ok,
+          timestamp: Date.now(),
+        });
       }
 
-      // 6. Persist assistant message
-      const assistantMsgEntity = this.messageRepo.create({
-        id: ulid(),
-        conversationId,
-        role: 'ASSISTANT',
-        text: fullText || null,
-        toolCalls: pendingToolCalls.length > 0 ? pendingToolCalls : null,
-        tokenPrompt: promptTokens,
-        tokenCompletion: completionTokens,
-        tokenModel: MODEL_WRITE,
-        finishReason,
-      });
-      await this.messageRepo.save(assistantMsgEntity);
+      if (toolCalls.length > 0) {
+        fullText = '';
+        const s2 = this.llm.streamContext(context);
 
-      // 7. Update conversation last_activity
+        for await (const event of s2) {
+          if (event.type === 'text_delta') {
+            fullText += event.delta;
+            subject.next({ data: JSON.stringify({ kind: 'text_delta', delta: event.delta, conversationId }) });
+          }
+        }
+
+        const finalMessage2 = await s2.result();
+        promptTokens += finalMessage2.usage.input;
+        completionTokens += finalMessage2.usage.output;
+        fullText = fullText || (finalMessage2.content.find((b) => b.type === 'text')?.type === 'text'
+          ? (finalMessage2.content.find((b) => b.type === 'text') as { type: 'text'; text: string }).text
+          : '');
+      }
+
+      // 5. Persist assistant message
+      await this.messageRepo.save(
+        this.messageRepo.create({
+          id: ulid(),
+          conversationId,
+          role: 'ASSISTANT',
+          text: fullText || null,
+          tokenPrompt: promptTokens,
+          tokenCompletion: completionTokens,
+          finishReason: finalMessage.stopReason ?? '',
+        }),
+      );
+
       await this.convRepo.update({ id: conversationId }, { lastActivity: new Date() });
 
-      subject.next({ data: JSON.stringify({ kind: 'done', promptTokens, completionTokens, finishReason }) });
+      subject.next({ data: JSON.stringify({ kind: 'done', promptTokens, completionTokens }) });
       subject.complete();
     } catch (err) {
       this.logger.error('Agent loop error', err instanceof Error ? err.stack : String(err));
@@ -229,33 +210,24 @@ export class AgentService {
 
   private async executeTool(
     toolName: string,
-    argsJson: string,
+    args: Record<string, unknown>,
     callId: string,
     ctx: ToolContext,
-  ): Promise<{ ok: boolean; data: Record<string, unknown>; error: string; mode: string; taskId?: string }> {
+  ): Promise<{ ok: boolean; data: Record<string, unknown>; error: string }> {
     const executor = this.toolMap.get(toolName);
-    if (!executor) {
-      return { ok: false, data: {}, error: `Unknown tool: ${toolName}`, mode: 'SYNC' };
-    }
-
-    let args: Record<string, unknown> = {};
-    try {
-      args = argsJson ? (JSON.parse(argsJson) as Record<string, unknown>) : {};
-    } catch {
-      return { ok: false, data: {}, error: `Invalid tool arguments JSON`, mode: 'SYNC' };
-    }
+    if (!executor) return { ok: false, data: {}, error: `Unknown tool: ${toolName}` };
 
     try {
       const result = await executor.execute(callId, args, ctx);
       const text = result.content.map((c) => c.text).join('\n');
-      return { ok: true, data: { text, ...result.details }, error: '', mode: 'SYNC' };
+      return { ok: true, data: { text, ...result.details }, error: '' };
     } catch (err) {
       this.logger.error(`Tool ${toolName} failed`, err);
-      return { ok: false, data: {}, error: String(err), mode: 'SYNC' };
+      return { ok: false, data: {}, error: String(err) };
     }
   }
 
-  private getToolsForScene(conversationKind: string): ToolDef[] {
+  private getToolsForScene(conversationKind: string): Tool[] {
     return Array.from(this.toolMap.values())
       .filter((tool) => {
         const scenes = TOOL_SCENES[tool.name] ?? [];

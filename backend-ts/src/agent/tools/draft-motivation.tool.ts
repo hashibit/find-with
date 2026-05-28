@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Type } from '@sinclair/typebox';
 import { JobParsedJd } from '../../database/entities/jobs/parsed-jd.entity.js';
-import { LlmService, MODEL_WRITE } from '../../llm/llm.service.js';
+import { LlmService } from '../../llm/llm.service.js';
 
 export const DRAFT_MOTIVATION_TOOL_NAME = 'draft_motivation';
 
@@ -43,14 +43,10 @@ export class DraftMotivationTool {
       .filter(Boolean)
       .join('\n');
 
-    const draft = await this.llm.complete(MODEL_WRITE, [
-      {
-        role: 'system',
-        content:
-          'You write concise, authentic "Why are you interested?" responses for job applications. 2-3 sentences max. No clichés. Specific to the role.',
-      },
-      { role: 'user', content: `Write a motivation statement for this application:\n${context}` },
-    ]);
+    const draft = await this.llm.completeContext({
+      systemPrompt: 'You write concise, authentic "Why are you interested?" responses for job applications. 2-3 sentences max. No clichés. Specific to the role.',
+      messages: [{ role: 'user', content: `Write a motivation statement for this application:\n${context}` }],
+    });
 
     return {
       content: [{ type: 'text', text: `Here's a draft motivation statement:\n\n"${draft.trim()}"` }],

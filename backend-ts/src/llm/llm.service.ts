@@ -6,7 +6,7 @@ import { AppConfig } from '../config/configuration.js';
 
 export const MODEL_PARSE = 'gpt-4.1-mini';
 export const MODEL_WRITE = 'gpt-4.1';
-export const MODEL_WRITE_FALLBACK = 'claude-sonnet-4-6-20250514';
+export const MODEL_WRITE_FALLBACK = 'claude-sonnet-4-6';
 
 const FAILOVER_THRESHOLD = 5;
 const FAILOVER_WINDOW_MS = 60_000;

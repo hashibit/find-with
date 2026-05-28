@@ -5,7 +5,7 @@ import { ApplyFillPlan } from '../../database/entities/apply/fill-plan.entity.js
 import { ApplyApplication } from '../../database/entities/apply/application.entity.js';
 import { JobRadarItem } from '../../database/entities/jobs/radar-item.entity.js';
 import { JobParsedJd } from '../../database/entities/jobs/parsed-jd.entity.js';
-import { LlmService, MODEL_WRITE } from '../../llm/llm.service.js';
+import { LlmService } from '../../llm/llm.service.js';
 import { ulid } from 'ulid';
 
 @Injectable()
@@ -28,13 +28,14 @@ export class ApplyService {
       : null;
 
     // Generate field plan via LLM
-    const raw = await this.llm.complete(MODEL_WRITE, [
-      { role: 'system', content: 'You generate LinkedIn Easy Apply field plans. Output JSON array of field objects.' },
-      {
+    const raw = await this.llm.completeContext({
+      systemPrompt: 'You generate LinkedIn Easy Apply field plans. Output JSON array of field objects.',
+      messages: [{
         role: 'user',
         content: `Generate a fill plan for this job:\nTitle: ${parsedJd?.title ?? 'Unknown'}\nCompany: ${parsedJd?.company ?? 'Unknown'}\n\nReturn JSON: [{ "fieldName": string, "fieldType": string, "value": string, "source": string }]`,
-      },
-    ]);
+        timestamp: Date.now(),
+      }],
+    });
 
     let fields: unknown[] = [];
     try {

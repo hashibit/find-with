@@ -54,7 +54,7 @@ Return JSON with:
 
     const raw = await this.llm.completeContext({
       systemPrompt: 'You classify recruitment emails. Respond only with valid JSON.',
-      messages: [{ role: 'user', content: prompt }],
+      messages: [{ role: 'user', content: prompt, timestamp: Date.now() }],
     });
 
     let parsed: { kind?: string; keyInfo?: Record<string, unknown>; summary?: string } = {};

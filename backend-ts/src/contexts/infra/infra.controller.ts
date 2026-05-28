@@ -72,7 +72,7 @@ export class InfraController {
     const stripeConfig = this.config.get('stripe', { infer: true })!;
     const rawBody = req.rawBody ?? Buffer.from('');
     const event = this.stripe.webhooks.constructEvent(rawBody, sig, stripeConfig.webhookSecret);
-    await this.billingService.handleStripeEvent(event as Parameters<typeof this.billingService.handleStripeEvent>[0]);
+    await this.billingService.handleStripeEvent(event as unknown as Parameters<typeof this.billingService.handleStripeEvent>[0]);
     return { ok: true };
   }
 

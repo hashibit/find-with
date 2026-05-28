@@ -49,7 +49,8 @@ export class ProfileService {
 
   async upsertProfile(userId: string, patch: Partial<Pick<ProfileProfile, 'basicInfo' | 'certifications'>>): Promise<ProfileProfile> {
     const etag = randomBytes(8).toString('hex');
-    await this.profileRepo.upsert({ userId, ...patch, etag, updatedAt: new Date() }, ['userId']);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await this.profileRepo.upsert({ userId, ...patch, etag, updatedAt: new Date() } as any, ['userId']);
     return (await this.profileRepo.findOne({ where: { userId } }))!;
   }
 
@@ -59,9 +60,9 @@ export class ProfileService {
       materials.map(async (m) => {
         const { rawText, ...rest } = m;
         if (rawText) {
-          return { ...rest, rawText: await this.crypto.decrypt(rawText) };
+          return { ...rest, rawText: await this.crypto.decrypt(rawText) } as Omit<ProfileMaterial, 'rawText'> & { rawText?: string };
         }
-        return { ...rest, rawText: undefined };
+        return { ...rest, rawText: undefined } as Omit<ProfileMaterial, 'rawText'> & { rawText?: string };
       }),
     );
   }

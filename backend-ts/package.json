@@ -43,7 +43,6 @@
     "ioredis": "^5.4.1",
     "jose": "^5.0.0",
     "mammoth": "^1.8.0",
-    "multer": "^1.4.5-lts.1",
     "nestjs-pino": "^4.1.0",
     "openai": "^4.55.0",
     "pino": "^9.3.1",

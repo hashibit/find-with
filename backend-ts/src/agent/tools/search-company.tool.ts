@@ -47,7 +47,7 @@ Respond as JSON with keys: whatTheyDo, sizeStage, recentNews (array), risks (obj
 
     const raw = await this.llm.completeContext({
       systemPrompt: 'You are a company research assistant. Respond only with valid JSON.',
-      messages: [{ role: 'user', content: prompt }],
+      messages: [{ role: 'user', content: prompt, timestamp: Date.now() }],
     });
 
     let parsed: Record<string, unknown> = {};

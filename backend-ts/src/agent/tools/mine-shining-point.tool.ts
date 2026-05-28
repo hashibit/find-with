@@ -46,7 +46,7 @@ Example shiningText: "Redesigned onboarding process within first 60 days, reduci
 
     const raw = await this.llm.completeContext({
       systemPrompt: 'You are a career coach who extracts professional achievements. Respond only with valid JSON.',
-      messages: [{ role: 'user', content: prompt }],
+      messages: [{ role: 'user', content: prompt, timestamp: Date.now() }],
     });
 
     let parsed: { shiningText?: string; rationale?: string; tags?: string[] } = {};

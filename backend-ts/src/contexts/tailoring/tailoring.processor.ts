@@ -7,7 +7,7 @@ import { TailoringResume } from '../../database/entities/tailoring/tailoring-res
 import { JobParsedJd } from '../../database/entities/jobs/parsed-jd.entity.js';
 import { ProfileBaseResume } from '../../database/entities/profile/base-resume.entity.js';
 import { ProfileMaterial } from '../../database/entities/profile/material.entity.js';
-import { LlmService, MODEL_WRITE } from '../../llm/llm.service.js';
+import { LlmService } from '../../llm/llm.service.js';
 import { TAILORING_QUEUE } from './tailoring.service.js';
 import { ulid } from 'ulid';
 
@@ -77,10 +77,10 @@ Rules:
 - Use strong action verbs
 - Mark bullets you had to infer (not directly from materials) as status: "PENDING"`;
 
-    const raw = await this.llm.complete(MODEL_WRITE, [
-      { role: 'system', content: 'You write tailored resume sections. Use only provided materials. Output JSON.' },
-      { role: 'user', content: prompt },
-    ]);
+    const raw = await this.llm.completeContext({
+      systemPrompt: 'You write tailored resume sections. Use only provided materials. Output JSON.',
+      messages: [{ role: 'user', content: prompt, timestamp: Date.now() }],
+    });
 
     let sections: unknown[] = [];
     try {

@@ -11,7 +11,7 @@ import { ProfileEducation } from '../../database/entities/profile/education.enti
 import { ProfileWorkExperience } from '../../database/entities/profile/work-experience.entity.js';
 import { ProfileSkill } from '../../database/entities/profile/skill.entity.js';
 import { STORAGE, Storage } from '../../adapters/storage/storage.interface.js';
-import { LlmService, MODEL_PARSE } from '../../llm/llm.service.js';
+import { LlmService } from '../../llm/llm.service.js';
 import { RESUME_PARSE_QUEUE } from './profile.service.js';
 import { ulid } from 'ulid';
 
@@ -56,8 +56,8 @@ export class ProfileProcessor extends WorkerHost {
       // Extract text
       let text = '';
       if (source.contentType === 'application/pdf') {
-        const { text: pages } = await extractText(new Uint8Array(buffer), { mergePages: true });
-        text = pages.join('\n');
+        const { text: merged } = await extractText(new Uint8Array(buffer), { mergePages: true });
+        text = merged;
       } else if (source.contentType.includes('word') || source.filename.endsWith('.docx')) {
         const result = await mammoth.extractRawText({ buffer });
         text = result.value;
@@ -79,10 +79,10 @@ Return JSON matching this schema:
   "skills": [{ "name": string, "kind": "HARD"|"SOFT"|"TOOL" }]
 }`;
 
-      const raw = await this.llm.complete(MODEL_PARSE, [
-        { role: 'system', content: 'You parse resumes into structured JSON. Output only valid JSON.' },
-        { role: 'user', content: prompt },
-      ]);
+      const raw = await this.llm.completeContext({
+        systemPrompt: 'You parse resumes into structured JSON. Output only valid JSON.',
+        messages: [{ role: 'user', content: prompt, timestamp: Date.now() }],
+      });
 
       let parsed: ParsedResume;
       try {

@@ -100,11 +100,23 @@ export class ContextBuilderService {
       systemPrompt += `\n\n# Conversation summary so far\n${conversation.rollingSummary}`;
     }
 
-    const messages: Context['messages'] = history.map((msg) => ({
-      role: msg.role === 'USER' ? ('user' as const) : ('assistant' as const),
-      content: msg.text ?? '',
-      timestamp: msg.createdAt.getTime(),
-    }));
+    // Reconstruct history from DB records. AssistantMessage.content must be ContentBlock[]
+    // (pi-ai calls .flatMap on it). Provide stub metadata so transform-messages treats these
+    // as cross-model history (isSameModel=false) and only passes through text content.
+    const messages: Context['messages'] = history.map((msg) =>
+      msg.role === 'USER'
+        ? { role: 'user' as const, content: msg.text ?? '', timestamp: msg.createdAt.getTime() }
+        : {
+            role: 'assistant' as const,
+            content: [{ type: 'text' as const, text: msg.text ?? '' }],
+            api: 'openai-completions' as const,
+            provider: 'openai' as const,
+            model: 'unknown',
+            usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
+            stopReason: 'stop' as const,
+            timestamp: msg.createdAt.getTime(),
+          },
+    );
 
     return { systemPrompt, messages };
   }

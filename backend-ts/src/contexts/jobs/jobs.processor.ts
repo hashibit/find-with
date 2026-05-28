@@ -9,7 +9,7 @@ import { JobCompanyBrief } from '../../database/entities/jobs/company-brief.enti
 import { JobMatchResult } from '../../database/entities/jobs/match-result.entity.js';
 import { JobRadarItem } from '../../database/entities/jobs/radar-item.entity.js';
 import { ProfileMaterial } from '../../database/entities/profile/material.entity.js';
-import { LlmService, MODEL_PARSE } from '../../llm/llm.service.js';
+import { LlmService } from '../../llm/llm.service.js';
 import { JOB_ANALYZE_QUEUE } from './jobs.service.js';
 import { ulid } from 'ulid';
 
@@ -56,10 +56,10 @@ Return JSON:
   "buzzwordTranslation": string
 }`;
 
-    const jdRaw = await this.llm.complete(MODEL_PARSE, [
-      { role: 'system', content: 'Parse job descriptions into structured JSON. Output only JSON.' },
-      { role: 'user', content: jdPrompt },
-    ]);
+    const jdRaw = await this.llm.completeContext({
+      systemPrompt: 'Parse job descriptions into structured JSON. Output only JSON.',
+      messages: [{ role: 'user', content: jdPrompt, timestamp: Date.now() }],
+    });
 
     let jdParsed: Record<string, unknown> = {};
     try {
@@ -91,10 +91,10 @@ Return JSON:
       const existing = await this.companyRepo.findOne({ where: { company } });
       if (!existing || !existing.ttlExpires || existing.ttlExpires < new Date()) {
         const companyPrompt = `Research "${company}". Return JSON: { "whatTheyDo": string, "sizeStage": string, "recentNews": [string], "risks": { "layoffs": boolean, "regulatory": boolean }, "glassdoorRating": number|null }`;
-        const companyRaw = await this.llm.complete(MODEL_PARSE, [
-          { role: 'system', content: 'You research companies. Return only JSON.' },
-          { role: 'user', content: companyPrompt },
-        ]);
+        const companyRaw = await this.llm.completeContext({
+          systemPrompt: 'You research companies. Return only JSON.',
+          messages: [{ role: 'user', content: companyPrompt, timestamp: Date.now() }],
+        });
         let companyData: Record<string, unknown> = {};
         try {
           const m = companyRaw.match(/\{[\s\S]*\}/);

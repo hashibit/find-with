@@ -67,8 +67,9 @@ export class DraftReplyTool {
       messages: [{
         role: 'user',
         content: `Write a reply to this email:\n\nSubject: ${email.subject}\nFrom: ${email.fromAddr}\n\n${originalBody.slice(0, 1500)}\n\nIntent: ${params.intent}`,
+        timestamp: Date.now(),
       }],
-    ]);
+    });
 
     const saved = this.draftRepo.create({
       id: ulid(),

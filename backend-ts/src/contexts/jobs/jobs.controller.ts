@@ -1,35 +1,38 @@
 import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { IsIn, IsOptional, IsString } from 'class-validator';
+import { createZodDto } from 'nestjs-zod';
+import { z } from 'zod';
 import { ClerkAuthGuard } from '../../common/guards/clerk-auth.guard.js';
 import { CurrentUser, AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { JobsService } from './jobs.service.js';
 
-class CaptureJobDto {
-  @IsString() source: string;
-  @IsString() sourceUrl: string;
-  @IsOptional() @IsString() sourceJobId?: string;
-  @IsOptional() @IsString() capturedHtml?: string;
-  @IsOptional() @IsString() capturedText?: string;
-}
+class CaptureJobDto extends createZodDto(
+  z.object({
+    source: z.string(),
+    sourceUrl: z.string(),
+    sourceJobId: z.string().optional(),
+    capturedHtml: z.string().optional(),
+    capturedText: z.string().optional(),
+  }),
+) {}
 
-class UpdateRadarDto {
-  @IsIn([
-    'BROWSED',
-    'ANALYZED',
-    'DECIDED',
-    'DECIDED_NO',
-    'APPLIED',
-    'INTERVIEWING',
-    'OFFER_RECEIVED',
-    'OFFER_ACCEPTED',
-    'OFFER_REJECTED',
-    'REJECTED',
-  ])
-  status: string;
-
-  @IsOptional() @IsString() note?: string;
-}
+class UpdateRadarDto extends createZodDto(
+  z.object({
+    status: z.enum([
+      'BROWSED',
+      'ANALYZED',
+      'DECIDED',
+      'DECIDED_NO',
+      'APPLIED',
+      'INTERVIEWING',
+      'OFFER_RECEIVED',
+      'OFFER_ACCEPTED',
+      'OFFER_REJECTED',
+      'REJECTED',
+    ]),
+    note: z.string().optional(),
+  }),
+) {}
 
 @ApiTags('jobs')
 @ApiBearerAuth()

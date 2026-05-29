@@ -1,32 +1,25 @@
 import { Body, Controller, Get, Patch, Post, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { IsOptional, IsString, IsIn } from 'class-validator';
+import { createZodDto } from 'nestjs-zod';
+import { z } from 'zod';
 import { ClerkAuthGuard } from '../../common/guards/clerk-auth.guard.js';
 import { CurrentUser, AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { IamService } from './iam.service.js';
 
-class UpsertUserDto {
-  @IsString()
-  email: string;
+class UpsertUserDto extends createZodDto(
+  z.object({
+    email: z.string(),
+    fullName: z.string().optional(),
+  }),
+) {}
 
-  @IsOptional()
-  @IsString()
-  fullName?: string;
-}
-
-class UpdateSettingsDto {
-  @IsOptional()
-  @IsIn(['ENGAGED', 'BALANCED', 'QUIET'])
-  density?: string;
-
-  @IsOptional()
-  @IsString()
-  locale?: string;
-
-  @IsOptional()
-  @IsString()
-  timezone?: string;
-}
+class UpdateSettingsDto extends createZodDto(
+  z.object({
+    density: z.enum(['ENGAGED', 'BALANCED', 'QUIET']).optional(),
+    locale: z.string().optional(),
+    timezone: z.string().optional(),
+  }),
+) {}
 
 @ApiTags('iam')
 @ApiBearerAuth()

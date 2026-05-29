@@ -1,18 +1,19 @@
 import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { IsString } from 'class-validator';
+import { createZodDto } from 'nestjs-zod';
+import { z } from 'zod';
 import { ClerkAuthGuard } from '../../common/guards/clerk-auth.guard.js';
 import { CurrentUser, AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { TailoringService } from './tailoring.service.js';
 
-class StartTailoringDto {
-  @IsString() baseResumeId: string;
-  @IsString() parsedJdId: string;
-}
+class StartTailoringDto extends createZodDto(
+  z.object({
+    baseResumeId: z.string(),
+    parsedJdId: z.string(),
+  }),
+) {}
 
-class EditBulletDto {
-  @IsString() text: string;
-}
+class EditBulletDto extends createZodDto(z.object({ text: z.string() })) {}
 
 @ApiTags('tailoring')
 @ApiBearerAuth()

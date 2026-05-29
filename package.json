@@ -5,6 +5,7 @@
   "scripts": {
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "format:version": "prettier -v",
     "lint": "pnpm --recursive run lint",
     "proto:lint": "buf lint",
     "proto:breaking": "buf breaking --against .git#branch=main",

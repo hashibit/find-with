@@ -1,25 +1,21 @@
 import { Body, Controller, Get, MessageEvent, Param, Post, Sse, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Observable, map } from 'rxjs';
+import { createZodDto } from 'nestjs-zod';
+import { z } from 'zod';
 import { ClerkAuthGuard } from '../../common/guards/clerk-auth.guard.js';
 import { CurrentUser, AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { ConversationService } from './conversation.service.js';
 import { AgentService } from '../../agent/agent.service.js';
-import { IsOptional, IsString, IsIn } from 'class-validator';
 
-class CreateConversationDto {
-  @IsIn(['FREE_CHAT', 'ONBOARDING', 'JOB_ANALYSIS', 'GAP_MINING', 'TAILOR_EDIT', 'FOLLOWUP'])
-  kind: string;
+class CreateConversationDto extends createZodDto(
+  z.object({
+    kind: z.enum(['FREE_CHAT', 'ONBOARDING', 'JOB_ANALYSIS', 'GAP_MINING', 'TAILOR_EDIT', 'FOLLOWUP']),
+    anchorId: z.string().optional(),
+  }),
+) {}
 
-  @IsOptional()
-  @IsString()
-  anchorId?: string;
-}
-
-class SendPromptDto {
-  @IsString()
-  message: string;
-}
+class SendPromptDto extends createZodDto(z.object({ message: z.string() })) {}
 
 @ApiTags('conversation')
 @ApiBearerAuth()

@@ -1,8 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { getModel, stream, complete, type Context } from '@earendil-works/pi-ai';
 import OpenAI from 'openai';
-import { AppConfig } from '../config/configuration.js';
 import { type LlmProvider } from './llm-provider.interface.js';
 
 export const MODEL_PARSE = 'gpt-4.1-mini';
@@ -19,10 +17,9 @@ export class LlmService implements LlmProvider {
   private errorCount = 0;
   private errorLastAt = 0;
 
-  constructor(config: ConfigService<AppConfig>) {
-    const { openaiApiKey } = config.get('llm', { infer: true })!;
-    this.openai = new OpenAI({ apiKey: openaiApiKey });
+  constructor() {
     // pi-ai reads OPENAI_API_KEY + ANTHROPIC_API_KEY from process.env automatically
+    this.openai = new OpenAI();
   }
 
   /** Returns a pi-ai stream. Caller iterates events and calls .result() for the final message. */

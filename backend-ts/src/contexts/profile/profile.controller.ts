@@ -12,7 +12,8 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
-import { IsOptional, IsString, IsArray, IsIn } from 'class-validator';
+import { createZodDto } from 'nestjs-zod';
+import { z } from 'zod';
 import { ClerkAuthGuard } from '../../common/guards/clerk-auth.guard.js';
 import { CurrentUser, AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { ProfileService } from './profile.service.js';
@@ -20,25 +21,31 @@ import { STORAGE, Storage } from '../../adapters/storage/storage.interface.js';
 import { Inject } from '@nestjs/common';
 import { ulid } from 'ulid';
 
-class CreateMaterialDto {
-  @IsOptional() @IsString() rawText?: string;
-  @IsOptional() @IsString() shiningText?: string;
-  @IsOptional() @IsString() rationale?: string;
-  @IsOptional() @IsArray() tags?: string[];
-  @IsString() provenanceKind: string;
-}
+class CreateMaterialDto extends createZodDto(
+  z.object({
+    rawText: z.string().optional(),
+    shiningText: z.string().optional(),
+    rationale: z.string().optional(),
+    tags: z.array(z.string()).optional(),
+    provenanceKind: z.string(),
+  }),
+) {}
 
-class UpdateMaterialDto {
-  @IsOptional() @IsString() shiningText?: string;
-  @IsOptional() @IsString() rationale?: string;
-  @IsOptional() @IsArray() tags?: string[];
-  @IsOptional() @IsIn(['PROPOSED', 'CONFIRMED', 'USER_EDITED']) status?: string;
-}
+class UpdateMaterialDto extends createZodDto(
+  z.object({
+    shiningText: z.string().optional(),
+    rationale: z.string().optional(),
+    tags: z.array(z.string()).optional(),
+    status: z.enum(['PROPOSED', 'CONFIRMED', 'USER_EDITED']).optional(),
+  }),
+) {}
 
-class CreateBaseResumeDto {
-  @IsString() name: string;
-  @IsOptional() @IsArray() selectedMaterialIds?: string[];
-}
+class CreateBaseResumeDto extends createZodDto(
+  z.object({
+    name: z.string(),
+    selectedMaterialIds: z.array(z.string()).optional(),
+  }),
+) {}
 
 @ApiTags('profile')
 @ApiBearerAuth()

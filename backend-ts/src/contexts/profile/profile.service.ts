@@ -14,6 +14,8 @@ import { randomBytes } from 'crypto';
 
 export const RESUME_PARSE_QUEUE = 'RESUME_PARSE';
 
+type ProfileMaterialView = Omit<ProfileMaterial, 'rawText'> & { rawText?: string };
+
 @Injectable()
 export class ProfileService {
   constructor(
@@ -64,9 +66,7 @@ export class ProfileService {
     return (await this.profileRepo.findOne({ where: { userId } }))!;
   }
 
-  async listMaterials(
-    userId: string,
-  ): Promise<Array<Omit<ProfileMaterial, 'rawText'> & { rawText?: string }>> {
+  async listMaterials(userId: string): Promise<Array<ProfileMaterialView>> {
     const materials = await this.materialRepo.find({
       where: { userId },
       order: { createdAt: 'DESC' },
@@ -74,15 +74,10 @@ export class ProfileService {
     return Promise.all(
       materials.map(async (m) => {
         const { rawText, ...rest } = m;
-        if (rawText) {
-          return { ...rest, rawText: await this.crypto.decrypt(rawText) } as Omit<
-            ProfileMaterial,
-            'rawText'
-          > & { rawText?: string };
-        }
-        return { ...rest, rawText: undefined } as Omit<ProfileMaterial, 'rawText'> & {
-          rawText?: string;
-        };
+        return {
+          ...rest,
+          rawText: rawText ? await this.crypto.decrypt(rawText) : undefined,
+        } as ProfileMaterialView;
       }),
     );
   }

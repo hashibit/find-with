@@ -1,18 +1,19 @@
 import { Body, Controller, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { IsOptional, IsString } from 'class-validator';
+import { createZodDto } from 'nestjs-zod';
+import { z } from 'zod';
 import { ClerkAuthGuard } from '../../common/guards/clerk-auth.guard.js';
 import { CurrentUser, AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { ApplyService } from './apply.service.js';
 
-class GenerateFillPlanDto {
-  @IsString() radarItemId: string;
-}
+class GenerateFillPlanDto extends createZodDto(z.object({ radarItemId: z.string() })) {}
 
-class RecordSubmissionDto {
-  @IsString() radarItemId: string;
-  @IsOptional() @IsString() resumeSnapshotId?: string;
-}
+class RecordSubmissionDto extends createZodDto(
+  z.object({
+    radarItemId: z.string(),
+    resumeSnapshotId: z.string().optional(),
+  }),
+) {}
 
 @ApiTags('apply')
 @ApiBearerAuth()

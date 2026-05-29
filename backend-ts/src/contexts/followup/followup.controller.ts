@@ -1,16 +1,19 @@
 import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { IsOptional, IsString } from 'class-validator';
+import { createZodDto } from 'nestjs-zod';
+import { z } from 'zod';
 import { ClerkAuthGuard } from '../../common/guards/clerk-auth.guard.js';
 import { CurrentUser, AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { FollowupService } from './followup.service.js';
 
-class CaptureEmailDto {
-  @IsOptional() @IsString() subject?: string;
-  @IsOptional() @IsString() fromAddr?: string;
-  @IsOptional() @IsString() bodyText?: string;
-  @IsOptional() @IsString() radarItemId?: string;
-}
+class CaptureEmailDto extends createZodDto(
+  z.object({
+    subject: z.string().optional(),
+    fromAddr: z.string().optional(),
+    bodyText: z.string().optional(),
+    radarItemId: z.string().optional(),
+  }),
+) {}
 
 @ApiTags('followup')
 @ApiBearerAuth()

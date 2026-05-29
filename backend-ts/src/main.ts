@@ -1,8 +1,8 @@
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { Logger } from 'nestjs-pino';
+import { ZodValidationPipe } from 'nestjs-zod';
 import { AppModule } from './app.module.js';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter.js';
 import { ConfigService } from '@nestjs/config';
@@ -23,14 +23,7 @@ async function bootstrap(): Promise<void> {
   app.enableCors({ origin: corsOrigins, credentials: true });
 
   // Global validation
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      transform: true,
-      forbidNonWhitelisted: true,
-      transformOptions: { enableImplicitConversion: true },
-    }),
-  );
+  app.useGlobalPipes(new ZodValidationPipe());
 
   // Global RFC 7807 exception filter
   app.useGlobalFilters(new HttpExceptionFilter());

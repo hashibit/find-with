@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createCipheriv, createDecipheriv, randomBytes } from 'crypto';
-import { AppConfig } from '../../config/configuration.js';
-import { FieldCrypto } from './crypto.interface.js';
+import { type AppConfig } from '../../config/configuration.js';
+import { type FieldCrypto } from './crypto.interface.js';
 
 const ALGORITHM = 'aes-256-gcm';
 const NONCE_LEN = 12;

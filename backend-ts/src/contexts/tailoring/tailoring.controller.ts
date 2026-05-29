@@ -2,8 +2,7 @@ import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/co
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
-import { ClerkAuthGuard } from '../../common/guards/clerk-auth.guard.js';
-import { CurrentUser, AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
+import { CurrentUser, type AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { TailoringService } from './tailoring.service.js';
 
 class StartTailoringDto extends createZodDto(
@@ -17,7 +16,6 @@ class EditBulletDto extends createZodDto(z.object({ text: z.string() })) {}
 
 @ApiTags('tailoring')
 @ApiBearerAuth()
-@UseGuards(ClerkAuthGuard)
 @Controller('tailoring')
 export class TailoringController {
   constructor(private readonly service: TailoringService) {}

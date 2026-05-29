@@ -10,7 +10,7 @@ import { ProfileProfile } from '../../database/entities/profile/profile.entity.j
 import { ProfileEducation } from '../../database/entities/profile/education.entity.js';
 import { ProfileWorkExperience } from '../../database/entities/profile/work-experience.entity.js';
 import { ProfileSkill } from '../../database/entities/profile/skill.entity.js';
-import { STORAGE, Storage } from '../../adapters/storage/storage.interface.js';
+import { STORAGE, type Storage } from '../../adapters/storage/storage.interface.js';
 import { LLM_PROVIDER, type LlmProvider } from '../../llm/llm-provider.interface.js';
 import { RESUME_PARSE_QUEUE } from './profile.service.js';
 import { ulid } from 'ulid';

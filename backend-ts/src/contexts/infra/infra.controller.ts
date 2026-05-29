@@ -1,7 +1,7 @@
-import { Body, Controller, Headers, Post, RawBodyRequest, Req } from '@nestjs/common';
+import { Body, Controller, Headers, Post, type RawBodyRequest, Req } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
-import { Request } from 'express';
+import { type Request } from 'express';
 import Stripe from 'stripe';
 import { Webhook } from 'svix';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -9,7 +9,7 @@ import { Repository } from 'typeorm';
 import { TelemetryEvent } from '../../database/entities/telemetry/telemetry-event.entity.js';
 import { IamService } from '../iam/iam.service.js';
 import { BillingService } from '../iam/billing.service.js';
-import { AppConfig } from '../../config/configuration.js';
+import { type AppConfig } from '../../config/configuration.js';
 import { ulid } from 'ulid';
 
 @ApiTags('infra')

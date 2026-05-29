@@ -2,8 +2,7 @@ import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/co
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
-import { ClerkAuthGuard } from '../../common/guards/clerk-auth.guard.js';
-import { CurrentUser, AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
+import { CurrentUser, type AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { JobsService } from './jobs.service.js';
 
 class CaptureJobDto extends createZodDto(
@@ -36,7 +35,6 @@ class UpdateRadarDto extends createZodDto(
 
 @ApiTags('jobs')
 @ApiBearerAuth()
-@UseGuards(ClerkAuthGuard)
 @Controller('jobs')
 export class JobsController {
   constructor(private readonly service: JobsService) {}

@@ -2,8 +2,7 @@ import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
-import { ClerkAuthGuard } from '../../common/guards/clerk-auth.guard.js';
-import { CurrentUser, AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
+import { CurrentUser, type AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { FollowupService } from './followup.service.js';
 
 class CaptureEmailDto extends createZodDto(
@@ -17,7 +16,6 @@ class CaptureEmailDto extends createZodDto(
 
 @ApiTags('followup')
 @ApiBearerAuth()
-@UseGuards(ClerkAuthGuard)
 @Controller('followup')
 export class FollowupController {
   constructor(private readonly service: FollowupService) {}

@@ -1,8 +1,8 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
-import { AppConfig } from '../../config/configuration.js';
-import { AuthVerifier, VerifiedToken } from './auth.interface.js';
+import { type AppConfig } from '../../config/configuration.js';
+import { type AuthVerifier, type VerifiedToken } from './auth.interface.js';
 
 @Injectable()
 export class ClerkAuthAdapter implements AuthVerifier {

@@ -8,7 +8,7 @@ import { FollowupDraft } from '../../database/entities/followup/followup-draft.e
 import { FIELD_CRYPTO } from '../../common/crypto/crypto.interface.js';
 import { EnvelopeCryptoService } from '../../common/crypto/envelope-crypto.service.js';
 import { EphemeralCryptoService } from '../../common/crypto/ephemeral-crypto.service.js';
-import { AppConfig } from '../../config/configuration.js';
+import { type AppConfig } from '../../config/configuration.js';
 
 @Module({
   imports: [TypeOrmModule.forFeature([FollowupEmail, FollowupDraft])],

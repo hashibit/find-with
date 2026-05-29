@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { FieldCrypto } from './crypto.interface.js';
+import { type FieldCrypto } from './crypto.interface.js';
 
 /**
  * Dev-only identity "crypto" — stores plaintext as UTF-8 bytes.

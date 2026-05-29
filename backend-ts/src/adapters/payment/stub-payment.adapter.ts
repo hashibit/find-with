@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { CheckoutSession, PaymentGateway, PortalSession } from './payment.interface.js';
+import { type CheckoutSession, type PaymentGateway, type PortalSession } from './payment.interface.js';
 
 @Injectable()
 export class StubPaymentAdapter implements PaymentGateway {

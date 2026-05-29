@@ -6,8 +6,8 @@
   "scripts": {
     "build": "nest build",
     "start": "node dist/main.js",
-    "start:dev": "tsx watch src/main.ts",
-    "start:debug": "tsx watch --inspect src/main.ts",
+    "start:dev": "nest start --builder swc --watch",
+    "start:debug": "nest start --builder swc --watch --debug",
     "start:prod": "node dist/main.js",
     "lint": "eslint src test --fix",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
@@ -15,10 +15,10 @@
     "test:watch": "vitest",
     "test:cov": "vitest run --coverage",
     "test:int": "vitest run --config test/vitest.integration.config.ts",
-    "typeorm": "tsx ./node_modules/typeorm/cli.js --dataSource src/database/data-source.ts",
-    "migration:generate": "pnpm run typeorm -- migration:generate",
-    "migration:run": "pnpm run typeorm -- migration:run",
-    "migration:revert": "pnpm run typeorm -- migration:revert"
+    "typeorm": "tsx ./node_modules/typeorm/cli.js",
+    "migration:generate": "pnpm run typeorm migration:generate -d src/database/data-source.ts",
+    "migration:run": "pnpm run typeorm migration:run -d src/database/data-source.ts",
+    "migration:revert": "pnpm run typeorm migration:revert -d src/database/data-source.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.600.0",
@@ -40,6 +40,7 @@
     "bullmq": "^5.12.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
+    "dotenv": "^17.4.2",
     "ioredis": "^5.4.1",
     "jose": "^5.0.0",
     "mammoth": "^1.8.0",
@@ -63,6 +64,8 @@
     "@nestjs/cli": "^10.4.2",
     "@nestjs/schematics": "^10.1.4",
     "@nestjs/testing": "^10.3.0",
+    "@swc/cli": "^0.8.1",
+    "@swc/core": "^1.15.40",
     "@testcontainers/postgresql": "^10.11.0",
     "@testcontainers/redis": "^10.11.0",
     "@types/express": "^4.17.21",

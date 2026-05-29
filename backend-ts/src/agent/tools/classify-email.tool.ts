@@ -4,7 +4,7 @@ import { Repository } from 'typeorm';
 import { Type } from '@sinclair/typebox';
 import { FollowupEmail } from '../../database/entities/followup/followup-email.entity.js';
 import { LLM_PROVIDER, type LlmProvider } from '../../llm/llm-provider.interface.js';
-import { FIELD_CRYPTO, FieldCrypto } from '../../common/crypto/crypto.interface.js';
+import { FIELD_CRYPTO, type FieldCrypto } from '../../common/crypto/crypto.interface.js';
 
 export const CLASSIFY_EMAIL_TOOL_NAME = 'classify_email';
 

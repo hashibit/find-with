@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Stripe from 'stripe';
-import { AppConfig } from '../../config/configuration.js';
-import { CheckoutSession, PaymentGateway, PortalSession } from './payment.interface.js';
+import { type AppConfig } from '../../config/configuration.js';
+import { type CheckoutSession, type PaymentGateway, type PortalSession } from './payment.interface.js';
 
 @Injectable()
 export class StripePaymentAdapter implements PaymentGateway {

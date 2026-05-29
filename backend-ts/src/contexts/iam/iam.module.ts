@@ -12,7 +12,7 @@ import { QuotaUsageCounter } from '../../database/entities/quota/quota-counter.e
 import { PAYMENT_GATEWAY } from '../../adapters/payment/payment.interface.js';
 import { StripePaymentAdapter } from '../../adapters/payment/stripe-payment.adapter.js';
 import { StubPaymentAdapter } from '../../adapters/payment/stub-payment.adapter.js';
-import { AppConfig } from '../../config/configuration.js';
+import { type AppConfig } from '../../config/configuration.js';
 import { AUTH_VERIFIER } from '../../adapters/auth/auth.interface.js';
 import { ClerkAuthAdapter } from '../../adapters/auth/clerk-auth.adapter.js';
 import { DevAuthAdapter } from '../../adapters/auth/dev-auth.adapter.js';
@@ -42,6 +42,6 @@ import { DevAuthAdapter } from '../../adapters/auth/dev-auth.adapter.js';
       },
     },
   ],
-  exports: [IamService, AUTH_VERIFIER, PAYMENT_GATEWAY],
+  exports: [IamService, BillingService, AUTH_VERIFIER, PAYMENT_GATEWAY],
 })
 export class IamModule {}

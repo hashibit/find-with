@@ -4,7 +4,7 @@ import { Repository } from 'typeorm';
 import { Type } from '@sinclair/typebox';
 import { ProfileMaterial } from '../../database/entities/profile/material.entity.js';
 import { LLM_PROVIDER, type LlmProvider } from '../../llm/llm-provider.interface.js';
-import { FIELD_CRYPTO, FieldCrypto } from '../../common/crypto/crypto.interface.js';
+import { FIELD_CRYPTO, type FieldCrypto } from '../../common/crypto/crypto.interface.js';
 import { ulid } from 'ulid';
 
 export const MINE_SHINING_POINT_TOOL_NAME = 'mine_shining_point';

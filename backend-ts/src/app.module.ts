@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
+import { UserAuthGuard } from './common/guards/user-auth.guard.js';
 import { BullModule } from '@nestjs/bullmq';
 import { LoggerModule } from 'nestjs-pino';
 import { ThrottlerModule } from '@nestjs/throttler';
@@ -17,7 +19,7 @@ import { ApplyModule } from './contexts/apply/apply.module.js';
 import { FollowupModule } from './contexts/followup/followup.module.js';
 import { RecommendationModule } from './contexts/recommendation/recommendation.module.js';
 import { InfraModule } from './contexts/infra/infra.module.js';
-import { AppConfig } from './config/configuration.js';
+import { type AppConfig } from './config/configuration.js';
 
 @Module({
   imports: [
@@ -52,5 +54,6 @@ import { AppConfig } from './config/configuration.js';
     RecommendationModule,
     InfraModule,
   ],
+  providers: [{ provide: APP_GUARD, useClass: UserAuthGuard }],
 })
 export class AppModule {}

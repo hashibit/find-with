@@ -1,15 +1,15 @@
 import {
-  CanActivate,
-  ExecutionContext,
+  type CanActivate,
+  type ExecutionContext,
   Inject,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
-import { Request } from 'express';
-import { AUTH_VERIFIER, AuthVerifier } from '../../adapters/auth/auth.interface.js';
+import { type Request } from 'express';
+import { AUTH_VERIFIER, type AuthVerifier } from '../../adapters/auth/auth.interface.js';
 
 @Injectable()
-export class ClerkAuthGuard implements CanActivate {
+export class UserAuthGuard implements CanActivate {
   constructor(@Inject(AUTH_VERIFIER) private readonly verifier: AuthVerifier) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {

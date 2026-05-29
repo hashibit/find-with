@@ -14,10 +14,9 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
-import { ClerkAuthGuard } from '../../common/guards/clerk-auth.guard.js';
-import { CurrentUser, AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
+import { CurrentUser, type AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { ProfileService } from './profile.service.js';
-import { STORAGE, Storage } from '../../adapters/storage/storage.interface.js';
+import { STORAGE, type Storage } from '../../adapters/storage/storage.interface.js';
 import { Inject } from '@nestjs/common';
 import { ulid } from 'ulid';
 
@@ -49,7 +48,6 @@ class CreateBaseResumeDto extends createZodDto(
 
 @ApiTags('profile')
 @ApiBearerAuth()
-@UseGuards(ClerkAuthGuard)
 @Controller('profile')
 export class ProfileController {
   constructor(

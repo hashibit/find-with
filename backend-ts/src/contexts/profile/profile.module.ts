@@ -19,7 +19,7 @@ import { EnvelopeCryptoService } from '../../common/crypto/envelope-crypto.servi
 import { EphemeralCryptoService } from '../../common/crypto/ephemeral-crypto.service.js';
 import { STORAGE } from '../../adapters/storage/storage.interface.js';
 import { S3StorageAdapter } from '../../adapters/storage/s3-storage.adapter.js';
-import { AppConfig } from '../../config/configuration.js';
+import { type AppConfig } from '../../config/configuration.js';
 
 @Module({
   imports: [

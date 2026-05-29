@@ -6,7 +6,7 @@ import { ZodValidationPipe } from 'nestjs-zod';
 import { AppModule } from './app.module.js';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter.js';
 import { ConfigService } from '@nestjs/config';
-import { AppConfig } from './config/configuration.js';
+import { type AppConfig } from './config/configuration.js';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule, { bufferLogs: true, rawBody: true });

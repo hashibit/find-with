@@ -9,3 +9,5 @@ v0.1-website-design.md
 协议： @proto/findwith
 
 开发计划： @docs/sprint
+
+Always use English in the whole project.

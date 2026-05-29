@@ -2,8 +2,7 @@ import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
-import { ClerkAuthGuard } from '../../common/guards/clerk-auth.guard.js';
-import { CurrentUser, AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
+import { CurrentUser, type AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { BillingService } from './billing.service.js';
 
 class CreateCheckoutDto extends createZodDto(
@@ -18,7 +17,6 @@ class CreatePortalDto extends createZodDto(z.object({ returnUrl: z.string() })) 
 
 @ApiTags('billing')
 @ApiBearerAuth()
-@UseGuards(ClerkAuthGuard)
 @Controller('billing')
 export class BillingController {
   constructor(private readonly service: BillingService) {}

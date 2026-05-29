@@ -7,7 +7,7 @@ import { ProfileProfile } from '../../database/entities/profile/profile.entity.j
 import { ProfileMaterial } from '../../database/entities/profile/material.entity.js';
 import { ProfileBaseResume } from '../../database/entities/profile/base-resume.entity.js';
 import { ProfileResumeSource } from '../../database/entities/profile/resume-source.entity.js';
-import { FIELD_CRYPTO, FieldCrypto } from '../../common/crypto/crypto.interface.js';
+import { FIELD_CRYPTO, type FieldCrypto } from '../../common/crypto/crypto.interface.js';
 import { Inject } from '@nestjs/common';
 import { ulid } from 'ulid';
 import { randomBytes } from 'crypto';

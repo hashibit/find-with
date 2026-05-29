@@ -11,7 +11,7 @@ import { ProfileEducation } from '../../database/entities/profile/education.enti
 import { ProfileWorkExperience } from '../../database/entities/profile/work-experience.entity.js';
 import { ProfileSkill } from '../../database/entities/profile/skill.entity.js';
 import { STORAGE, Storage } from '../../adapters/storage/storage.interface.js';
-import { LlmService } from '../../llm/llm.service.js';
+import { LLM_PROVIDER, type LlmProvider } from '../../llm/llm-provider.interface.js';
 import { RESUME_PARSE_QUEUE } from './profile.service.js';
 import { ulid } from 'ulid';
 
@@ -38,7 +38,7 @@ export class ProfileProcessor extends WorkerHost {
     @InjectRepository(ProfileSkill)
     private readonly skillRepo: Repository<ProfileSkill>,
     @Inject(STORAGE) private readonly storage: Storage,
-    private readonly llm: LlmService,
+    @Inject(LLM_PROVIDER) private readonly llm: LlmProvider,
   ) {
     super();
   }

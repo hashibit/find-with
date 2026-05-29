@@ -1,9 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Type } from '@sinclair/typebox';
 import { JobCompanyBrief } from '../../database/entities/jobs/company-brief.entity.js';
-import { LlmService } from '../../llm/llm.service.js';
+import { LLM_PROVIDER, type LlmProvider } from '../../llm/llm-provider.interface.js';
 import { ulid } from 'ulid';
 
 export const SEARCH_COMPANY_TOOL_NAME = 'search_company';
@@ -13,7 +13,7 @@ export class SearchCompanyTool {
   constructor(
     @InjectRepository(JobCompanyBrief)
     private readonly repo: Repository<JobCompanyBrief>,
-    private readonly llm: LlmService,
+    @Inject(LLM_PROVIDER) private readonly llm: LlmProvider,
   ) {}
 
   readonly name = SEARCH_COMPANY_TOOL_NAME;

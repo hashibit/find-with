@@ -7,6 +7,7 @@ import { ConvConversation } from '../database/entities/conversation/conversation
 import { ProfileProfile } from '../database/entities/profile/profile.entity.js';
 import { ProfileMaterial } from '../database/entities/profile/material.entity.js';
 import { FIELD_CRYPTO, FieldCrypto } from '../common/crypto/crypto.interface.js';
+import { resolveDensity, densityInstruction } from '../common/density-resolver.js';
 
 const QUINN_SYSTEM_PROMPT = `You are Quinn, an AI job search companion built into the FindWith Chrome extension. The user is a job seeker in North America.
 
@@ -99,6 +100,12 @@ export class ContextBuilderService {
     if (conversation?.rollingSummary) {
       systemPrompt += `\n\n# Conversation summary so far\n${conversation.rollingSummary}`;
     }
+
+    // Append density instruction — effectiveDensity is set by set_conversation_density tool
+    // and defaults to BALANCED (which is already described in the base Quinn prompt).
+    // TODO: pass IamSettings.density as globalDensity once IamSettings is accessible here.
+    const density = resolveDensity(conversation?.effectiveDensity, null);
+    systemPrompt += densityInstruction(density);
 
     // Reconstruct history from DB records. AssistantMessage.content must be ContentBlock[]
     // (pi-ai calls .flatMap on it). Provide stub metadata so transform-messages treats these

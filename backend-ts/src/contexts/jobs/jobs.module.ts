@@ -9,12 +9,13 @@ import { JobParsedJd } from '../../database/entities/jobs/parsed-jd.entity.js';
 import { JobCompanyBrief } from '../../database/entities/jobs/company-brief.entity.js';
 import { JobMatchResult } from '../../database/entities/jobs/match-result.entity.js';
 import { JobRadarItem } from '../../database/entities/jobs/radar-item.entity.js';
-import { ProfileMaterial } from '../../database/entities/profile/material.entity.js';
+import { ProfileModule } from '../profile/profile.module.js';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([JobCapture, JobParsedJd, JobCompanyBrief, JobMatchResult, JobRadarItem, ProfileMaterial]),
+    TypeOrmModule.forFeature([JobCapture, JobParsedJd, JobCompanyBrief, JobMatchResult, JobRadarItem]),
     BullModule.registerQueue({ name: JOB_ANALYZE_QUEUE }),
+    ProfileModule,
   ],
   controllers: [JobsController],
   providers: [JobsService, JobsProcessor],

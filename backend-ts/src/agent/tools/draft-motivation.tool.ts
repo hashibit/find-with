@@ -1,9 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Type } from '@sinclair/typebox';
 import { JobParsedJd } from '../../database/entities/jobs/parsed-jd.entity.js';
-import { LlmService } from '../../llm/llm.service.js';
+import { LLM_PROVIDER, type LlmProvider } from '../../llm/llm-provider.interface.js';
 
 export const DRAFT_MOTIVATION_TOOL_NAME = 'draft_motivation';
 
@@ -12,7 +12,7 @@ export class DraftMotivationTool {
   constructor(
     @InjectRepository(JobParsedJd)
     private readonly jdRepo: Repository<JobParsedJd>,
-    private readonly llm: LlmService,
+    @Inject(LLM_PROVIDER) private readonly llm: LlmProvider,
   ) {}
 
   readonly name = DRAFT_MOTIVATION_TOOL_NAME;

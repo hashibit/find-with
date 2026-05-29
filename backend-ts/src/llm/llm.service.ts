@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { getModel, stream, complete, type Context } from '@earendil-works/pi-ai';
 import OpenAI from 'openai';
 import { AppConfig } from '../config/configuration.js';
+import { type LlmProvider } from './llm-provider.interface.js';
 
 export const MODEL_PARSE = 'gpt-4.1-mini';
 export const MODEL_WRITE = 'gpt-4.1';
@@ -12,7 +13,7 @@ const FAILOVER_THRESHOLD = 5;
 const FAILOVER_WINDOW_MS = 60_000;
 
 @Injectable()
-export class LlmService {
+export class LlmService implements LlmProvider {
   // openai kept solely for embeddings — pi-ai does not cover the embeddings API
   private readonly openai: OpenAI;
   private errorCount = 0;

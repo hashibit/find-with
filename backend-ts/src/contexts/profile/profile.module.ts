@@ -5,6 +5,7 @@ import { ConfigService } from '@nestjs/config';
 import { ProfileController } from './profile.controller.js';
 import { ProfileService, RESUME_PARSE_QUEUE } from './profile.service.js';
 import { ProfileProcessor } from './profile.processor.js';
+import { MaterialManager } from './material-manager.service.js';
 import { ProfileResumeSource } from '../../database/entities/profile/resume-source.entity.js';
 import { ProfileProfile } from '../../database/entities/profile/profile.entity.js';
 import { ProfileEducation } from '../../database/entities/profile/education.entity.js';
@@ -33,6 +34,7 @@ import { AppConfig } from '../../config/configuration.js';
   providers: [
     ProfileService,
     ProfileProcessor,
+    MaterialManager,
     {
       provide: FIELD_CRYPTO,
       inject: [ConfigService],
@@ -47,6 +49,6 @@ import { AppConfig } from '../../config/configuration.js';
       useFactory: (config: ConfigService<AppConfig>) => new S3StorageAdapter(config),
     },
   ],
-  exports: [ProfileService],
+  exports: [ProfileService, MaterialManager],
 })
 export class ProfileModule {}

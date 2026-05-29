@@ -1,11 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Type } from '@sinclair/typebox';
 import { FollowupEmail } from '../../database/entities/followup/followup-email.entity.js';
-import { LlmService } from '../../llm/llm.service.js';
+import { LLM_PROVIDER, type LlmProvider } from '../../llm/llm-provider.interface.js';
 import { FIELD_CRYPTO, FieldCrypto } from '../../common/crypto/crypto.interface.js';
-import { Inject } from '@nestjs/common';
 
 export const CLASSIFY_EMAIL_TOOL_NAME = 'classify_email';
 
@@ -14,7 +13,7 @@ export class ClassifyEmailTool {
   constructor(
     @InjectRepository(FollowupEmail)
     private readonly repo: Repository<FollowupEmail>,
-    private readonly llm: LlmService,
+    @Inject(LLM_PROVIDER) private readonly llm: LlmProvider,
     @Inject(FIELD_CRYPTO) private readonly crypto: FieldCrypto,
   ) {}
 

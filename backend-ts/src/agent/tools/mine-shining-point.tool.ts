@@ -1,11 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Type } from '@sinclair/typebox';
 import { ProfileMaterial } from '../../database/entities/profile/material.entity.js';
-import { LlmService } from '../../llm/llm.service.js';
+import { LLM_PROVIDER, type LlmProvider } from '../../llm/llm-provider.interface.js';
 import { FIELD_CRYPTO, FieldCrypto } from '../../common/crypto/crypto.interface.js';
-import { Inject } from '@nestjs/common';
 import { ulid } from 'ulid';
 
 export const MINE_SHINING_POINT_TOOL_NAME = 'mine_shining_point';
@@ -15,7 +14,7 @@ export class MineShiningPointTool {
   constructor(
     @InjectRepository(ProfileMaterial)
     private readonly repo: Repository<ProfileMaterial>,
-    private readonly llm: LlmService,
+    @Inject(LLM_PROVIDER) private readonly llm: LlmProvider,
     @Inject(FIELD_CRYPTO) private readonly crypto: FieldCrypto,
   ) {}
 

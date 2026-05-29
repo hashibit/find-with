@@ -1,12 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Type, Static } from '@sinclair/typebox';
 import { FollowupEmail } from '../../database/entities/followup/followup-email.entity.js';
 import { FollowupDraft } from '../../database/entities/followup/followup-draft.entity.js';
-import { LlmService } from '../../llm/llm.service.js';
+import { LLM_PROVIDER, type LlmProvider } from '../../llm/llm-provider.interface.js';
 import { FIELD_CRYPTO, FieldCrypto } from '../../common/crypto/crypto.interface.js';
-import { Inject } from '@nestjs/common';
 import { ulid } from 'ulid';
 
 export const DRAFT_REPLY_TOOL_NAME = 'draft_reply';
@@ -27,7 +26,7 @@ export class DraftReplyTool {
     private readonly emailRepo: Repository<FollowupEmail>,
     @InjectRepository(FollowupDraft)
     private readonly draftRepo: Repository<FollowupDraft>,
-    private readonly llm: LlmService,
+    @Inject(LLM_PROVIDER) private readonly llm: LlmProvider,
     @Inject(FIELD_CRYPTO) private readonly crypto: FieldCrypto,
   ) {}
 

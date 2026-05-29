@@ -1,13 +1,13 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
-import { Logger } from '@nestjs/common';
+import { Logger, Inject } from '@nestjs/common';
 import { Job } from 'bullmq';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { TailoringResume } from '../../database/entities/tailoring/tailoring-resume.entity.js';
 import { JobParsedJd } from '../../database/entities/jobs/parsed-jd.entity.js';
 import { ProfileBaseResume } from '../../database/entities/profile/base-resume.entity.js';
-import { ProfileMaterial } from '../../database/entities/profile/material.entity.js';
-import { LlmService } from '../../llm/llm.service.js';
+import { LLM_PROVIDER, type LlmProvider } from '../../llm/llm-provider.interface.js';
+import { MaterialManager } from '../profile/material-manager.service.js';
 import { TAILORING_QUEUE } from './tailoring.service.js';
 import { ulid } from 'ulid';
 
@@ -19,8 +19,8 @@ export class TailoringProcessor extends WorkerHost {
     @InjectRepository(TailoringResume) private readonly resumeRepo: Repository<TailoringResume>,
     @InjectRepository(JobParsedJd) private readonly jdRepo: Repository<JobParsedJd>,
     @InjectRepository(ProfileBaseResume) private readonly baseResumeRepo: Repository<ProfileBaseResume>,
-    @InjectRepository(ProfileMaterial) private readonly materialRepo: Repository<ProfileMaterial>,
-    private readonly llm: LlmService,
+    @Inject(LLM_PROVIDER) private readonly llm: LlmProvider,
+    private readonly materialManager: MaterialManager,
   ) {
     super();
   }
@@ -29,6 +29,12 @@ export class TailoringProcessor extends WorkerHost {
     const { tailoredResumeId, userId } = job.data;
     const tailored = await this.resumeRepo.findOne({ where: { id: tailoredResumeId } });
     if (!tailored) return;
+
+    // Idempotent: skip generation if sections are already populated
+    if (tailored.sections && (tailored.sections as unknown[]).length > 0) {
+      this.logger.log(`Tailoring ${tailoredResumeId} already has sections — skipping generation`);
+      return;
+    }
 
     const [parsedJd, baseResume] = await Promise.all([
       this.jdRepo.findOne({ where: { id: tailored.parsedJdId } }),
@@ -40,12 +46,11 @@ export class TailoringProcessor extends WorkerHost {
       return;
     }
 
-    // Get confirmed materials
-    const materialIds = baseResume.selectedMaterialIds ?? [];
-    const materials = await this.materialRepo.find({ where: { userId, status: 'CONFIRMED' } });
-    const relevantMaterials = materialIds.length > 0
-      ? materials.filter((m) => materialIds.includes(m.id))
-      : materials;
+    // MaterialManager owns all material reads
+    const relevantMaterials = await this.materialManager.forTailoring(
+      userId,
+      baseResume.selectedMaterialIds ?? null,
+    );
 
     const materialContext = relevantMaterials
       .map((m) => `- ${m.shiningText ?? ''} [${(m.tags ?? []).join(', ')}]`)

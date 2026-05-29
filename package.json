@@ -3,6 +3,9 @@
   "private": true,
   "packageManager": "pnpm@9.1.0",
   "scripts": {
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "pnpm --recursive run lint",
     "proto:lint": "buf lint",
     "proto:breaking": "buf breaking --against .git#branch=main",
     "proto:generate": "buf generate",
@@ -12,5 +15,8 @@
     "web:dev": "pnpm --filter web dev",
     "web:build": "pnpm --filter web build",
     "web:test": "pnpm --filter web test"
+  },
+  "devDependencies": {
+    "prettier": "^3.3.3"
   }
 }

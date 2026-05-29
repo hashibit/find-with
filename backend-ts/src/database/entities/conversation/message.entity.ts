@@ -8,34 +8,15 @@ export class ConvMessage extends BaseEntity {
   conversationId: string;
 
   @Column({ type: 'varchar', length: 20 })
-  role: string; // USER | ASSISTANT | SYSTEM | TOOL
+  role: string; // USER | ASSISTANT | TOOL_RESULT
 
+  // Extracted text for display / search. Null for non-text messages.
   @Column({ type: 'text', nullable: true })
   text: string | null;
 
+  // Full pi-ai Message object. Null only for legacy USER messages.
   @Column({ type: 'jsonb', nullable: true })
-  toolCalls: unknown[] | null;
-
-  @Column({ type: 'jsonb', nullable: true })
-  toolResult: Record<string, unknown> | null;
-
-  @Column({ type: 'int', nullable: true })
-  tokenPrompt: number | null;
-
-  @Column({ type: 'int', nullable: true })
-  tokenCompletion: number | null;
-
-  @Column({ type: 'varchar', length: 50, nullable: true })
-  tokenModel: string | null;
-
-  @Column({ type: 'float', nullable: true })
-  tokenCostUsd: number | null;
-
-  @Column({ type: 'varchar', length: 20, nullable: true })
-  finishReason: string | null;
-
-  @Column({ type: 'jsonb', nullable: true })
-  meta: Record<string, unknown> | null;
+  payload: unknown | null;
 
   @Column({ type: 'boolean', default: false })
   archived: boolean;

@@ -1,13 +1,18 @@
 import { Injectable, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { type Context } from '@earendil-works/pi-ai';
+import { type Context, type Message } from '@earendil-works/pi-ai';
+
 import { ConvMessage } from '../database/entities/conversation/message.entity.js';
 import { ConvConversation } from '../database/entities/conversation/conversation.entity.js';
+import { ConvRollingSummary } from '@/database/entities/conversation/rolling-summary.entity.js';
+
 import { ProfileProfile } from '../database/entities/profile/profile.entity.js';
 import { ProfileMaterial } from '../database/entities/profile/material.entity.js';
-import { FIELD_CRYPTO, type FieldCrypto } from '../common/crypto/crypto.interface.js';
 import { resolveDensity, densityInstruction } from '../common/density-resolver.js';
+
+import { PinoLogger, InjectPinoLogger } from 'nestjs-pino';
+import { convertTools } from 'node_modules/@earendil-works/pi-ai/dist/providers/google-shared.js';
 
 const QUINN_SYSTEM_PROMPT = `You are Quinn, an AI job search companion built into the FindWith Chrome extension. The user is a job seeker in North America.
 
@@ -46,7 +51,9 @@ Push back with reasoning: "I don't recommend you apply to this. Here's why: [rea
 # When user gets an offer they accept
 Be direct, not gushy. Help them archive the journey for future reference. Say goodbye gracefully.`;
 
-const MAX_HISTORY_MESSAGES = 30;
+export const MOST_RECENT_MESSAGES = 30;
+export const MAX_ROLLING_SUMMARIES = 20;
+export const MAX_MATERIALS = 20;
 
 @Injectable()
 export class ContextBuilderService {
@@ -55,11 +62,14 @@ export class ContextBuilderService {
     private readonly messageRepo: Repository<ConvMessage>,
     @InjectRepository(ConvConversation)
     private readonly convRepo: Repository<ConvConversation>,
+    @InjectRepository(ConvRollingSummary)
+    private readonly rollingSummayRepo: Repository<ConvRollingSummary>,
     @InjectRepository(ProfileProfile)
     private readonly profileRepo: Repository<ProfileProfile>,
     @InjectRepository(ProfileMaterial)
     private readonly materialRepo: Repository<ProfileMaterial>,
-    @Inject(FIELD_CRYPTO) private readonly crypto: FieldCrypto,
+    @InjectPinoLogger(ContextBuilderService.name)
+    private readonly logger: PinoLogger,
   ) {}
 
   async build(
@@ -68,20 +78,29 @@ export class ContextBuilderService {
     conversationKind: string,
     anchorId?: string | null,
   ): Promise<Context> {
-    const [profile, materials, history, conversation] = await Promise.all([
+    const [profile, materials, recentMessages, rollingSummaries, conversation] = await Promise.all([
       this.profileRepo.findOne({ where: { userId } }),
       this.materialRepo.find({
         where: { userId, status: 'CONFIRMED' },
-        take: 20,
+        take: MAX_MATERIALS,
         order: { createdAt: 'DESC' },
       }),
       this.messageRepo.find({
-        where: { conversationId },
+        where: { conversationId, archived: false },
+        order: { createdAt: 'DESC' },
+        take: MOST_RECENT_MESSAGES,
+      }),
+      this.rollingSummayRepo.find({
+        where: { conversationId: conversationId },
+        take: MAX_ROLLING_SUMMARIES,
         order: { createdAt: 'ASC' },
-        take: MAX_HISTORY_MESSAGES,
       }),
       this.convRepo.findOne({ where: { id: conversationId } }),
     ]);
+
+    // from DESC to ASC;
+    recentMessages.reverse();
+    materials.reverse();
 
     let systemPrompt = QUINN_SYSTEM_PROMPT;
 
@@ -91,14 +110,21 @@ export class ContextBuilderService {
     }
 
     if (materials.length > 0) {
+      if (materials.length >= MAX_MATERIALS) {
+        this.logger.warn(`materials count reach maximun value.${MAX_MATERIALS}`);
+      }
       const materialLines = materials
         .slice(0, 10)
         .map((m) => `- ${m.shiningText ?? '(no shining text)'} [${(m.tags ?? []).join(', ')}]`);
       systemPrompt += `\n\n# User's confirmed shining points (material library)\n${materialLines.join('\n')}`;
     }
 
-    if (conversation?.rollingSummary) {
-      systemPrompt += `\n\n# Conversation summary so far\n${conversation.rollingSummary}`;
+    if (rollingSummaries.length > 0) {
+      if (rollingSummaries.length > MAX_ROLLING_SUMMARIES) {
+        this.logger.warn(`rollingSummaries count reach maximun value.${MAX_ROLLING_SUMMARIES}`);
+      }
+      const summariesContent = rollingSummaries.map((s) => s.content).join('\n\n----\n\n');
+      systemPrompt += `\n\n# Conversation summaries so far\n${summariesContent}`;
     }
 
     // Append density instruction — effectiveDensity is set by set_conversation_density tool
@@ -107,30 +133,23 @@ export class ContextBuilderService {
     const density = resolveDensity(conversation?.effectiveDensity, null);
     systemPrompt += densityInstruction(density);
 
-    // Reconstruct history from DB records. AssistantMessage.content must be ContentBlock[]
-    // (pi-ai calls .flatMap on it). Provide stub metadata so transform-messages treats these
-    // as cross-model history (isSameModel=false) and only passes through text content.
-    const messages: Context['messages'] = history.map((msg) =>
-      msg.role === 'USER'
-        ? { role: 'user' as const, content: msg.text ?? '', timestamp: msg.createdAt.getTime() }
-        : {
-            role: 'assistant' as const,
-            content: [{ type: 'text' as const, text: msg.text ?? '' }],
-            api: 'openai-completions' as const,
-            provider: 'openai' as const,
-            model: 'unknown',
-            usage: {
-              input: 0,
-              output: 0,
-              cacheRead: 0,
-              cacheWrite: 0,
-              totalTokens: 0,
-              cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
-            },
-            stopReason: 'stop' as const,
+    // Reconstruct history from DB records. USER messages have no payload (legacy text-only).
+    // ASSISTANT and TOOL_RESULT messages carry the full pi-ai Message object in payload.
+    const messages: Message[] = recentMessages.flatMap((msg) => {
+      if (msg.role === 'USER') {
+        return [
+          {
+            role: 'user' as const,
+            content: msg.text ?? '',
             timestamp: msg.createdAt.getTime(),
           },
-    );
+        ];
+      }
+      if (msg.payload) {
+        return [msg.payload as Message];
+      }
+      return [];
+    });
 
     return { systemPrompt, messages };
   }

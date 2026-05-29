@@ -2,11 +2,17 @@ import { Injectable, Logger, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Observable, Subject } from 'rxjs';
-import { type Context, type Tool } from '@earendil-works/pi-ai';
+import {
+  type AssistantMessage,
+  type Context,
+  type Message,
+  type Tool,
+  type ToolResultMessage,
+} from '@earendil-works/pi-ai';
 import { ConvMessage } from '../database/entities/conversation/message.entity.js';
 import { ConvConversation } from '../database/entities/conversation/conversation.entity.js';
 import { LLM_PROVIDER, type LlmProvider } from '../llm/llm-provider.interface.js';
-import { ContextBuilderService } from './context-builder.service.js';
+import { MOST_RECENT_MESSAGES, ContextBuilderService } from './context-builder.service.js';
 import { SearchCompanyTool } from './tools/search-company.tool.js';
 import { MineShiningPointTool } from './tools/mine-shining-point.tool.js';
 import { DraftMotivationTool } from './tools/draft-motivation.tool.js';
@@ -167,16 +173,14 @@ export class AgentService {
           .map((b) => b.text)
           .join('');
 
-        // 3. Persist assistant message
+        // 3. Persist assistant message with full payload
         await this.messageRepo.save(
           this.messageRepo.create({
             id: ulid(),
             conversationId,
             role: 'ASSISTANT',
             text: fullText || null,
-            tokenPrompt: promptTokens,
-            tokenCompletion: completionTokens,
-            finishReason: finalMessage.stopReason ?? '',
+            payload: finalMessage,
           }),
         );
 
@@ -186,7 +190,6 @@ export class AgentService {
           break;
         }
 
-        const toolCallResult: Record<string, unknown> = {};
         for (const call of toolCalls) {
           if (call.type !== 'toolCall') continue;
           const result = await this.executeTool(
@@ -205,31 +208,39 @@ export class AgentService {
             }),
           });
 
-          toolCallResult[call.id] = result;
-
-          // Add tool result to context and get continuation
-          context.messages.push({
-            role: 'toolResult',
+          const toolResultMsg = {
+            role: 'toolResult' as const,
             toolCallId: call.id,
             toolName: call.name,
             content: [
-              { type: 'text', text: result.ok ? JSON.stringify(result.data) : result.error },
+              {
+                type: 'text' as const,
+                text: result.ok ? JSON.stringify(result.data) : result.error,
+              },
             ],
             isError: !result.ok,
             timestamp: Date.now(),
-          });
-        }
+          };
 
-        // 5. Persist tool messages
-        await this.messageRepo.save(
-          this.messageRepo.create({
-            id: ulid(),
-            conversationId,
-            role: 'TOOL',
-            toolCalls: toolCalls,
-            toolResult: toolCallResult,
-          }),
-        );
+          context.messages.push(toolResultMsg);
+
+          // 5. Persist each tool result as its own row
+          await this.messageRepo.save(
+            this.messageRepo.create({
+              id: ulid(),
+              conversationId,
+              role: 'TOOL_RESULT',
+              payload: toolResultMsg,
+            }),
+          );
+        }
+      }
+
+      const unarchivedMessagesCount = await this.messageRepo.count({
+        where: { archived: false },
+      });
+      if (unarchivedMessagesCount > MOST_RECENT_MESSAGES) {
+        // trigger summary
       }
 
       await this.convRepo.update({ id: conversationId }, { lastActivity: new Date() });
@@ -273,5 +284,37 @@ export class AgentService {
         description: tool.description,
         parameters: tool.parameters as Record<string, unknown>,
       }));
+  }
+
+  private async shouldCompress(conversationId: string): Promise<boolean> {
+    const unarchivedMessages = await this.messageRepo.find({
+      where: { conversationId: conversationId, archived: false },
+      order: { createdAt: 'ASC' },
+    });
+    if (unarchivedMessages.length < 6) {
+      return false;
+    }
+
+    const tokens = unarchivedMessages.reduce((sum, m) => {
+      if (m.role == 'USER') return sum + this.estimateStringTokens(m.text);
+      if (m.role == 'ASSISTANT') {
+        return sum + (m.payload as AssistantMessage).usage.totalTokens;
+      }
+      if (m.role == 'TOOL_RESULT') {
+        const content = (m.payload as ToolResultMessage).content;
+        const tool_tokens = content.reduce((v, c) => {
+          if (c.type == 'text') return v + this.estimateStringTokens(c.text);
+          return v + c.data.length / 3;
+        }, 0);
+        return sum + tool_tokens;
+      }
+      return sum;
+    }, 0);
+
+    return false;
+  }
+
+  estimateStringTokens(text: string | null | undefined): number {
+    return (text?.length ?? 0) / 3;
   }
 }

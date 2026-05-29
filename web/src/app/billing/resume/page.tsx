@@ -47,7 +47,8 @@ export default function BillingResumePage() {
             <div className="text-5xl mb-4">&#9888;</div>
             <h1 className="font-serif text-2xl font-bold mb-2">Resume your subscription</h1>
             <p className="text-gray-600 mb-6">
-              Your subscription is currently paused. Resume it to restore full access to FindWith Pro.
+              Your subscription is currently paused. Resume it to restore full access to FindWith
+              Pro.
             </p>
             {status === 'error' && (
               <p className="text-sm text-red-600 mb-4">

@@ -8,7 +8,9 @@ export default function TosPage() {
   return (
     <div className="min-h-screen">
       <nav className="flex items-center justify-between px-8 py-4 border-b">
-        <Link href="/" className="font-serif text-2xl font-bold text-brand-700">FindWith</Link>
+        <Link href="/" className="font-serif text-2xl font-bold text-brand-700">
+          FindWith
+        </Link>
       </nav>
 
       <main className="max-w-3xl mx-auto py-12 px-8 prose prose-gray">
@@ -18,9 +20,9 @@ export default function TosPage() {
         <section className="mb-8">
           <h2 className="text-xl font-semibold mb-3">1. Acceptance</h2>
           <p className="text-gray-700 leading-relaxed">
-            By using FindWith (the extension, website, or API), you agree to these Terms. If you
-            are using FindWith on behalf of an organization, you represent that you have authority
-            to bind that organization.
+            By using FindWith (the extension, website, or API), you agree to these Terms. If you are
+            using FindWith on behalf of an organization, you represent that you have authority to
+            bind that organization.
           </p>
         </section>
 
@@ -37,8 +39,8 @@ export default function TosPage() {
           <h2 className="text-xl font-semibold mb-3">3. Truthfulness</h2>
           <p className="text-gray-700 leading-relaxed">
             FindWith is designed to be truthful — resume tailoring is grounded in your actual
-            experience. You are responsible for the accuracy of the source material you provide.
-            Do not submit false information. We are not liable for consequences arising from
+            experience. You are responsible for the accuracy of the source material you provide. Do
+            not submit false information. We are not liable for consequences arising from
             misrepresentation in applications.
           </p>
         </section>
@@ -46,9 +48,9 @@ export default function TosPage() {
         <section className="mb-8">
           <h2 className="text-xl font-semibold mb-3">4. Subscriptions and billing</h2>
           <p className="text-gray-700 leading-relaxed">
-            Paid plans are billed monthly or annually via Stripe. You may cancel at any time;
-            access continues until the end of the billing period. Refunds are issued at our
-            discretion for unused time on annual plans.
+            Paid plans are billed monthly or annually via Stripe. You may cancel at any time; access
+            continues until the end of the billing period. Refunds are issued at our discretion for
+            unused time on annual plans.
           </p>
         </section>
 
@@ -63,8 +65,8 @@ export default function TosPage() {
         <section className="mb-8">
           <h2 className="text-xl font-semibold mb-3">6. Limitation of liability</h2>
           <p className="text-gray-700 leading-relaxed">
-            FindWith is provided as-is. We do not guarantee job placement outcomes. Our liability
-            is limited to the fees paid in the 12 months preceding any claim.
+            FindWith is provided as-is. We do not guarantee job placement outcomes. Our liability is
+            limited to the fees paid in the 12 months preceding any claim.
           </p>
         </section>
 

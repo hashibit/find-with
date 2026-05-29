@@ -31,7 +31,12 @@ export class BillingController {
   @Post('checkout')
   @ApiOperation({ summary: 'Create Stripe checkout session' })
   async checkout(@CurrentUser() user: AuthenticatedUser, @Body() dto: CreateCheckoutDto) {
-    return this.service.createCheckoutSession(user.userId, dto.priceId, dto.successUrl, dto.cancelUrl);
+    return this.service.createCheckoutSession(
+      user.userId,
+      dto.priceId,
+      dto.successUrl,
+      dto.cancelUrl,
+    );
   }
 
   @Post('portal')

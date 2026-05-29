@@ -29,19 +29,24 @@ export class ApplyService {
 
     // Generate field plan via LLM
     const raw = await this.llm.completeContext({
-      systemPrompt: 'You generate LinkedIn Easy Apply field plans. Output JSON array of field objects.',
-      messages: [{
-        role: 'user',
-        content: `Generate a fill plan for this job:\nTitle: ${parsedJd?.title ?? 'Unknown'}\nCompany: ${parsedJd?.company ?? 'Unknown'}\n\nReturn JSON: [{ "fieldName": string, "fieldType": string, "value": string, "source": string }]`,
-        timestamp: Date.now(),
-      }],
+      systemPrompt:
+        'You generate LinkedIn Easy Apply field plans. Output JSON array of field objects.',
+      messages: [
+        {
+          role: 'user',
+          content: `Generate a fill plan for this job:\nTitle: ${parsedJd?.title ?? 'Unknown'}\nCompany: ${parsedJd?.company ?? 'Unknown'}\n\nReturn JSON: [{ "fieldName": string, "fieldType": string, "value": string, "source": string }]`,
+          timestamp: Date.now(),
+        },
+      ],
     });
 
     let fields: unknown[] = [];
     try {
       const m = raw.match(/\[[\s\S]*\]/);
       if (m) fields = JSON.parse(m[0]) as unknown[];
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
 
     const plan = this.planRepo.create({
       id: ulid(),
@@ -62,10 +67,22 @@ export class ApplyService {
     return this.planRepo.save(plan);
   }
 
-  async recordSubmission(userId: string, radarItemId: string, resumeSnapshotId?: string): Promise<ApplyApplication> {
-    const app = this.appRepo.create({ id: ulid(), userId, radarItemId, resumeSnapshotId: resumeSnapshotId ?? null });
+  async recordSubmission(
+    userId: string,
+    radarItemId: string,
+    resumeSnapshotId?: string,
+  ): Promise<ApplyApplication> {
+    const app = this.appRepo.create({
+      id: ulid(),
+      userId,
+      radarItemId,
+      resumeSnapshotId: resumeSnapshotId ?? null,
+    });
     await this.appRepo.save(app);
-    await this.radarRepo.update({ id: radarItemId }, { status: 'APPLIED', lastStatusAt: new Date() });
+    await this.radarRepo.update(
+      { id: radarItemId },
+      { status: 'APPLIED', lastStatusAt: new Date() },
+    );
     return app;
   }
 }

@@ -12,13 +12,15 @@ export function App() {
   return (
     <BrowserRouter>
       <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
-        <header style={{
-          padding: '12px 16px',
-          borderBottom: '1px solid #e5e7eb',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-        }}>
+        <header
+          style={{
+            padding: '12px 16px',
+            borderBottom: '1px solid #e5e7eb',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+          }}
+        >
           <span style={{ fontFamily: 'Source Serif 4, serif', fontWeight: 700, fontSize: 18 }}>
             FindWith
           </span>

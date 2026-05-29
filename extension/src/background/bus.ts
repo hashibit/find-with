@@ -5,7 +5,10 @@ export type BgMsg =
   | { type: 'OPEN_SIDEPANEL'; payload: { route?: string } }
   | { type: 'SSE_EVENT'; payload: any };
 
-export async function handleMessage(msg: BgMsg, sender: chrome.runtime.MessageSender): Promise<any> {
+export async function handleMessage(
+  msg: BgMsg,
+  sender: chrome.runtime.MessageSender,
+): Promise<any> {
   switch (msg.type) {
     case 'JOB_CAPTURE':
       return handleJobCapture(msg.payload);
@@ -28,7 +31,9 @@ async function handleJobCapture(payload: any) {
   const token = await getToken();
   if (!token) return { error: 'not_authenticated' };
 
-  const idempotencyKey = await digestMessage(`${payload.source_url}|${new Date().toISOString().slice(0, 10)}`);
+  const idempotencyKey = await digestMessage(
+    `${payload.source_url}|${new Date().toISOString().slice(0, 10)}`,
+  );
 
   try {
     const resp = await fetch('http://localhost:14667/v1/jobs/captures', {

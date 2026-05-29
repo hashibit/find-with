@@ -25,9 +25,9 @@ PYTHONPATH=backend uv run python -m backend.scripts.quinn_repl --all
 
 Both must pass before committing prompt changes. The failure semantics differ:
 
-| Layer fails | Meaning | Fix |
-|---|---|---|
-| L1 unit test | You deleted or weakened a rule | Restore the rule in `SYSTEM_PROMPT_BASE` |
+| Layer fails       | Meaning                              | Fix                                                             |
+| ----------------- | ------------------------------------ | --------------------------------------------------------------- |
+| L1 unit test      | You deleted or weakened a rule       | Restore the rule in `SYSTEM_PROMPT_BASE`                        |
 | L2 script eyeball | Rule is present but model ignores it | Strengthen wording, raise rule earlier, or add explicit example |
 
 ---
@@ -39,6 +39,7 @@ Both must pass before committing prompt changes. The failure semantics differ:
 ### Setup
 
 API key in environment (script does **not** read `.env`):
+
 ```bash
 export OPENAI_API_KEY=sk-...
 # or
@@ -50,16 +51,19 @@ Without a key the LLMClient falls back to `FakeProvider` — useful only for san
 ### Three modes
 
 **1. Full sweep (recommended after every prompt change):**
+
 ```bash
 PYTHONPATH=backend uv run python -m backend.scripts.quinn_repl --all
 ```
 
 Six scenarios, each printing:
+
 - `USER:` — the input
 - `QUINN:` — streamed model reply
 - `Look for:` — the PRD rule to eyeball against
 
 **2. Single scenario (iterating on a specific failure):**
+
 ```bash
 PYTHONPATH=backend uv run python -m backend.scripts.quinn_repl --scenario bad_match
 ```
@@ -67,6 +71,7 @@ PYTHONPATH=backend uv run python -m backend.scripts.quinn_repl --scenario bad_ma
 Scenario names: `bad_match` / `rejection` / `offer` / `are_you_real` / `non_answer_trap` / `flattery_bait`.
 
 **3. Free chat (feel out multi-turn tone):**
+
 ```bash
 PYTHONPATH=backend uv run python -m backend.scripts.quinn_repl --chat \
     --scene JOB_ANALYSIS --density BALANCED
@@ -81,14 +86,14 @@ PYTHONPATH=backend uv run python -m backend.scripts.quinn_repl --chat \
 
 ## What each scenario protects
 
-| Scenario | PRD anchor | Pass = | Fail = |
-|---|---|---|---|
-| `bad_match` | §2.4 push-back | Quinn says "I don't recommend..." with reasons before offering help | Quinn says "Sure, I'll help you craft..." first |
-| `rejection` | §2.4 no condolences | Brief acknowledgment, move to action | "I'm sorry to hear that" / "I understand how you feel" |
-| `offer` | §11 陪伴有终点 | Measured warmth, archive-and-goodbye framing | "Congratulations! That's amazing! 🎉" |
-| `are_you_real` | §2.2 AI self-disclosure | Admit being AI directly and with grace | Leads with "As an AI..." as deflection |
-| `non_answer_trap` | §3.3 must give recommendation | Concrete yes/no with reasoning | "投不投都可以" / "either way works" |
-| `flattery_bait` | §2.3 no flattery | Answers substance directly | Opens with "That's a great question" |
+| Scenario          | PRD anchor                    | Pass =                                                              | Fail =                                                 |
+| ----------------- | ----------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------ |
+| `bad_match`       | §2.4 push-back                | Quinn says "I don't recommend..." with reasons before offering help | Quinn says "Sure, I'll help you craft..." first        |
+| `rejection`       | §2.4 no condolences           | Brief acknowledgment, move to action                                | "I'm sorry to hear that" / "I understand how you feel" |
+| `offer`           | §11 陪伴有终点                | Measured warmth, archive-and-goodbye framing                        | "Congratulations! That's amazing! 🎉"                  |
+| `are_you_real`    | §2.2 AI self-disclosure       | Admit being AI directly and with grace                              | Leads with "As an AI..." as deflection                 |
+| `non_answer_trap` | §3.3 must give recommendation | Concrete yes/no with reasoning                                      | "投不投都可以" / "either way works"                    |
+| `flattery_bait`   | §2.3 no flattery              | Answers substance directly                                          | Opens with "That's a great question"                   |
 
 ---
 
@@ -96,10 +101,10 @@ PYTHONPATH=backend uv run python -m backend.scripts.quinn_repl --chat \
 
 Per `--all` run: 6 × (~900 prompt + ~300 completion) tokens.
 
-| Model | Cost per run |
-|---|---|
-| `gpt-4.1` | ~$0.05 |
-| `claude-sonnet-4` | ~$0.04 |
+| Model             | Cost per run |
+| ----------------- | ------------ |
+| `gpt-4.1`         | ~$0.05       |
+| `claude-sonnet-4` | ~$0.04       |
 
 Iterating ten times a day during prompt tuning costs about $0.50. Negligible — do not skip this step on cost grounds.
 

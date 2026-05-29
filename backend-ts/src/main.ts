@@ -36,7 +36,9 @@ async function bootstrap(): Promise<void> {
   app.useGlobalFilters(new HttpExceptionFilter());
 
   // API prefix
-  app.setGlobalPrefix('api/v1', { exclude: ['health', 'ready', 'webhooks/:path*', 'ingest/:path*'] });
+  app.setGlobalPrefix('api/v1', {
+    exclude: ['health', 'ready', 'webhooks/:path*', 'ingest/:path*'],
+  });
 
   // Swagger (non-production)
   if (env !== 'production') {

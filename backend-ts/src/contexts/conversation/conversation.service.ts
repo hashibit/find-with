@@ -26,7 +26,10 @@ export class ConversationService {
     return this.convRepo.save(conv);
   }
 
-  async findOne(userId: string, id: string): Promise<{ conversation: ConvConversation; messages: ConvMessage[] }> {
+  async findOne(
+    userId: string,
+    id: string,
+  ): Promise<{ conversation: ConvConversation; messages: ConvMessage[] }> {
     const conv = await this.convRepo.findOne({ where: { id } });
     if (!conv) throw new NotFoundException('Conversation not found');
     if (conv.userId !== userId) throw new ForbiddenException();

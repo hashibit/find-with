@@ -1,6 +1,14 @@
 import {
-  Body, Controller, Delete, Get, Param, Patch, Post,
-  UploadedFile, UseGuards, UseInterceptors,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';

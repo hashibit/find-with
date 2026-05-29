@@ -32,7 +32,9 @@ export default function DataExportPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <nav className="bg-white border-b px-8 py-4 flex items-center justify-between">
-        <Link href="/" className="font-serif text-xl font-bold text-brand-700">FindWith</Link>
+        <Link href="/" className="font-serif text-xl font-bold text-brand-700">
+          FindWith
+        </Link>
         <Link href="/dashboard/account" className="text-sm text-gray-600 hover:text-gray-900">
           Back to Account
         </Link>
@@ -72,10 +74,7 @@ export default function DataExportPage() {
           <p className="text-sm text-gray-600 mb-4">
             Permanently deletes your account and all associated data. This cannot be undone.
           </p>
-          <Link
-            href="/dashboard/account"
-            className="text-sm text-red-600 hover:underline"
-          >
+          <Link href="/dashboard/account" className="text-sm text-red-600 hover:underline">
             Manage in Account Settings
           </Link>
         </div>

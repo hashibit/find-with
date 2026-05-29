@@ -39,7 +39,10 @@ export class BillingService {
   }): Promise<void> {
     const obj = event.data.object;
 
-    if (event.type === 'customer.subscription.created' || event.type === 'customer.subscription.updated') {
+    if (
+      event.type === 'customer.subscription.created' ||
+      event.type === 'customer.subscription.updated'
+    ) {
       const subscriptionId = obj['id'] as string;
       const customerId = obj['customer'] as string;
       const status = obj['status'] as string;
@@ -77,7 +80,8 @@ export class BillingService {
   }
 
   private tierFromStatus(obj: Record<string, unknown>): string {
-    const items = (obj['items'] as { data: Array<{ price: { id: string } }> } | undefined)?.data ?? [];
+    const items =
+      (obj['items'] as { data: Array<{ price: { id: string } }> } | undefined)?.data ?? [];
     const priceId = items[0]?.price?.id ?? '';
     if (priceId.includes('pro_plus')) return 'PRO_PLUS';
     if (priceId.includes('pro')) return 'PRO';

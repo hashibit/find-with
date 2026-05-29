@@ -36,7 +36,14 @@ export class JobsService {
 
   async captureJob(
     userId: string,
-    data: { source: string; sourceUrl: string; sourceJobId?: string; capturedHtml?: string; capturedText?: string; meta?: Record<string, unknown> },
+    data: {
+      source: string;
+      sourceUrl: string;
+      sourceJobId?: string;
+      capturedHtml?: string;
+      capturedText?: string;
+      meta?: Record<string, unknown>;
+    },
   ): Promise<{ capture: JobCapture; radarItem: JobRadarItem }> {
     const capture = this.captureRepo.create({ id: ulid(), userId, ...data });
     await this.captureRepo.save(capture);

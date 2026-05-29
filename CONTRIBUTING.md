@@ -46,17 +46,20 @@ enum new values:     all readers first (handle unknown) → writer last
 ## Code Style
 
 ### Backend (Python)
+
 - Formatter: `ruff format`
 - Linter: `ruff check`
 - Type checker: `mypy --strict`
 - Test: `pytest`
 
 ### Extension (TypeScript)
+
 - Linter: ESLint
 - Formatter: Prettier
 - Test: Vitest + Playwright
 
 ### Web (Next.js)
+
 - Same as extension
 
 ## Alembic Ownership (U-01)
@@ -64,6 +67,7 @@ enum new values:     all readers first (handle unknown) → writer last
 The `backend/` repository is the **sole owner** of Alembic migrations. The web (Next.js) repository does NOT run migrations.
 
 If the website needs a new table or column:
+
 1. Submit an Alembic PR to the backend repository
 2. Reference the migration revision in the website PR
 3. Website CI verifies `alembic current >= referenced revision`
@@ -71,6 +75,7 @@ If the website needs a new table or column:
 ## Commit Messages
 
 Use conventional commits:
+
 ```
 feat: add resume upload endpoint
 fix: handle empty JD in parser

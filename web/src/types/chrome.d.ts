@@ -8,7 +8,7 @@ declare namespace chrome {
     function sendMessage(
       extensionId: string,
       message: unknown,
-      callback?: (response: { ok?: boolean }) => void
+      callback?: (response: { ok?: boolean }) => void,
     ): void;
   }
 }

@@ -27,9 +27,7 @@ export default function BillingSuccessPage() {
           Your subscription is active. FindWith Pro features are available immediately.
         </p>
         {synced && (
-          <p className="text-sm text-green-600 mb-6">
-            Extension updated with your new plan.
-          </p>
+          <p className="text-sm text-green-600 mb-6">Extension updated with your new plan.</p>
         )}
         <div className="flex flex-col gap-3">
           <Link
@@ -38,10 +36,7 @@ export default function BillingSuccessPage() {
           >
             Go to Dashboard
           </Link>
-          <Link
-            href="/billing/portal"
-            className="text-sm text-gray-500 hover:text-gray-700"
-          >
+          <Link href="/billing/portal" className="text-sm text-gray-500 hover:text-gray-700">
             Manage subscription
           </Link>
         </div>

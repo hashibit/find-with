@@ -20,8 +20,7 @@ export class SetConversationDensityTool {
   ) {}
 
   readonly name = SET_CONVERSATION_DENSITY_TOOL_NAME;
-  readonly description =
-    'Temporarily change conversation density when user expresses preference.';
+  readonly description = 'Temporarily change conversation density when user expresses preference.';
   readonly parameters = Type.Object({
     density: DensityEnum,
     reason: Type.String(),
@@ -36,7 +35,7 @@ export class SetConversationDensityTool {
 
     const messages: Record<string, string> = {
       ENGAGED: "Got it. I'll be more proactive from here.",
-      BALANCED: "Understood. Back to standard mode.",
+      BALANCED: 'Understood. Back to standard mode.',
       QUIET: "Sure. I'll keep it minimal.",
     };
 

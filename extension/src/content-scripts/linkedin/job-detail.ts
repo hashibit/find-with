@@ -9,24 +9,24 @@ import { sanitizeText } from '../shared/sanitize';
 
 function scrapeJobDetail(): Record<string, string> {
   return {
-    title: sanitizeText(queryText([
-      '.job-details-jobs-unified-top-card__job-title',
-      'h1.t-24',
-      'h1',
-    ])),
-    company: sanitizeText(queryText([
-      '.job-details-jobs-unified-top-card__company-name',
-      '.jobs-unified-top-card__company-name',
-    ])),
-    location: sanitizeText(queryText([
-      '.job-details-jobs-unified-top-card__bullet',
-      '.jobs-unified-top-card__workplace-type',
-    ])),
-    description: sanitizeText(queryText([
-      '.jobs-description__content',
-      '.jobs-box__html-content',
-      '#job-details',
-    ])),
+    title: sanitizeText(
+      queryText(['.job-details-jobs-unified-top-card__job-title', 'h1.t-24', 'h1']),
+    ),
+    company: sanitizeText(
+      queryText([
+        '.job-details-jobs-unified-top-card__company-name',
+        '.jobs-unified-top-card__company-name',
+      ]),
+    ),
+    location: sanitizeText(
+      queryText([
+        '.job-details-jobs-unified-top-card__bullet',
+        '.jobs-unified-top-card__workplace-type',
+      ]),
+    ),
+    description: sanitizeText(
+      queryText(['.jobs-description__content', '.jobs-box__html-content', '#job-details']),
+    ),
     source_url: window.location.href,
   };
 }
@@ -72,7 +72,10 @@ function injectAskQuinnButton() {
         btn.textContent = 'Error — retry';
       } else {
         btn.textContent = 'Sent to Quinn';
-        await chrome.runtime.sendMessage({ type: 'OPEN_SIDEPANEL', payload: { route: '/job-analysis' } });
+        await chrome.runtime.sendMessage({
+          type: 'OPEN_SIDEPANEL',
+          payload: { route: '/job-analysis' },
+        });
       }
     } catch (e) {
       btn.textContent = 'Ask Quinn';

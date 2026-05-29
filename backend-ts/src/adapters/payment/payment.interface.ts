@@ -10,7 +10,12 @@ export interface PortalSession {
 }
 
 export interface PaymentGateway {
-  createCheckoutSession(userId: string, priceId: string, successUrl: string, cancelUrl: string): Promise<CheckoutSession>;
+  createCheckoutSession(
+    userId: string,
+    priceId: string,
+    successUrl: string,
+    cancelUrl: string,
+  ): Promise<CheckoutSession>;
   createPortalSession(customerId: string, returnUrl: string): Promise<PortalSession>;
   cancelSubscription(subscriptionId: string): Promise<void>;
   pauseSubscription(subscriptionId: string): Promise<void>;

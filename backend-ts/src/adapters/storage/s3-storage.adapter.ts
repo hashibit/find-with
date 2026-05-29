@@ -31,15 +31,18 @@ export class S3StorageAdapter implements Storage {
 
   async upload(key: string, buffer: Buffer, contentType: string): Promise<string> {
     await this.client.send(
-      new PutObjectCommand({ Bucket: this.bucket, Key: key, Body: buffer, ContentType: contentType }),
+      new PutObjectCommand({
+        Bucket: this.bucket,
+        Key: key,
+        Body: buffer,
+        ContentType: contentType,
+      }),
     );
     return `s3://${this.bucket}/${key}`;
   }
 
   async download(key: string): Promise<Buffer> {
-    const result = await this.client.send(
-      new GetObjectCommand({ Bucket: this.bucket, Key: key }),
-    );
+    const result = await this.client.send(new GetObjectCommand({ Bucket: this.bucket, Key: key }));
     const stream = result.Body as Readable;
     return new Promise((resolve, reject) => {
       const chunks: Buffer[] = [];
@@ -50,11 +53,9 @@ export class S3StorageAdapter implements Storage {
   }
 
   async presignedUrl(key: string, expiresInSeconds = 3600): Promise<string> {
-    return getSignedUrl(
-      this.client,
-      new GetObjectCommand({ Bucket: this.bucket, Key: key }),
-      { expiresIn: expiresInSeconds },
-    );
+    return getSignedUrl(this.client, new GetObjectCommand({ Bucket: this.bucket, Key: key }), {
+      expiresIn: expiresInSeconds,
+    });
   }
 
   async delete(key: string): Promise<void> {

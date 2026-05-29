@@ -18,7 +18,8 @@ export class TailoringProcessor extends WorkerHost {
   constructor(
     @InjectRepository(TailoringResume) private readonly resumeRepo: Repository<TailoringResume>,
     @InjectRepository(JobParsedJd) private readonly jdRepo: Repository<JobParsedJd>,
-    @InjectRepository(ProfileBaseResume) private readonly baseResumeRepo: Repository<ProfileBaseResume>,
+    @InjectRepository(ProfileBaseResume)
+    private readonly baseResumeRepo: Repository<ProfileBaseResume>,
     @Inject(LLM_PROVIDER) private readonly llm: LlmProvider,
     private readonly materialManager: MaterialManager,
   ) {

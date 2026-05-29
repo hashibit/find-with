@@ -41,13 +41,18 @@ export class InfraController {
     const wh = new Webhook(svixConfig.signingSecret);
 
     const rawBody = req.rawBody?.toString() ?? JSON.stringify(body);
-    wh.verify(rawBody, { 'svix-id': svixId, 'svix-timestamp': svixTimestamp, 'svix-signature': svixSignature });
+    wh.verify(rawBody, {
+      'svix-id': svixId,
+      'svix-timestamp': svixTimestamp,
+      'svix-signature': svixSignature,
+    });
 
     const event = body as { type: string; data: Record<string, unknown> };
 
     if (event.type === 'user.created') {
       const d = event.data;
-      const email = ((d['email_addresses'] as Array<{ email_address: string }>)?.[0]?.email_address) ?? '';
+      const email =
+        (d['email_addresses'] as Array<{ email_address: string }>)?.[0]?.email_address ?? '';
       const fullName = [d['first_name'], d['last_name']].filter(Boolean).join(' ') || undefined;
       await this.iamService.upsert(d['id'] as string, email, fullName);
     }
@@ -57,7 +62,9 @@ export class InfraController {
       try {
         const user = await this.iamService.findByClerkId(d['id'] as string);
         await this.iamService.softDelete(user.id);
-      } catch { /* user may not exist */ }
+      } catch {
+        /* user may not exist */
+      }
     }
 
     return { ok: true };
@@ -72,13 +79,20 @@ export class InfraController {
     const stripeConfig = this.config.get('stripe', { infer: true })!;
     const rawBody = req.rawBody ?? Buffer.from('');
     const event = this.stripe.webhooks.constructEvent(rawBody, sig, stripeConfig.webhookSecret);
-    await this.billingService.handleStripeEvent(event as unknown as Parameters<typeof this.billingService.handleStripeEvent>[0]);
+    await this.billingService.handleStripeEvent(
+      event as unknown as Parameters<typeof this.billingService.handleStripeEvent>[0],
+    );
     return { ok: true };
   }
 
   @Post('ingest/events')
   @ApiOperation({ summary: 'Ingest telemetry events from Chrome extension' })
-  async ingestEvents(@Body() body: { events: Array<{ eventType: string; userId?: string; payload?: Record<string, unknown> }> }) {
+  async ingestEvents(
+    @Body()
+    body: {
+      events: Array<{ eventType: string; userId?: string; payload?: Record<string, unknown> }>;
+    },
+  ) {
     const entities = (body.events ?? []).map((e) =>
       this.telemetryRepo.create({ id: ulid(), ...e }),
     );

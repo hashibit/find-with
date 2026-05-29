@@ -10,9 +10,7 @@ import { AUTH_VERIFIER, AuthVerifier } from '../../adapters/auth/auth.interface.
 
 @Injectable()
 export class ClerkAuthGuard implements CanActivate {
-  constructor(
-    @Inject(AUTH_VERIFIER) private readonly verifier: AuthVerifier,
-  ) {}
+  constructor(@Inject(AUTH_VERIFIER) private readonly verifier: AuthVerifier) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<Request & { user?: unknown }>();

@@ -9,24 +9,31 @@ FindWith is a Chrome extension + web backend that puts an AI partner (Quinn) in 
 ## What makes it different
 
 ### Quinn has a personality and opinions
+
 Quinn pushes back when a job is a bad fit, gives concrete recommendations instead of hedge answers, and tells you when it doesn't know something. Built against the PRD's character spec — not a feature wrapper in a trench coat.
 
 ### The material library
+
 Every conversation mines for "shining moments" — achievements you didn't know were valuable. These get tagged, stored, and reused across every future application. Your resume becomes a filtered view of a richer corpus, not a static document.
 
 ### Three-layer match analysis
+
 Not a keyword overlap percentage. Three distinct signals:
+
 1. **Surface match** — what ATS sees (keywords in your resume vs. JD)
 2. **Deep match** — what your material library covers that your resume doesn't
 3. **Gap analysis** — what's in the JD that neither your resume nor your library addresses, with targeted conversation prompts to fill it
 
 ### Traceable resume bullets
+
 Every generated bullet traces back to something you actually said. Unverified bullets are flagged. Quinn cannot fabricate experience.
 
 ### Companion density controls
+
 Three modes (Engaged / Balanced / Quiet) users can switch mid-conversation. Quinn honors them without needing to be reminded.
 
 ### Graceful exit
+
 When a user accepts an offer, Quinn archives the journey and pauses the subscription. The product's job is done. This is intentional.
 
 ---
@@ -43,18 +50,18 @@ monorepo/
 
 ### Backend stack
 
-| Layer | Technology |
-|---|---|
-| HTTP framework | NestJS 10 |
-| ORM | TypeORM 0.3 (PostgreSQL 15 + pgvector) |
-| Job queues | BullMQ + Redis |
+| Layer            | Technology                                                 |
+| ---------------- | ---------------------------------------------------------- |
+| HTTP framework   | NestJS 10                                                  |
+| ORM              | TypeORM 0.3 (PostgreSQL 15 + pgvector)                     |
+| Job queues       | BullMQ + Redis                                             |
 | AI orchestration | Custom `AgentService` (OpenAI primary, Anthropic failover) |
-| Auth | Clerk (JWKS-based JWT, 1hr cache) |
-| Payments | Stripe + Svix webhook verification |
-| Storage | S3-compatible (MinIO in dev) |
-| Field encryption | AES-256-GCM envelope encryption (nonce+ct+tag as `bytea`) |
-| Observability | nestjs-pino + Sentry |
-| API docs | OpenAPI via `@nestjs/swagger` |
+| Auth             | Clerk (JWKS-based JWT, 1hr cache)                          |
+| Payments         | Stripe + Svix webhook verification                         |
+| Storage          | S3-compatible (MinIO in dev)                               |
+| Field encryption | AES-256-GCM envelope encryption (nonce+ct+tag as `bytea`)  |
+| Observability    | nestjs-pino + Sentry                                       |
+| API docs         | OpenAPI via `@nestjs/swagger`                              |
 
 ### Domain contexts (DDD)
 
@@ -76,14 +83,14 @@ contexts/
 
 The `AgentService` drives a tool-use loop over SSE. Six registered tools, each scoped to specific conversation scenes:
 
-| Tool | Scene |
-|---|---|
-| `search_company` | Job analysis |
-| `mine_shining_point` | Onboarding, gap mining |
-| `draft_motivation` | Form fill |
-| `classify_email` | Email follow-up |
-| `draft_reply` | Email follow-up |
-| `set_conversation_density` | All |
+| Tool                       | Scene                  |
+| -------------------------- | ---------------------- |
+| `search_company`           | Job analysis           |
+| `mine_shining_point`       | Onboarding, gap mining |
+| `draft_motivation`         | Form fill              |
+| `classify_email`           | Email follow-up        |
+| `draft_reply`              | Email follow-up        |
+| `set_conversation_density` | All                    |
 
 Resume generation, bullet editing, and match recomputation run as BullMQ processors in the `TAILORING` queue — not as agent tools — because they need async progress reporting.
 
@@ -184,11 +191,11 @@ Requires [buf CLI](https://buf.build/docs/installation).
 
 ## Testing
 
-| Layer | Command | Notes |
-|---|---|---|
-| Unit (L2) | `make test` | Jest, no external deps |
+| Layer            | Command                 | Notes                                         |
+| ---------------- | ----------------------- | --------------------------------------------- |
+| Unit (L2)        | `make test`             | Jest, no external deps                        |
 | Integration (L3) | `make test-integration` | Testcontainers, pulls Postgres + Redis images |
-| E2E mocked (L4) | `make test-e2e-mock` | Playwright + Docker Compose test stack |
+| E2E mocked (L4)  | `make test-e2e-mock`    | Playwright + Docker Compose test stack        |
 
 Unit tests live alongside source files as `*.spec.ts`. Integration tests are in `backend-ts/test/integration/`.
 

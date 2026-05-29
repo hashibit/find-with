@@ -64,19 +64,19 @@
 
 ## 二、技术栈一览
 
-| 层级 | 选型 | 理由 |
-|---|---|---|
-| 扩展前端 | 原生 JS / TypeScript（Manifest V3） | 标准方案，避免框架增加包体积 |
-| 后端框架 | **FastAPI**（Python 3.11+） | 异步原生、自动文档、类型友好 |
-| ORM | **SQLAlchemy 2.0** + Alembic（迁移） | 生态最成熟 |
-| 数据库 | **PostgreSQL 15+** | 关系型 + JSON 字段灵活，事实标准 |
-| 认证 | **Clerk**（首选）/ Supabase Auth（预算敏感） | 省去密码管理、社交登录、2FA 实现 |
-| 支付 | **Stripe**（Checkout + Customer Portal + Webhook） | 北美事实标准，开发体验最佳 |
-| 邮件 | **Resend** | 现代 API、免费额度够用、送达率好 |
-| 托管 | **Render** / **Railway** / **Fly.io** | PaaS 三选一，按熟悉度选 |
-| 监控 | **Sentry** | 错误追踪行业标准 |
-| CDN/DNS | **Cloudflare** | 免费、DNS 管理方便 |
-| 域名 | **Cloudflare Registrar** / Namecheap | 不加价 |
+| 层级     | 选型                                               | 理由                             |
+| -------- | -------------------------------------------------- | -------------------------------- |
+| 扩展前端 | 原生 JS / TypeScript（Manifest V3）                | 标准方案，避免框架增加包体积     |
+| 后端框架 | **FastAPI**（Python 3.11+）                        | 异步原生、自动文档、类型友好     |
+| ORM      | **SQLAlchemy 2.0** + Alembic（迁移）               | 生态最成熟                       |
+| 数据库   | **PostgreSQL 15+**                                 | 关系型 + JSON 字段灵活，事实标准 |
+| 认证     | **Clerk**（首选）/ Supabase Auth（预算敏感）       | 省去密码管理、社交登录、2FA 实现 |
+| 支付     | **Stripe**（Checkout + Customer Portal + Webhook） | 北美事实标准，开发体验最佳       |
+| 邮件     | **Resend**                                         | 现代 API、免费额度够用、送达率好 |
+| 托管     | **Render** / **Railway** / **Fly.io**              | PaaS 三选一，按熟悉度选          |
+| 监控     | **Sentry**                                         | 错误追踪行业标准                 |
+| CDN/DNS  | **Cloudflare**                                     | 免费、DNS 管理方便               |
+| 域名     | **Cloudflare Registrar** / Namecheap               | 不加价                           |
 
 ---
 
@@ -97,16 +97,16 @@
     "service_worker": "background.js",
     "type": "module"
   },
-  "content_scripts": [{
-    "matches": ["<all_urls>"],
-    "js": ["content.js"],
-    "css": ["content.css"],
-    "run_at": "document_idle"
-  }],
-  "permissions": ["storage", "tabs", "scripting"],
-  "host_permissions": [
-    "https://api.yourapp.com/*"
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
   ],
+  "permissions": ["storage", "tabs", "scripting"],
+  "host_permissions": ["https://api.yourapp.com/*"],
   "externally_connectable": {
     "matches": ["https://yourapp.com/*"]
   },
@@ -130,25 +130,23 @@
 ```js
 // 在扩展面板里发起登录
 chrome.tabs.create({
-  url: 'https://yourapp.com/sign-in?source=extension&ext_id=' + chrome.runtime.id
+  url: 'https://yourapp.com/sign-in?source=extension&ext_id=' + chrome.runtime.id,
 });
 
 // 在你的网站登录成功后，向扩展发送 token
 // （在 yourapp.com 的页面 JS 里执行）
 chrome.runtime.sendMessage(EXTENSION_ID, {
   type: 'auth',
-  token: clerkSessionToken
+  token: clerkSessionToken,
 });
 
 // 在扩展 background.js 里接收
-chrome.runtime.onMessageExternal.addListener(
-  (msg, sender, sendResponse) => {
-    if (msg.type === 'auth') {
-      chrome.storage.local.set({ token: msg.token });
-      sendResponse({ ok: true });
-    }
+chrome.runtime.onMessageExternal.addListener((msg, sender, sendResponse) => {
+  if (msg.type === 'auth') {
+    chrome.storage.local.set({ token: msg.token });
+    sendResponse({ ok: true });
   }
-);
+});
 ```
 
 ### 3.4 调用后端 API
@@ -161,10 +159,10 @@ async function apiCall(path, options = {}) {
   return fetch(`https://api.yourapp.com${path}`, {
     ...options,
     headers: {
-      'Authorization': `Bearer ${token}`,
+      Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
-      ...(options.headers || {})
-    }
+      ...(options.headers || {}),
+    },
   });
 }
 ```
@@ -307,15 +305,15 @@ async def get_current_user(authorization: str = Header(...)):
 
 ### 5.1 选型对比
 
-| 维度 | Clerk | Supabase Auth |
-|---|---|---|
-| 免费额度 | 月活 1 万 | 月活 5 万 |
-| 开发体验 | 业内最佳，UI 组件漂亮 | 不错，跟数据库一起用更顺 |
-| 社交登录 | Google/Apple/GitHub 等开箱即用 | 同样支持 |
-| 2FA / MFA | 内置 | 内置 |
-| 企业 SSO | 高价档支持 | Pro 档有限支持 |
-| 自定义程度 | 较高 | 高 |
-| 适合场景 | 重视用户体验、不缺预算 | 数据库已用 Supabase、预算敏感 |
+| 维度       | Clerk                          | Supabase Auth                 |
+| ---------- | ------------------------------ | ----------------------------- |
+| 免费额度   | 月活 1 万                      | 月活 5 万                     |
+| 开发体验   | 业内最佳，UI 组件漂亮          | 不错，跟数据库一起用更顺      |
+| 社交登录   | Google/Apple/GitHub 等开箱即用 | 同样支持                      |
+| 2FA / MFA  | 内置                           | 内置                          |
+| 企业 SSO   | 高价档支持                     | Pro 档有限支持                |
+| 自定义程度 | 较高                           | 高                            |
+| 适合场景   | 重视用户体验、不缺预算         | 数据库已用 Supabase、预算敏感 |
 
 **推荐**：MVP 阶段用 **Clerk**，1 万 MAU 内免费，省下的开发时间最值。
 
@@ -520,11 +518,11 @@ async def send_welcome(to: str, name: str):
 
 ### 8.1 三选一推荐
 
-| 平台 | 优点 | 起步月费 |
-|---|---|---|
-| **Render** | UI 最简单、文档好、部署快 | ~$14（Web + DB） |
-| **Railway** | 配置极简、按用量计费 | ~$10~$15 |
-| **Fly.io** | 全球节点多、冷启动快 | ~$5~$10 |
+| 平台        | 优点                      | 起步月费         |
+| ----------- | ------------------------- | ---------------- |
+| **Render**  | UI 最简单、文档好、部署快 | ~$14（Web + DB） |
+| **Railway** | 配置极简、按用量计费      | ~$10~$15         |
+| **Fly.io**  | 全球节点多、冷启动快      | ~$5~$10          |
 
 **MVP 推荐 Render**：界面友好，新手最快上手。
 
@@ -594,12 +592,12 @@ if settings.sentry_dsn:
 
 ### 10.1 各阶段月成本
 
-| 阶段 | 用户量 | 月成本 |
-|---|---|---|
-| 开发期 | 0 | ~$0~$14 |
-| 上线初期 | <100 付费用户 | ~$15~$30 |
-| 增长期 | 1000 付费 / 月流水 $5K | ~$50~$100 + Stripe 抽成 |
-| 规模化 | 1 万+ 付费 | $300~$1000 + 抽成 |
+| 阶段     | 用户量                 | 月成本                  |
+| -------- | ---------------------- | ----------------------- |
+| 开发期   | 0                      | ~$0~$14                 |
+| 上线初期 | <100 付费用户          | ~$15~$30                |
+| 增长期   | 1000 付费 / 月流水 $5K | ~$50~$100 + Stripe 抽成 |
+| 规模化   | 1 万+ 付费             | $300~$1000 + 抽成       |
 
 ### 10.2 一次性 / 年费成本
 
@@ -609,13 +607,13 @@ if settings.sentry_dsn:
 
 ### 10.3 何时升级
 
-| 服务 | 触发升级的信号 |
-|---|---|
-| Clerk | 月活 > 1 万 |
+| 服务     | 触发升级的信号            |
+| -------- | ------------------------- |
+| Clerk    | 月活 > 1 万               |
 | Supabase | 数据库 > 500MB 或项目暂停 |
-| Resend | 月发件 > 3000 |
-| Sentry | 月事件 > 5000 |
-| Render | 内存/CPU 持续打满 |
+| Resend   | 月发件 > 3000             |
+| Sentry   | 月事件 > 5000             |
+| Render   | 内存/CPU 持续打满         |
 
 ---
 

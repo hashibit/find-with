@@ -10,9 +10,13 @@ export default async function AccountPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <nav className="bg-white border-b px-8 py-4 flex items-center justify-between">
-        <Link href="/" className="font-serif text-xl font-bold text-brand-700">FindWith</Link>
+        <Link href="/" className="font-serif text-xl font-bold text-brand-700">
+          FindWith
+        </Link>
         <div className="flex items-center gap-4 text-sm">
-          <Link href="/dashboard" className="text-gray-600 hover:text-gray-900">Dashboard</Link>
+          <Link href="/dashboard" className="text-gray-600 hover:text-gray-900">
+            Dashboard
+          </Link>
         </div>
       </nav>
 

@@ -24,9 +24,14 @@ import { AppConfig } from '../../config/configuration.js';
 @Module({
   imports: [
     TypeOrmModule.forFeature([
-      ProfileResumeSource, ProfileProfile, ProfileEducation,
-      ProfileWorkExperience, ProfileProject, ProfileSkill,
-      ProfileMaterial, ProfileBaseResume,
+      ProfileResumeSource,
+      ProfileProfile,
+      ProfileEducation,
+      ProfileWorkExperience,
+      ProfileProject,
+      ProfileSkill,
+      ProfileMaterial,
+      ProfileBaseResume,
     ]),
     BullModule.registerQueue({ name: RESUME_PARSE_QUEUE }),
   ],

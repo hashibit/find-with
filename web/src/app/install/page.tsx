@@ -1,14 +1,19 @@
 import Link from 'next/link';
 
-const CHROME_STORE_URL = process.env.NEXT_PUBLIC_CHROME_STORE_URL || 'https://chrome.google.com/webstore';
+const CHROME_STORE_URL =
+  process.env.NEXT_PUBLIC_CHROME_STORE_URL || 'https://chrome.google.com/webstore';
 
 export default function InstallPage() {
   return (
     <div className="min-h-screen">
       <nav className="flex items-center justify-between px-8 py-4 border-b">
-        <Link href="/" className="font-serif text-2xl font-bold text-brand-700">FindWith</Link>
+        <Link href="/" className="font-serif text-2xl font-bold text-brand-700">
+          FindWith
+        </Link>
         <div className="flex items-center gap-4">
-          <Link href="/login" className="text-gray-600 hover:text-gray-900">Log in</Link>
+          <Link href="/login" className="text-gray-600 hover:text-gray-900">
+            Log in
+          </Link>
         </div>
       </nav>
 
@@ -41,7 +46,10 @@ export default function InstallPage() {
               desc: 'Quinn will automatically analyze the role and give you tailored guidance.',
             },
           ].map((s) => (
-            <div key={s.step} className="flex items-start gap-4 text-left bg-gray-50 rounded-xl p-6 border">
+            <div
+              key={s.step}
+              className="flex items-start gap-4 text-left bg-gray-50 rounded-xl p-6 border"
+            >
               <span className="bg-brand-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold shrink-0">
                 {s.step}
               </span>

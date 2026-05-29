@@ -102,7 +102,9 @@ Return JSON:
         try {
           const m = companyRaw.match(/\{[\s\S]*\}/);
           if (m) companyData = JSON.parse(m[0]) as Record<string, unknown>;
-        } catch { /* ignore */ }
+        } catch {
+          /* ignore */
+        }
 
         const brief = existing ?? this.companyRepo.create({ id: ulid() });
         Object.assign(brief, {
@@ -132,7 +134,8 @@ Return JSON:
       const surfaceHits = hardSkills.filter((s) => text.toLowerCase().includes(s.toLowerCase()));
       const deepHits = hardSkills.filter((s) => materialTexts.includes(s.toLowerCase()));
 
-      const surfaceScore = hardSkills.length > 0 ? (surfaceHits.length / hardSkills.length) * 100 : 0;
+      const surfaceScore =
+        hardSkills.length > 0 ? (surfaceHits.length / hardSkills.length) * 100 : 0;
       const deepScore =
         hardSkills.length > 0
           ? (Math.max(surfaceHits.length, deepHits.length) / hardSkills.length) * 100
@@ -158,7 +161,12 @@ Return JSON:
     // 4. Update radar status to ANALYZED
     await this.radarRepo.update(
       { captureId },
-      { status: 'ANALYZED', parsedJdId: parsedJd.id, matchId: matchResult.id, lastStatusAt: new Date() },
+      {
+        status: 'ANALYZED',
+        parsedJdId: parsedJd.id,
+        matchId: matchResult.id,
+        lastStatusAt: new Date(),
+      },
     );
 
     this.logger.log(

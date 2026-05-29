@@ -1,13 +1,4 @@
-import {
-  Body,
-  Controller,
-  Get,
-  MessageEvent,
-  Param,
-  Post,
-  Sse,
-  UseGuards,
-} from '@nestjs/common';
+import { Body, Controller, Get, MessageEvent, Param, Post, Sse, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Observable, map } from 'rxjs';
 import { ClerkAuthGuard } from '../../common/guards/clerk-auth.guard.js';
@@ -42,10 +33,7 @@ export class ConversationController {
 
   @Post()
   @ApiOperation({ summary: 'Create a new conversation' })
-  async create(
-    @CurrentUser() user: AuthenticatedUser,
-    @Body() dto: CreateConversationDto,
-  ) {
+  async create(@CurrentUser() user: AuthenticatedUser, @Body() dto: CreateConversationDto) {
     return this.service.create(user.userId, dto.kind, dto.anchorId);
   }
 
@@ -64,6 +52,6 @@ export class ConversationController {
   ): Observable<MessageEvent> {
     return this.agent
       .respond(id, user.userId, dto.message)
-      .pipe(map((evt) => ({ data: evt.data } as MessageEvent)));
+      .pipe(map((evt) => ({ data: evt.data }) as MessageEvent));
   }
 }

@@ -41,7 +41,9 @@ function UpgradeRedirect() {
       <div className="text-center">
         <div className="text-4xl mb-4">&#8987;</div>
         <h1 className="text-xl font-semibold mb-2">Redirecting to checkout...</h1>
-        <p className="text-gray-500 text-sm">You will be taken to Stripe to complete your upgrade.</p>
+        <p className="text-gray-500 text-sm">
+          You will be taken to Stripe to complete your upgrade.
+        </p>
       </div>
     </div>
   );
@@ -49,11 +51,13 @@ function UpgradeRedirect() {
 
 export default function BillingUpgradePage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <p className="text-gray-500">Loading...</p>
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+          <p className="text-gray-500">Loading...</p>
+        </div>
+      }
+    >
       <UpgradeRedirect />
     </Suspense>
   );

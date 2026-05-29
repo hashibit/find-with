@@ -29,7 +29,12 @@ export class ProfileService {
     @InjectQueue(RESUME_PARSE_QUEUE) private readonly parseQueue: Queue,
   ) {}
 
-  async uploadResume(userId: string, blobUri: string, filename: string, contentType: string): Promise<ProfileResumeSource> {
+  async uploadResume(
+    userId: string,
+    blobUri: string,
+    filename: string,
+    contentType: string,
+  ): Promise<ProfileResumeSource> {
     const source = this.resumeSourceRepo.create({
       id: ulid(),
       userId,
@@ -47,29 +52,50 @@ export class ProfileService {
     return this.profileRepo.findOne({ where: { userId } });
   }
 
-  async upsertProfile(userId: string, patch: Partial<Pick<ProfileProfile, 'basicInfo' | 'certifications'>>): Promise<ProfileProfile> {
+  async upsertProfile(
+    userId: string,
+    patch: Partial<Pick<ProfileProfile, 'basicInfo' | 'certifications'>>,
+  ): Promise<ProfileProfile> {
     const etag = randomBytes(8).toString('hex');
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await this.profileRepo.upsert({ userId, ...patch, etag, updatedAt: new Date() } as any, ['userId']);
+    await this.profileRepo.upsert({ userId, ...patch, etag, updatedAt: new Date() } as any, [
+      'userId',
+    ]);
     return (await this.profileRepo.findOne({ where: { userId } }))!;
   }
 
-  async listMaterials(userId: string): Promise<Array<Omit<ProfileMaterial, 'rawText'> & { rawText?: string }>> {
-    const materials = await this.materialRepo.find({ where: { userId }, order: { createdAt: 'DESC' } });
+  async listMaterials(
+    userId: string,
+  ): Promise<Array<Omit<ProfileMaterial, 'rawText'> & { rawText?: string }>> {
+    const materials = await this.materialRepo.find({
+      where: { userId },
+      order: { createdAt: 'DESC' },
+    });
     return Promise.all(
       materials.map(async (m) => {
         const { rawText, ...rest } = m;
         if (rawText) {
-          return { ...rest, rawText: await this.crypto.decrypt(rawText) } as Omit<ProfileMaterial, 'rawText'> & { rawText?: string };
+          return { ...rest, rawText: await this.crypto.decrypt(rawText) } as Omit<
+            ProfileMaterial,
+            'rawText'
+          > & { rawText?: string };
         }
-        return { ...rest, rawText: undefined } as Omit<ProfileMaterial, 'rawText'> & { rawText?: string };
+        return { ...rest, rawText: undefined } as Omit<ProfileMaterial, 'rawText'> & {
+          rawText?: string;
+        };
       }),
     );
   }
 
   async createMaterial(
     userId: string,
-    data: { rawText?: string; shiningText?: string; rationale?: string; tags?: string[]; provenanceKind: string },
+    data: {
+      rawText?: string;
+      shiningText?: string;
+      rationale?: string;
+      tags?: string[];
+      provenanceKind: string;
+    },
   ): Promise<ProfileMaterial> {
     const encryptedRaw = data.rawText ? await this.crypto.encrypt(data.rawText) : null;
     const material = this.materialRepo.create({
@@ -108,7 +134,11 @@ export class ProfileService {
     return this.baseResumeRepo.find({ where: { userId } });
   }
 
-  async createBaseResume(userId: string, name: string, selectedMaterialIds?: string[]): Promise<ProfileBaseResume> {
+  async createBaseResume(
+    userId: string,
+    name: string,
+    selectedMaterialIds?: string[],
+  ): Promise<ProfileBaseResume> {
     const resume = this.baseResumeRepo.create({
       id: ulid(),
       userId,

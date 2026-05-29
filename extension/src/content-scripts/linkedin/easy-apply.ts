@@ -28,7 +28,7 @@ function scanEasyApplyFields(): FormField[] {
 
     const field: FormField = {
       label,
-      type: el.tagName === 'SELECT' ? 'select' : (el as HTMLInputElement).type ?? 'text',
+      type: el.tagName === 'SELECT' ? 'select' : ((el as HTMLInputElement).type ?? 'text'),
       name: el.name ?? el.id ?? '',
       required: el.required,
     };

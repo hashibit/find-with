@@ -16,9 +16,29 @@ import { RESUME_PARSE_QUEUE } from './profile.service.js';
 import { ulid } from 'ulid';
 
 interface ParsedResume {
-  basicInfo: { fullName?: string; email?: string; phone?: string; location?: string; linkedinUrl?: string };
-  education: Array<{ school: string; degree?: string; major?: string; start?: string; end?: string; gpa?: string }>;
-  workExperience: Array<{ company: string; title: string; location?: string; start?: string; end?: string; bullets: string[] }>;
+  basicInfo: {
+    fullName?: string;
+    email?: string;
+    phone?: string;
+    location?: string;
+    linkedinUrl?: string;
+  };
+  education: Array<{
+    school: string;
+    degree?: string;
+    major?: string;
+    start?: string;
+    end?: string;
+    gpa?: string;
+  }>;
+  workExperience: Array<{
+    company: string;
+    title: string;
+    location?: string;
+    start?: string;
+    end?: string;
+    bullets: string[];
+  }>;
   skills: Array<{ name: string; kind: string }>;
 }
 
@@ -87,7 +107,9 @@ Return JSON matching this schema:
       let parsed: ParsedResume;
       try {
         const jsonMatch = raw.match(/\{[\s\S]*\}/);
-        parsed = jsonMatch ? (JSON.parse(jsonMatch[0]) as ParsedResume) : { basicInfo: {}, education: [], workExperience: [], skills: [] };
+        parsed = jsonMatch
+          ? (JSON.parse(jsonMatch[0]) as ParsedResume)
+          : { basicInfo: {}, education: [], workExperience: [], skills: [] };
       } catch {
         throw new Error(`Failed to parse LLM response as JSON: ${raw.slice(0, 200)}`);
       }
@@ -111,7 +133,9 @@ Return JSON matching this schema:
       }
 
       if (parsed.skills?.length) {
-        const skills = parsed.skills.map((s) => this.skillRepo.create({ id: ulid(), userId, ...s }));
+        const skills = parsed.skills.map((s) =>
+          this.skillRepo.create({ id: ulid(), userId, ...s }),
+        );
         await this.skillRepo.save(skills);
       }
 

@@ -16,22 +16,11 @@ interface EmailCapture {
 
 function scrapeOpenEmail(): EmailCapture | null {
   // Gmail renders the open email in an aria-expanded thread
-  const subject = queryText([
-    'h2.hP',
-    '[data-legacy-message-id] h2',
-  ]);
+  const subject = queryText(['h2.hP', '[data-legacy-message-id] h2']);
 
-  const from = queryText([
-    '.gD[email]',
-    '.go span[email]',
-    'span.gD',
-  ]);
+  const from = queryText(['.gD[email]', '.go span[email]', 'span.gD']);
 
-  const body = queryText([
-    '.a3s.aiL',
-    '.ii.gt div',
-    '.Am.Al.editable',
-  ]);
+  const body = queryText(['.a3s.aiL', '.ii.gt div', '.Am.Al.editable']);
 
   if (!subject && !from) return null;
 

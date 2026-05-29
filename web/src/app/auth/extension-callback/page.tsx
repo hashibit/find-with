@@ -30,20 +30,16 @@ export default function ExtensionCallbackPage() {
         }
 
         if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage && EXT_ID) {
-          chrome.runtime.sendMessage(
-            EXT_ID,
-            { type: 'AUTH_TOKEN', token },
-            (response) => {
-              if (chrome.runtime.lastError) {
-                console.error('Extension messaging error:', chrome.runtime.lastError);
-                setStatus('error');
-              } else if (response?.ok) {
-                setStatus('sent');
-              } else {
-                setStatus('error');
-              }
+          chrome.runtime.sendMessage(EXT_ID, { type: 'AUTH_TOKEN', token }, (response) => {
+            if (chrome.runtime.lastError) {
+              console.error('Extension messaging error:', chrome.runtime.lastError);
+              setStatus('error');
+            } else if (response?.ok) {
+              setStatus('sent');
+            } else {
+              setStatus('error');
             }
-          );
+          });
         } else {
           // Extension not present or not in Chrome — show token for manual handling.
           console.warn('chrome.runtime not available; token not delivered to extension');
@@ -82,7 +78,11 @@ export default function ExtensionCallbackPage() {
             <div className="text-4xl mb-4">&#128274;</div>
             <h1 className="text-xl font-semibold mb-2">Not signed in</h1>
             <p className="text-gray-500 text-sm">
-              Please <a href="/login" className="text-brand-600 hover:underline">log in</a> first, then try again.
+              Please{' '}
+              <a href="/login" className="text-brand-600 hover:underline">
+                log in
+              </a>{' '}
+              first, then try again.
             </p>
           </>
         )}

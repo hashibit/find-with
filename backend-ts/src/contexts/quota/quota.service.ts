@@ -40,7 +40,9 @@ export class QuotaService {
 
     const counter = await this.getCounter(userId);
     if (counter.tailoringCompleted >= counter.tailoringLimit) {
-      throw new ForbiddenException('Tailoring quota exhausted. Upgrade to Pro for unlimited exports.');
+      throw new ForbiddenException(
+        'Tailoring quota exhausted. Upgrade to Pro for unlimited exports.',
+      );
     }
 
     // Atomic increment + log in a transaction
@@ -63,6 +65,9 @@ export class QuotaService {
   }
 
   async resetToFreeLimit(userId: string): Promise<void> {
-    await this.counterRepo.upsert({ userId, tailoringLimit: 3, tailoringCompleted: 0, windowStart: new Date() }, ['userId']);
+    await this.counterRepo.upsert(
+      { userId, tailoringLimit: 3, tailoringCompleted: 0, windowStart: new Date() },
+      ['userId'],
+    );
   }
 }

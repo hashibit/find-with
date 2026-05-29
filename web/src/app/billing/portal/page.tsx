@@ -37,7 +37,9 @@ export default function BillingPortalPage() {
       <div className="text-center">
         <div className="text-4xl mb-4">&#8987;</div>
         <h1 className="text-xl font-semibold mb-2">Opening billing portal...</h1>
-        <p className="text-gray-500 text-sm">You will be redirected to Stripe to manage your subscription.</p>
+        <p className="text-gray-500 text-sm">
+          You will be redirected to Stripe to manage your subscription.
+        </p>
       </div>
     </div>
   );

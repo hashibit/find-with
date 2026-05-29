@@ -39,12 +39,15 @@ export class HttpExceptionFilter implements ExceptionFilter {
       this.logger.error(exception.message, exception.stack);
     }
 
-    response.status(status).type('application/problem+json').json({
-      type: `https://findwith.app/errors/${status}`,
-      title,
-      status,
-      detail,
-      instance: request.url,
-    });
+    response
+      .status(status)
+      .type('application/problem+json')
+      .json({
+        type: `https://findwith.app/errors/${status}`,
+        title,
+        status,
+        detail,
+        instance: request.url,
+      });
   }
 }

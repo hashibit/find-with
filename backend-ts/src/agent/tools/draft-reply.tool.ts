@@ -54,7 +54,8 @@ export class DraftReplyTool {
 
     const intentPrompts: Record<string, string> = {
       accept_interview: 'Confirm attendance at the interview. Be professional and brief.',
-      ask_reschedule: 'Politely request to reschedule. Suggest flexibility without specifying times.',
+      ask_reschedule:
+        'Politely request to reschedule. Suggest flexibility without specifying times.',
       accept_offer: 'Accept the job offer formally. Express genuine (not gushing) appreciation.',
       negotiate_offer: 'Express interest while indicating you would like to discuss compensation.',
       decline_politely: 'Decline the opportunity gracefully. Keep the door open for the future.',
@@ -63,11 +64,13 @@ export class DraftReplyTool {
 
     const draft = await this.llm.completeContext({
       systemPrompt: `You write professional email replies for job seekers. Quinn's style: direct, no fluff, authentic. ${intentPrompts[params.intent] ?? ''}`,
-      messages: [{
-        role: 'user',
-        content: `Write a reply to this email:\n\nSubject: ${email.subject}\nFrom: ${email.fromAddr}\n\n${originalBody.slice(0, 1500)}\n\nIntent: ${params.intent}`,
-        timestamp: Date.now(),
-      }],
+      messages: [
+        {
+          role: 'user',
+          content: `Write a reply to this email:\n\nSubject: ${email.subject}\nFrom: ${email.fromAddr}\n\n${originalBody.slice(0, 1500)}\n\nIntent: ${params.intent}`,
+          timestamp: Date.now(),
+        },
+      ],
     });
 
     const saved = this.draftRepo.create({

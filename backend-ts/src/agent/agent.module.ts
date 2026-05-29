@@ -41,7 +41,9 @@ import { AppConfig } from '../config/configuration.js';
       inject: [ConfigService],
       useFactory: (config: ConfigService<AppConfig>) => {
         const env = config.get('env', { infer: true });
-        return env === 'production' ? new EnvelopeCryptoService(config) : new EphemeralCryptoService();
+        return env === 'production'
+          ? new EnvelopeCryptoService(config)
+          : new EphemeralCryptoService();
       },
     },
     AgentService,

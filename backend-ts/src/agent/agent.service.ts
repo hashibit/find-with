@@ -48,7 +48,6 @@ const TOOL_SCENES: Record<string, string[]> = {
 
 const MAX_ITERATION = 10;
 
-
 @Injectable()
 export class AgentService {
   private readonly logger = new Logger(AgentService.name);
@@ -84,7 +83,13 @@ export class AgentService {
     anchorId?: string | null,
   ): Observable<AgentSseEvent> {
     const subject = new Subject<AgentSseEvent>();
-    void this.runAgentLoop(subject, { conversationId, userId, userMessage, conversationKind, anchorId });
+    void this.runAgentLoop(subject, {
+      conversationId,
+      userId,
+      userMessage,
+      conversationKind,
+      anchorId,
+    });
     return subject.asObservable();
   }
 
@@ -109,7 +114,10 @@ export class AgentService {
 
       // 2. Build pi-ai Context (system prompt + history)
       const context: Context = await this.contextBuilder.build(
-        conversationId, userId, conversationKind, opts.anchorId,
+        conversationId,
+        userId,
+        conversationKind,
+        opts.anchorId,
       );
 
       // Attach scene-filtered tools for the LLM to see
@@ -117,21 +125,29 @@ export class AgentService {
 
       // Add the current user turn
       context.messages.push({ role: 'user', content: userMessage, timestamp: Date.now() });
-      
+
       let promptTokens = 0;
       let completionTokens = 0;
-      
+
       let iteration = 0;
-      while(iteration++ < MAX_ITERATION) {
+      while (iteration++ < MAX_ITERATION) {
         // 3. Stream LLM turn
 
         const s = this.llm.streamContext(context);
 
         for await (const event of s) {
           if (event.type === 'text_delta') {
-            subject.next({ data: JSON.stringify({ kind: 'text_delta', delta: event.delta, conversationId }) });
+            subject.next({
+              data: JSON.stringify({ kind: 'text_delta', delta: event.delta, conversationId }),
+            });
           } else if (event.type === 'toolcall_end') {
-            subject.next({ data: JSON.stringify({ kind: 'tool_call', name: event.toolCall.name, callId: event.toolCall.id }) });
+            subject.next({
+              data: JSON.stringify({
+                kind: 'tool_call',
+                name: event.toolCall.name,
+                callId: event.toolCall.id,
+              }),
+            });
           } else if (event.type === 'error') {
             this.llm.recordError();
             subject.next({ data: JSON.stringify({ kind: 'error', message: String(event.error) }) });
@@ -145,11 +161,11 @@ export class AgentService {
         promptTokens += finalMessage.usage.input;
         completionTokens += finalMessage.usage.output;
         this.llm.clearErrors();
-        
+
         const fullText = finalMessage.content
-          .filter(b => b.type == "text")
-          .map(b => b.text)
-          .join("");
+          .filter((b) => b.type == 'text')
+          .map((b) => b.text)
+          .join('');
 
         // 3. Persist assistant message
         await this.messageRepo.save(
@@ -164,19 +180,29 @@ export class AgentService {
           }),
         );
 
-
         // 4. Execute tool calls and stream continuation
         const toolCalls = finalMessage.content.filter((b) => b.type === 'toolCall');
         if (toolCalls.length == 0) {
           break;
         }
 
-        const toolCallResult : Record<string, unknown> = {};
+        const toolCallResult: Record<string, unknown> = {};
         for (const call of toolCalls) {
           if (call.type !== 'toolCall') continue;
-          const result = await this.executeTool(call.name, call.arguments as Record<string, unknown>, call.id, toolCtx);
+          const result = await this.executeTool(
+            call.name,
+            call.arguments as Record<string, unknown>,
+            call.id,
+            toolCtx,
+          );
           subject.next({
-            data: JSON.stringify({ kind: 'tool_result', callId: call.id, ok: result.ok, data: result.data, error: result.error }),
+            data: JSON.stringify({
+              kind: 'tool_result',
+              callId: call.id,
+              ok: result.ok,
+              data: result.data,
+              error: result.error,
+            }),
           });
 
           toolCallResult[call.id] = result;
@@ -186,12 +212,14 @@ export class AgentService {
             role: 'toolResult',
             toolCallId: call.id,
             toolName: call.name,
-            content: [{ type: 'text', text: result.ok ? JSON.stringify(result.data) : result.error }],
+            content: [
+              { type: 'text', text: result.ok ? JSON.stringify(result.data) : result.error },
+            ],
             isError: !result.ok,
             timestamp: Date.now(),
           });
         }
-        
+
         // 5. Persist tool messages
         await this.messageRepo.save(
           this.messageRepo.create({
@@ -202,7 +230,6 @@ export class AgentService {
             toolResult: toolCallResult,
           }),
         );
-        
       }
 
       await this.convRepo.update({ id: conversationId }, { lastActivity: new Date() });

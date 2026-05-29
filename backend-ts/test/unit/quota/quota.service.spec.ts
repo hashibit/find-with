@@ -7,7 +7,13 @@ import { QuotaUsageCounter } from '../../../src/database/entities/quota/quota-co
 import { QuotaConsumeLog } from '../../../src/database/entities/quota/quota-log.entity.js';
 
 const mockCounter = (override: Partial<QuotaUsageCounter> = {}): QuotaUsageCounter =>
-  ({ userId: 'user_01', tailoringCompleted: 0, tailoringLimit: 3, windowStart: new Date(), ...override } as QuotaUsageCounter);
+  ({
+    userId: 'user_01',
+    tailoringCompleted: 0,
+    tailoringLimit: 3,
+    windowStart: new Date(),
+    ...override,
+  }) as QuotaUsageCounter;
 
 const mockRepo = (entity: unknown) => ({
   findOne: vi.fn(),
@@ -47,12 +53,16 @@ describe('QuotaService', () => {
 
   describe('getRemaining', () => {
     it('returns limit - completed', async () => {
-      counterRepo.findOne.mockResolvedValue(mockCounter({ tailoringCompleted: 1, tailoringLimit: 3 }));
+      counterRepo.findOne.mockResolvedValue(
+        mockCounter({ tailoringCompleted: 1, tailoringLimit: 3 }),
+      );
       expect(await service.getRemaining('user_01')).toBe(2);
     });
 
     it('returns 0 when exhausted', async () => {
-      counterRepo.findOne.mockResolvedValue(mockCounter({ tailoringCompleted: 3, tailoringLimit: 3 }));
+      counterRepo.findOne.mockResolvedValue(
+        mockCounter({ tailoringCompleted: 3, tailoringLimit: 3 }),
+      );
       expect(await service.getRemaining('user_01')).toBe(0);
     });
 
@@ -73,13 +83,19 @@ describe('QuotaService', () => {
 
     it('throws ForbiddenException when quota exhausted', async () => {
       logRepo.findOne.mockResolvedValue(null);
-      counterRepo.findOne.mockResolvedValue(mockCounter({ tailoringCompleted: 3, tailoringLimit: 3 }));
-      await expect(service.consumeOnExport('user_01', 'resume_02')).rejects.toThrow(ForbiddenException);
+      counterRepo.findOne.mockResolvedValue(
+        mockCounter({ tailoringCompleted: 3, tailoringLimit: 3 }),
+      );
+      await expect(service.consumeOnExport('user_01', 'resume_02')).rejects.toThrow(
+        ForbiddenException,
+      );
     });
 
     it('increments counter and writes log when within quota', async () => {
       logRepo.findOne.mockResolvedValue(null);
-      counterRepo.findOne.mockResolvedValue(mockCounter({ tailoringCompleted: 1, tailoringLimit: 3 }));
+      counterRepo.findOne.mockResolvedValue(
+        mockCounter({ tailoringCompleted: 1, tailoringLimit: 3 }),
+      );
       await service.consumeOnExport('user_01', 'resume_02');
       expect(counterRepo.manager.transaction).toHaveBeenCalled();
     });

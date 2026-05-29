@@ -18,11 +18,13 @@
 ## Procedure
 
 ### 1. Assess the situation
+
 - Check Sentry for error patterns
 - Verify the issue is data-level (not app code)
 - Determine target RPO (which backup to restore from)
 
 ### 2. Run restore
+
 ```bash
 # Dry run first
 ./scripts/dr/restore-from-r2.sh --dry-run
@@ -35,22 +37,24 @@ export KEK=<from-doppler>
 ```
 
 ### 3. Verify
+
 - Run `make smoke` against restored DB
 - Check encrypted field decryption works
 - Verify row counts match expected ranges
 
 ### 4. Cut over
+
 - Update Render environment variables to point to new DB
 - Restart web + worker services
 - Monitor Sentry for 30 minutes
 
 ## Backup Schedule
 
-| Type | Frequency | Retention | R2 Path |
-|------|-----------|-----------|---------|
-| Daily | Every night 03:00 UTC | 7 days | `daily/` |
-| Weekly | Sunday 03:00 UTC | 4 weeks | `weekly/` |
-| Monthly | 1st of month | 3 months | `monthly/` |
+| Type    | Frequency             | Retention | R2 Path    |
+| ------- | --------------------- | --------- | ---------- |
+| Daily   | Every night 03:00 UTC | 7 days    | `daily/`   |
+| Weekly  | Sunday 03:00 UTC      | 4 weeks   | `weekly/`  |
+| Monthly | 1st of month          | 3 months  | `monthly/` |
 
 ## Important Notes
 

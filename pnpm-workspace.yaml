@@ -1,4 +1,4 @@
 packages:
-  - "backend-ts"
-  - "extension"
-  - "web"
+  - 'backend-ts'
+  - 'extension'
+  - 'web'

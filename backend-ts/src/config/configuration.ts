@@ -49,9 +49,7 @@ export interface AppConfig {
 export function validateEnv(raw: Record<string, unknown>): Env {
   const result = envSchema.safeParse(raw);
   if (!result.success) {
-    const messages = result.error.issues
-      .map((i) => `${i.path.join('.')}: ${i.message}`)
-      .join('\n');
+    const messages = result.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('\n');
     throw new Error(`Environment validation failed:\n${messages}`);
   }
   return result.data;

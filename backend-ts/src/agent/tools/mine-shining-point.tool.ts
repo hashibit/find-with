@@ -44,7 +44,8 @@ Return JSON with:
 Example shiningText: "Redesigned onboarding process within first 60 days, reducing new-hire ramp time by 30%"`;
 
     const raw = await this.llm.completeContext({
-      systemPrompt: 'You are a career coach who extracts professional achievements. Respond only with valid JSON.',
+      systemPrompt:
+        'You are a career coach who extracts professional achievements. Respond only with valid JSON.',
       messages: [{ role: 'user', content: prompt, timestamp: Date.now() }],
     });
 

@@ -17,7 +17,13 @@ export class FollowupService {
 
   async captureEmail(
     userId: string,
-    data: { subject?: string; fromAddr?: string; bodyText?: string; radarItemId?: string; receivedAt?: Date },
+    data: {
+      subject?: string;
+      fromAddr?: string;
+      bodyText?: string;
+      radarItemId?: string;
+      receivedAt?: Date;
+    },
   ): Promise<FollowupEmail> {
     const encryptedBody = data.bodyText ? await this.crypto.encrypt(data.bodyText) : null;
     const email = this.emailRepo.create({

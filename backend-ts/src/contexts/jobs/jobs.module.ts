@@ -13,7 +13,13 @@ import { ProfileModule } from '../profile/profile.module.js';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([JobCapture, JobParsedJd, JobCompanyBrief, JobMatchResult, JobRadarItem]),
+    TypeOrmModule.forFeature([
+      JobCapture,
+      JobParsedJd,
+      JobCompanyBrief,
+      JobMatchResult,
+      JobRadarItem,
+    ]),
     BullModule.registerQueue({ name: JOB_ANALYZE_QUEUE }),
     ProfileModule,
   ],

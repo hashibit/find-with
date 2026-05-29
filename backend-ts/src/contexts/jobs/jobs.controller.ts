@@ -14,7 +14,18 @@ class CaptureJobDto {
 }
 
 class UpdateRadarDto {
-  @IsIn(['BROWSED','ANALYZED','DECIDED','DECIDED_NO','APPLIED','INTERVIEWING','OFFER_RECEIVED','OFFER_ACCEPTED','OFFER_REJECTED','REJECTED'])
+  @IsIn([
+    'BROWSED',
+    'ANALYZED',
+    'DECIDED',
+    'DECIDED_NO',
+    'APPLIED',
+    'INTERVIEWING',
+    'OFFER_RECEIVED',
+    'OFFER_ACCEPTED',
+    'OFFER_REJECTED',
+    'REJECTED',
+  ])
   status: string;
 
   @IsOptional() @IsString() note?: string;

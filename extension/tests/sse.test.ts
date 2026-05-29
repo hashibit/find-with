@@ -122,11 +122,7 @@ describe('parseSseBlock', () => {
 
 describe('parseSseStream (split events)', () => {
   it('parses multiple events separated by double newline', () => {
-    const stream = [
-      'id: 1\ndata: first',
-      'id: 2\ndata: second',
-      'id: 3\ndata: third',
-    ].join('\n\n');
+    const stream = ['id: 1\ndata: first', 'id: 2\ndata: second', 'id: 3\ndata: third'].join('\n\n');
 
     const events = parseSseStream(stream);
     expect(events).toHaveLength(3);

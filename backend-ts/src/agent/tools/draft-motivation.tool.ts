@@ -16,8 +16,7 @@ export class DraftMotivationTool {
   ) {}
 
   readonly name = DRAFT_MOTIVATION_TOOL_NAME;
-  readonly description =
-    "Draft a 'Why are you interested?' response for a job application form.";
+  readonly description = "Draft a 'Why are you interested?' response for a job application form.";
   readonly parameters = Type.Object({
     parsed_jd_id: Type.String(),
     profile_summary: Type.Optional(Type.String()),
@@ -44,12 +43,21 @@ export class DraftMotivationTool {
       .join('\n');
 
     const draft = await this.llm.completeContext({
-      systemPrompt: 'You write concise, authentic "Why are you interested?" responses for job applications. 2-3 sentences max. No clichés. Specific to the role.',
-      messages: [{ role: 'user', content: `Write a motivation statement for this application:\n${context}`, timestamp: Date.now() }],
+      systemPrompt:
+        'You write concise, authentic "Why are you interested?" responses for job applications. 2-3 sentences max. No clichés. Specific to the role.',
+      messages: [
+        {
+          role: 'user',
+          content: `Write a motivation statement for this application:\n${context}`,
+          timestamp: Date.now(),
+        },
+      ],
     });
 
     return {
-      content: [{ type: 'text', text: `Here's a draft motivation statement:\n\n"${draft.trim()}"` }],
+      content: [
+        { type: 'text', text: `Here's a draft motivation statement:\n\n"${draft.trim()}"` },
+      ],
       details: { draft: draft.trim(), parsedJdId: params.parsed_jd_id },
     };
   }

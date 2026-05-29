@@ -8,7 +8,9 @@ export default function PrivacyPage() {
   return (
     <div className="min-h-screen">
       <nav className="flex items-center justify-between px-8 py-4 border-b">
-        <Link href="/" className="font-serif text-2xl font-bold text-brand-700">FindWith</Link>
+        <Link href="/" className="font-serif text-2xl font-bold text-brand-700">
+          FindWith
+        </Link>
       </nav>
 
       <main className="max-w-3xl mx-auto py-12 px-8 prose prose-gray">
@@ -18,10 +20,10 @@ export default function PrivacyPage() {
         <section className="mb-8">
           <h2 className="text-xl font-semibold mb-3">1. What we collect</h2>
           <p className="text-gray-700 leading-relaxed">
-            FindWith collects information you provide directly (resume content, career history,
-            job preferences), data from your use of the extension (job descriptions you analyze,
-            actions in the job pipeline), and standard usage metadata (session tokens, timestamps).
-            We do not collect browsing history outside of job listing pages you interact with.
+            FindWith collects information you provide directly (resume content, career history, job
+            preferences), data from your use of the extension (job descriptions you analyze, actions
+            in the job pipeline), and standard usage metadata (session tokens, timestamps). We do
+            not collect browsing history outside of job listing pages you interact with.
           </p>
         </section>
 
@@ -29,8 +31,8 @@ export default function PrivacyPage() {
           <h2 className="text-xl font-semibold mb-3">2. How we use it</h2>
           <p className="text-gray-700 leading-relaxed">
             Your data powers the AI features — resume tailoring, JD analysis, interview prep —
-            personalized to your career profile. We do not sell your data to third parties or use
-            it to train general-purpose AI models.
+            personalized to your career profile. We do not sell your data to third parties or use it
+            to train general-purpose AI models.
           </p>
         </section>
 
@@ -45,8 +47,7 @@ export default function PrivacyPage() {
         <section className="mb-8">
           <h2 className="text-xl font-semibold mb-3">4. Your rights (GDPR / CCPA)</h2>
           <p className="text-gray-700 leading-relaxed">
-            You have the right to access, correct, export, or delete your data at any time.
-            Visit{' '}
+            You have the right to access, correct, export, or delete your data at any time. Visit{' '}
             <Link href="/dashboard/data" className="text-brand-600 hover:underline">
               Dashboard &rarr; Data
             </Link>{' '}

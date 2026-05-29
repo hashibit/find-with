@@ -1,4 +1,3 @@
-
 // DesignCanvas.jsx — Figma-ish design canvas wrapper
 // Warm gray grid bg + Sections + Artboards + PostIt notes.
 // Artboards are reorderable (grip-drag), deletable, labels/titles are
@@ -143,16 +142,29 @@ function DesignCanvas({ children, minScale, maxScale, style }) {
         setState((s) => ({ ...s, sections: saved.sections }));
       })
       .catch(() => {})
-      .finally(() => { didRead.current = true; if (!off) setReady(true); });
-    const t = setTimeout(() => { if (!off) setReady(true); }, 150);
-    return () => { off = true; clearTimeout(t); };
+      .finally(() => {
+        didRead.current = true;
+        if (!off) setReady(true);
+      });
+    const t = setTimeout(() => {
+      if (!off) setReady(true);
+    }, 150);
+    return () => {
+      off = true;
+      clearTimeout(t);
+    };
   }, []);
 
   React.useEffect(() => {
     if (!didRead.current) return;
-    if (skipNextWrite.current) { skipNextWrite.current = false; return; }
+    if (skipNextWrite.current) {
+      skipNextWrite.current = false;
+      return;
+    }
     const t = setTimeout(() => {
-      window.omelette?.writeFile(DC_STATE_FILE, JSON.stringify({ sections: state.sections })).catch(() => {});
+      window.omelette
+        ?.writeFile(DC_STATE_FILE, JSON.stringify({ sections: state.sections }))
+        .catch(() => {});
     }, 250);
     return () => clearTimeout(t);
   }, [state.sections]);
@@ -160,8 +172,8 @@ function DesignCanvas({ children, minScale, maxScale, style }) {
   // Build registries synchronously from children so FocusOverlay can read
   // them in the same render. Only direct DCSection > DCArtboard children are
   // walked — wrapping them in other elements opts out of focus/reorder.
-  const registry = {};     // slotId -> { sectionId, artboard }
-  const sectionMeta = {};  // sectionId -> { title, subtitle, slotIds[] }
+  const registry = {}; // slotId -> { sectionId, artboard }
+  const sectionMeta = {}; // sectionId -> { title, subtitle, slotIds[] }
   const sectionOrder = [];
   React.Children.forEach(children, (sec) => {
     if (!sec || sec.type !== DCSection) return;
@@ -178,7 +190,7 @@ function DesignCanvas({ children, minScale, maxScale, style }) {
     // hidden is scoped to one source revision — when the agent regenerates
     // (artboard-ID set changes), prior deletes don't apply to new content.
     const srcKey = abs.map(([k]) => k).join('\x1f');
-    const hidden = persisted.srcKey === srcKey ? (persisted.hidden || []) : [];
+    const hidden = persisted.srcKey === srcKey ? persisted.hidden || [] : [];
     const srcIds = [];
     abs.forEach(([aid, ab]) => {
       if (hidden.includes(aid)) return;
@@ -193,19 +205,28 @@ function DesignCanvas({ children, minScale, maxScale, style }) {
     };
   });
 
-  const api = React.useMemo(() => ({
-    state,
-    section: (id) => state.sections[id] || {},
-    patchSection: (id, p) => setState((s) => ({
-      ...s,
-      sections: { ...s.sections, [id]: { ...s.sections[id], ...(typeof p === 'function' ? p(s.sections[id] || {}) : p) } },
-    })),
-    setFocus: (slotId) => setState((s) => ({ ...s, focus: slotId })),
-  }), [state]);
+  const api = React.useMemo(
+    () => ({
+      state,
+      section: (id) => state.sections[id] || {},
+      patchSection: (id, p) =>
+        setState((s) => ({
+          ...s,
+          sections: {
+            ...s.sections,
+            [id]: { ...s.sections[id], ...(typeof p === 'function' ? p(s.sections[id] || {}) : p) },
+          },
+        })),
+      setFocus: (slotId) => setState((s) => ({ ...s, focus: slotId })),
+    }),
+    [state],
+  );
 
   // Esc exits focus; any outside pointerdown commits an in-progress rename.
   React.useEffect(() => {
-    const onKey = (e) => { if (e.key === 'Escape') api.setFocus(null); };
+    const onKey = (e) => {
+      if (e.key === 'Escape') api.setFocus(null);
+    };
     const onPd = (e) => {
       const ae = document.activeElement;
       if (ae && ae.isContentEditable && !ae.contains(e.target)) ae.blur();
@@ -220,9 +241,15 @@ function DesignCanvas({ children, minScale, maxScale, style }) {
 
   return (
     <DCCtx.Provider value={api}>
-      <DCViewport minScale={minScale} maxScale={maxScale} style={style}>{ready && children}</DCViewport>
+      <DCViewport minScale={minScale} maxScale={maxScale} style={style}>
+        {ready && children}
+      </DCViewport>
       {state.focus && registry[state.focus] && (
-        <DCFocusOverlay entry={registry[state.focus]} sectionMeta={sectionMeta} sectionOrder={sectionOrder} />
+        <DCFocusOverlay
+          entry={registry[state.focus]}
+          sectionMeta={sectionMeta}
+          sectionOrder={sectionOrder}
+        />
       )}
     </DCCtx.Provider>
   );
@@ -267,14 +294,18 @@ function DCViewport({ children, minScale = 0.1, maxScale = 8, style = {} }) {
     }
     clearTimeout(saveT.current);
     saveT.current = setTimeout(() => {
-      try { localStorage.setItem(tfKey, JSON.stringify(tf.current)); } catch {}
+      try {
+        localStorage.setItem(tfKey, JSON.stringify(tf.current));
+      } catch {}
     }, 200);
   }, [tfKey]);
 
   React.useLayoutEffect(() => {
     const flush = () => {
       clearTimeout(saveT.current);
-      try { localStorage.setItem(tfKey, JSON.stringify(tf.current)); } catch {}
+      try {
+        localStorage.setItem(tfKey, JSON.stringify(tf.current));
+      } catch {}
     };
     try {
       const s = JSON.parse(localStorage.getItem(tfKey) || 'null');
@@ -286,7 +317,10 @@ function DCViewport({ children, minScale = 0.1, maxScale = 8, style = {} }) {
     // Flush on pagehide and unmount so a reload within the 200ms debounce
     // window doesn't drop the last pan/zoom.
     window.addEventListener('pagehide', flush);
-    return () => { window.removeEventListener('pagehide', flush); flush(); };
+    return () => {
+      window.removeEventListener('pagehide', flush);
+      flush();
+    };
   }, []);
 
   React.useEffect(() => {
@@ -295,7 +329,8 @@ function DCViewport({ children, minScale = 0.1, maxScale = 8, style = {} }) {
 
     const zoomAt = (cx, cy, factor) => {
       const r = vp.getBoundingClientRect();
-      const px = cx - r.left, py = cy - r.top;
+      const px = cx - r.left,
+        py = cy - r.top;
       const t = tf.current;
       const next = Math.min(maxScale, Math.max(minScale, t.scale * factor));
       const k = next / t.scale;
@@ -340,12 +375,19 @@ function DCViewport({ children, minScale = 0.1, maxScale = 8, style = {} }) {
     // onWheel drop those entirely so they neither zoom nor pan.
     let gsBase = 1;
     let isGesturing = false;
-    const onGestureStart = (e) => { e.preventDefault(); isGesturing = true; gsBase = tf.current.scale; };
+    const onGestureStart = (e) => {
+      e.preventDefault();
+      isGesturing = true;
+      gsBase = tf.current.scale;
+    };
     const onGestureChange = (e) => {
       e.preventDefault();
       zoomAt(e.clientX, e.clientY, (gsBase * e.scale) / tf.current.scale);
     };
-    const onGestureEnd = (e) => { e.preventDefault(); isGesturing = false; };
+    const onGestureEnd = (e) => {
+      e.preventDefault();
+      isGesturing = false;
+    };
 
     // Drag-pan: middle button anywhere, or primary button on canvas
     // background (anything that isn't an artboard or an inline editor).
@@ -362,7 +404,8 @@ function DCViewport({ children, minScale = 0.1, maxScale = 8, style = {} }) {
       if (!drag || e.pointerId !== drag.id) return;
       tf.current.x += e.clientX - drag.lx;
       tf.current.y += e.clientY - drag.ly;
-      drag.lx = e.clientX; drag.ly = e.clientY;
+      drag.lx = e.clientX;
+      drag.ly = e.clientY;
       apply();
     };
     const onPointerUp = (e) => {
@@ -429,7 +472,8 @@ function DCViewport({ children, minScale = 0.1, maxScale = 8, style = {} }) {
       ref={vpRef}
       className="design-canvas"
       style={{
-        height: '100vh', width: '100vw',
+        height: '100vh',
+        width: '100vw',
         background: DC.bg,
         overflow: 'hidden',
         overscrollBehavior: 'none',
@@ -443,15 +487,27 @@ function DCViewport({ children, minScale = 0.1, maxScale = 8, style = {} }) {
       <div
         ref={worldRef}
         style={{
-          position: 'absolute', top: 0, left: 0,
+          position: 'absolute',
+          top: 0,
+          left: 0,
           transformOrigin: '0 0',
           willChange: 'transform',
-          width: 'max-content', minWidth: '100%',
+          width: 'max-content',
+          minWidth: '100%',
           minHeight: '100%',
           padding: '60px 0 80px',
         }}
       >
-        <div style={{ position: 'absolute', inset: -6000, backgroundImage: gridSvg, backgroundSize: '120px 120px', pointerEvents: 'none', zIndex: -1 }} />
+        <div
+          style={{
+            position: 'absolute',
+            inset: -6000,
+            backgroundImage: gridSvg,
+            backgroundSize: '120px 120px',
+            pointerEvents: 'none',
+            zIndex: -1,
+          }}
+        />
         {children}
       </div>
     </div>
@@ -472,7 +528,7 @@ function DCSection({ id, title, subtitle, children, gap = 48 }) {
   // IDs), or onDelete persists a srcKey that DesignCanvas never recognizes.
   const allIds = artboards.map((a) => a.props.id ?? a.props.label).filter(Boolean);
   const srcKey = allIds.join('\x1f');
-  const hidden = sec.srcKey === srcKey ? (sec.hidden || []) : [];
+  const hidden = sec.srcKey === srcKey ? sec.hidden || [] : [];
   const srcOrder = allIds.filter((k) => !hidden.includes(k));
 
   const order = React.useMemo(() => {
@@ -489,27 +545,57 @@ function DCSection({ id, title, subtitle, children, gap = 48 }) {
   // the 24px artboard-header (abs-positioned above each card) plus ~8px, so
   // the title sits tight against its own row at every zoom.
   return (
-    <div data-dc-section={sid}
-      style={{ marginBottom: 'calc(80px * var(--dc-inv-zoom, 1))', position: 'relative' }}>
+    <div
+      data-dc-section={sid}
+      style={{ marginBottom: 'calc(80px * var(--dc-inv-zoom, 1))', position: 'relative' }}
+    >
       <div style={{ padding: '0 60px' }}>
         <div className="dc-sectionhead" style={{ paddingBottom: 36 }}>
-          <DCEditable tag="div" value={sec.title ?? title}
+          <DCEditable
+            tag="div"
+            value={sec.title ?? title}
             onChange={(v) => ctx && sid && ctx.patchSection(sid, { title: v })}
-            style={{ fontSize: 28, fontWeight: 600, color: DC.title, letterSpacing: -0.4, marginBottom: 6, display: 'inline-block' }} />
+            style={{
+              fontSize: 28,
+              fontWeight: 600,
+              color: DC.title,
+              letterSpacing: -0.4,
+              marginBottom: 6,
+              display: 'inline-block',
+            }}
+          />
           {subtitle && <div style={{ fontSize: 16, color: DC.subtitle }}>{subtitle}</div>}
         </div>
       </div>
-      <div style={{ display: 'flex', gap, padding: '0 60px', alignItems: 'flex-start', width: 'max-content' }}>
+      <div
+        style={{
+          display: 'flex',
+          gap,
+          padding: '0 60px',
+          alignItems: 'flex-start',
+          width: 'max-content',
+        }}
+      >
         {order.map((k) => (
-          <DCArtboardFrame key={k} sectionId={sid} artboard={byId[k]} order={order}
+          <DCArtboardFrame
+            key={k}
+            sectionId={sid}
+            artboard={byId[k]}
+            order={order}
             label={(sec.labels || {})[k] ?? byId[k].props.label}
-            onRename={(v) => ctx && ctx.patchSection(sid, (x) => ({ labels: { ...x.labels, [k]: v } }))}
+            onRename={(v) =>
+              ctx && ctx.patchSection(sid, (x) => ({ labels: { ...x.labels, [k]: v } }))
+            }
             onReorder={(next) => ctx && ctx.patchSection(sid, { order: next })}
-            onDelete={() => ctx && ctx.patchSection(sid, (x) => ({
-              hidden: [...(x.srcKey === srcKey ? (x.hidden || []) : []), k],
-              srcKey,
-            }))}
-            onFocus={() => ctx && ctx.setFocus(`${sid}/${k}`)} />
+            onDelete={() =>
+              ctx &&
+              ctx.patchSection(sid, (x) => ({
+                hidden: [...(x.srcKey === srcKey ? x.hidden || [] : []), k],
+                srcKey,
+              }))
+            }
+            onFocus={() => ctx && ctx.setFocus(`${sid}/${k}`)}
+          />
         ))}
       </div>
       {rest}
@@ -518,7 +604,9 @@ function DCSection({ id, title, subtitle, children, gap = 48 }) {
 }
 
 // DCArtboard — marker; rendered by DCArtboardFrame via DCSection.
-function DCArtboard() { return null; }
+function DCArtboard() {
+  return null;
+}
 
 // Per-artboard export (kind: 'png' | 'html'). Both paths share the same
 // self-contained clone: computed styles baked in, @font-face / <img> /
@@ -527,57 +615,105 @@ function DCArtboard() { return null; }
 // (same pipeline the host uses for page captures); HTML wraps it in a
 // minimal standalone document. Both are independent of viewport zoom.
 async function dcExport(node, w, h, name, kind) {
-  try { await document.fonts.ready; } catch {}
-  const toDataURL = (url) => fetch(url).then((r) => r.blob()).then((b) => new Promise((res) => {
-    const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = () => res(url); fr.readAsDataURL(b);
-  })).catch(() => url);
+  try {
+    await document.fonts.ready;
+  } catch {}
+  const toDataURL = (url) =>
+    fetch(url)
+      .then((r) => r.blob())
+      .then(
+        (b) =>
+          new Promise((res) => {
+            const fr = new FileReader();
+            fr.onload = () => res(fr.result);
+            fr.onerror = () => res(url);
+            fr.readAsDataURL(b);
+          }),
+      )
+      .catch(() => url);
 
   // Collect @font-face rules. ss.cssRules throws SecurityError on
   // cross-origin sheets (e.g. fonts.googleapis.com) — in that case fetch
   // the CSS text directly (those endpoints send ACAO:*) and regex-extract
   // the blocks. @import and @media/@supports are walked so nested
   // @font-face rules aren't missed.
-  const fontRules = [], pending = [], seen = new Set();
+  const fontRules = [],
+    pending = [],
+    seen = new Set();
   const scrapeCss = (href) => {
-    if (seen.has(href)) return; seen.add(href);
-    pending.push(fetch(href).then((r) => r.text()).then((css) => {
-      for (const m of css.match(/@font-face\s*{[^}]*}/g) || []) fontRules.push({ css: m, base: href });
-      for (const m of css.matchAll(/@import\s+(?:url\()?['"]?([^'")\s;]+)/g))
-        scrapeCss(new URL(m[1], href).href);
-    }).catch(() => {}));
+    if (seen.has(href)) return;
+    seen.add(href);
+    pending.push(
+      fetch(href)
+        .then((r) => r.text())
+        .then((css) => {
+          for (const m of css.match(/@font-face\s*{[^}]*}/g) || [])
+            fontRules.push({ css: m, base: href });
+          for (const m of css.matchAll(/@import\s+(?:url\()?['"]?([^'")\s;]+)/g))
+            scrapeCss(new URL(m[1], href).href);
+        })
+        .catch(() => {}),
+    );
   };
   const walk = (rules, base) => {
     for (const r of rules) {
       if (r.type === CSSRule.FONT_FACE_RULE) fontRules.push({ css: r.cssText, base });
       else if (r.type === CSSRule.IMPORT_RULE && r.styleSheet) {
         const ibase = r.styleSheet.href || base;
-        try { walk(r.styleSheet.cssRules, ibase); } catch { scrapeCss(ibase); }
+        try {
+          walk(r.styleSheet.cssRules, ibase);
+        } catch {
+          scrapeCss(ibase);
+        }
       } else if (r.cssRules) walk(r.cssRules, base);
     }
   };
   for (const ss of document.styleSheets) {
     const base = ss.href || location.href;
-    try { walk(ss.cssRules, base); } catch { if (ss.href) scrapeCss(ss.href); }
+    try {
+      walk(ss.cssRules, base);
+    } catch {
+      if (ss.href) scrapeCss(ss.href);
+    }
   }
   while (pending.length) await pending.shift();
-  const fontCss = (await Promise.all(fontRules.map(async (rule) => {
-    let out = rule.css, m; const re = /url\((['"]?)([^'")]+)\1\)/g;
-    while ((m = re.exec(rule.css))) {
-      if (m[2].indexOf('data:') === 0) continue;
-      let abs; try { abs = new URL(m[2], rule.base).href; } catch { continue; }
-      out = out.split(m[0]).join('url("' + await toDataURL(abs) + '")');
-    }
-    return out;
-  }))).join('\n');
+  const fontCss = (
+    await Promise.all(
+      fontRules.map(async (rule) => {
+        let out = rule.css,
+          m;
+        const re = /url\((['"]?)([^'")]+)\1\)/g;
+        while ((m = re.exec(rule.css))) {
+          if (m[2].indexOf('data:') === 0) continue;
+          let abs;
+          try {
+            abs = new URL(m[2], rule.base).href;
+          } catch {
+            continue;
+          }
+          out = out.split(m[0]).join('url("' + (await toDataURL(abs)) + '")');
+        }
+        return out;
+      }),
+    )
+  ).join('\n');
 
   const cloneStyled = (src) => {
-    if (src.nodeType === 8 || (src.nodeType === 1 && src.tagName === 'SCRIPT')) return document.createTextNode('');
+    if (src.nodeType === 8 || (src.nodeType === 1 && src.tagName === 'SCRIPT'))
+      return document.createTextNode('');
     const dst = src.cloneNode(false);
     if (src.nodeType === 1) {
-      const cs = getComputedStyle(src); let txt = '';
+      const cs = getComputedStyle(src);
+      let txt = '';
       for (let i = 0; i < cs.length; i++) txt += cs[i] + ':' + cs.getPropertyValue(cs[i]) + ';';
       dst.setAttribute('style', txt + 'animation:none;transition:none;');
-      if (src.tagName === 'CANVAS') try { const im = document.createElement('img'); im.src = src.toDataURL(); im.setAttribute('style', txt); return im; } catch {}
+      if (src.tagName === 'CANVAS')
+        try {
+          const im = document.createElement('img');
+          im.src = src.toDataURL();
+          im.setAttribute('style', txt);
+          return im;
+        } catch {}
     }
     for (let c = src.firstChild; c; c = c.nextSibling) dst.appendChild(cloneStyled(c));
     return dst;
@@ -586,20 +722,29 @@ async function dcExport(node, w, h, name, kind) {
   clone.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml');
   // Drop the card's own shadow/radius so the export is a flush w×h rect;
   // the artboard's own background (if any) is already in the computed style.
-  clone.style.boxShadow = 'none'; clone.style.borderRadius = '0';
+  clone.style.boxShadow = 'none';
+  clone.style.borderRadius = '0';
 
   const jobs = [];
   clone.querySelectorAll('img').forEach((el) => {
     const s = el.getAttribute('src');
-    if (s && s.indexOf('data:') !== 0) jobs.push(toDataURL(el.src).then((d) => el.setAttribute('src', d)));
+    if (s && s.indexOf('data:') !== 0)
+      jobs.push(toDataURL(el.src).then((d) => el.setAttribute('src', d)));
   });
   [clone, ...clone.querySelectorAll('*')].forEach((el) => {
-    const bg = el.style.backgroundImage; if (!bg) return;
-    let m; const re = /url\(["']?([^"')]+)["']?\)/g;
+    const bg = el.style.backgroundImage;
+    if (!bg) return;
+    let m;
+    const re = /url\(["']?([^"')]+)["']?\)/g;
     while ((m = re.exec(bg))) {
-      const tok = m[0], url = m[1];
+      const tok = m[0],
+        url = m[1];
       if (url.indexOf('data:') === 0) continue;
-      jobs.push(toDataURL(url).then((d) => { el.style.backgroundImage = el.style.backgroundImage.split(tok).join('url("' + d + '")'); }));
+      jobs.push(
+        toDataURL(url).then((d) => {
+          el.style.backgroundImage = el.style.backgroundImage.split(tok).join('url("' + d + '")');
+        }),
+      );
     }
   });
   await Promise.all(jobs);
@@ -608,14 +753,21 @@ async function dcExport(node, w, h, name, kind) {
   const save = (blob, ext) => {
     if (!blob) return;
     const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob); a.download = name + '.' + ext; a.click();
+    a.href = URL.createObjectURL(blob);
+    a.download = name + '.' + ext;
+    a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   };
 
   if (kind === 'html') {
-    const html = '<!doctype html><html><head><meta charset="utf-8"><title>' + name + '</title>' +
+    const html =
+      '<!doctype html><html><head><meta charset="utf-8"><title>' +
+      name +
+      '</title>' +
       (fontCss ? '<style>' + fontCss + '</style>' : '') +
-      '</head><body style="margin:0">' + xml + '</body></html>';
+      '</head><body style="margin:0">' +
+      xml +
+      '</body></html>';
     return save(new Blob([html], { type: 'text/html' }), 'html');
   }
 
@@ -625,22 +777,54 @@ async function dcExport(node, w, h, name, kind) {
   // w×h foreignObject onto the px·w × px·h SVG canvas so the browser renders
   // the HTML at full resolution.
   const px = 3;
-  const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + w * px + '" height="' + h * px +
-    '" viewBox="0 0 ' + w + ' ' + h + '"><foreignObject width="' + w + '" height="' + h + '">' +
-    (fontCss ? '<style><![CDATA[' + fontCss + ']]></style>' : '') + xml + '</foreignObject></svg>';
+  const svg =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="' +
+    w * px +
+    '" height="' +
+    h * px +
+    '" viewBox="0 0 ' +
+    w +
+    ' ' +
+    h +
+    '"><foreignObject width="' +
+    w +
+    '" height="' +
+    h +
+    '">' +
+    (fontCss ? '<style><![CDATA[' + fontCss + ']]></style>' : '') +
+    xml +
+    '</foreignObject></svg>';
   const img = new Image();
   await new Promise((res, rej) => {
-    img.onload = res; img.onerror = () => rej(new Error('svg load failed'));
+    img.onload = res;
+    img.onerror = () => rej(new Error('svg load failed'));
     img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
   });
   const cv = document.createElement('canvas');
-  cv.width = w * px; cv.height = h * px;
+  cv.width = w * px;
+  cv.height = h * px;
   cv.getContext('2d').drawImage(img, 0, 0);
   cv.toBlob((blob) => save(blob, 'png'), 'image/png');
 }
 
-function DCArtboardFrame({ sectionId, artboard, label, order, onRename, onReorder, onFocus, onDelete }) {
-  const { id: rawId, label: rawLabel, width = 260, height = 480, children, style = {} } = artboard.props;
+function DCArtboardFrame({
+  sectionId,
+  artboard,
+  label,
+  order,
+  onRename,
+  onReorder,
+  onFocus,
+  onDelete,
+}) {
+  const {
+    id: rawId,
+    label: rawLabel,
+    width = 260,
+    height = 480,
+    children,
+    style = {},
+  } = artboard.props;
   const id = rawId ?? rawLabel;
   const ref = React.useRef(null);
   const cardRef = React.useRef(null);
@@ -651,8 +835,13 @@ function DCArtboardFrame({ sectionId, artboard, label, order, onRename, onReorde
   // ⋯ menu: close on any outside pointerdown. Two-click delete lives inside
   // the menu — first click arms the row, second commits; closing disarms.
   React.useEffect(() => {
-    if (!menuOpen) { setConfirming(false); return; }
-    const off = (e) => { if (!menuRef.current || !menuRef.current.contains(e.target)) setMenuOpen(false); };
+    if (!menuOpen) {
+      setConfirming(false);
+      return;
+    }
+    const off = (e) => {
+      if (!menuRef.current || !menuRef.current.contains(e.target)) setMenuOpen(false);
+    };
     document.addEventListener('pointerdown', off, true);
     return () => document.removeEventListener('pointerdown', off, true);
   }, [menuOpen]);
@@ -661,22 +850,30 @@ function DCArtboardFrame({ sectionId, artboard, label, order, onRename, onReorde
     setMenuOpen(false);
     if (!cardRef.current) return;
     const name = String(label || id || 'artboard').replace(/[^\w\s.-]+/g, '_');
-    dcExport(cardRef.current, width, height, name, kind)
-      .catch((e) => console.error('[design-canvas] export failed:', e));
+    dcExport(cardRef.current, width, height, name, kind).catch((e) =>
+      console.error('[design-canvas] export failed:', e),
+    );
   };
 
   // Live drag-reorder: dragged card sticks to cursor; siblings slide into
   // their would-be slots in real time via transforms. DOM order only
   // changes on drop.
   const onGripDown = (e) => {
-    e.preventDefault(); e.stopPropagation();
+    e.preventDefault();
+    e.stopPropagation();
     const me = ref.current;
     // translateX is applied in local (pre-scale) space but pointer deltas and
     // getBoundingClientRect().left are screen-space — divide by the viewport's
     // current scale so the dragged card tracks the cursor at any zoom level.
     const scale = me.getBoundingClientRect().width / me.offsetWidth || 1;
-    const peers = Array.from(document.querySelectorAll(`[data-dc-section="${sectionId}"] [data-dc-slot]`));
-    const homes = peers.map((el) => ({ el, id: el.dataset.dcSlot, x: el.getBoundingClientRect().left }));
+    const peers = Array.from(
+      document.querySelectorAll(`[data-dc-section="${sectionId}"] [data-dc-slot]`),
+    );
+    const homes = peers.map((el) => ({
+      el,
+      id: el.dataset.dcSlot,
+      x: el.getBoundingClientRect().left,
+    }));
     const slotXs = homes.map((h) => h.x);
     const startIdx = order.indexOf(id);
     const startX = e.clientX;
@@ -695,10 +892,14 @@ function DCArtboardFrame({ sectionId, artboard, label, order, onRename, onReorde
       const dx = ev.clientX - startX;
       me.style.transform = `translateX(${dx / scale}px)`;
       const cur = homes[startIdx].x + dx;
-      let nearest = 0, best = Infinity;
+      let nearest = 0,
+        best = Infinity;
       for (let i = 0; i < slotXs.length; i++) {
         const d = Math.abs(slotXs[i] - cur);
-        if (d < best) { best = d; nearest = i; }
+        if (d < best) {
+          best = d;
+          nearest = i;
+        }
       }
       if (liveOrder.indexOf(id) !== nearest) {
         liveOrder = order.filter((k) => k !== id);
@@ -716,11 +917,16 @@ function DCArtboardFrame({ sectionId, artboard, label, order, onRename, onReorde
       // After the settle transition, kill transitions + clear transforms +
       // commit the reorder in the same frame so there's no visual snap-back.
       setTimeout(() => {
-        for (const h of homes) { h.el.style.transition = 'none'; h.el.style.transform = ''; }
+        for (const h of homes) {
+          h.el.style.transition = 'none';
+          h.el.style.transform = '';
+        }
         if (liveOrder.join('|') !== order.join('|')) onReorder(liveOrder);
-        requestAnimationFrame(() => requestAnimationFrame(() => {
-          for (const h of homes) h.el.style.transition = '';
-        }));
+        requestAnimationFrame(() =>
+          requestAnimationFrame(() => {
+            for (const h of homes) h.el.style.transition = '';
+          }),
+        );
       }, 180);
     };
     document.addEventListener('pointermove', move);
@@ -729,41 +935,102 @@ function DCArtboardFrame({ sectionId, artboard, label, order, onRename, onReorde
 
   return (
     <div ref={ref} data-dc-slot={id} style={{ position: 'relative', flexShrink: 0 }}>
-      <div className="dc-header" style={{ color: DC.label }} onPointerDown={(e) => e.stopPropagation()}>
+      <div
+        className="dc-header"
+        style={{ color: DC.label }}
+        onPointerDown={(e) => e.stopPropagation()}
+      >
         <div className="dc-labelrow">
           <div className="dc-grip" onPointerDown={onGripDown} title="Drag to reorder">
-            <svg width="9" height="13" viewBox="0 0 9 13" fill="currentColor"><circle cx="2" cy="2" r="1.1"/><circle cx="7" cy="2" r="1.1"/><circle cx="2" cy="6.5" r="1.1"/><circle cx="7" cy="6.5" r="1.1"/><circle cx="2" cy="11" r="1.1"/><circle cx="7" cy="11" r="1.1"/></svg>
+            <svg width="9" height="13" viewBox="0 0 9 13" fill="currentColor">
+              <circle cx="2" cy="2" r="1.1" />
+              <circle cx="7" cy="2" r="1.1" />
+              <circle cx="2" cy="6.5" r="1.1" />
+              <circle cx="7" cy="6.5" r="1.1" />
+              <circle cx="2" cy="11" r="1.1" />
+              <circle cx="7" cy="11" r="1.1" />
+            </svg>
           </div>
           <div className="dc-labeltext" onClick={onFocus} title="Click to focus">
-            <DCEditable value={label} onChange={onRename} onClick={(e) => e.stopPropagation()}
-              style={{ fontSize: 15, fontWeight: 500, color: DC.label, lineHeight: 1 }} />
+            <DCEditable
+              value={label}
+              onChange={onRename}
+              onClick={(e) => e.stopPropagation()}
+              style={{ fontSize: 15, fontWeight: 500, color: DC.label, lineHeight: 1 }}
+            />
           </div>
         </div>
         <div className="dc-btns">
           <div ref={menuRef} style={{ position: 'relative' }}>
             <button className="dc-kebab" title="More" onClick={() => setMenuOpen((o) => !o)}>
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><circle cx="2.5" cy="6" r="1.1"/><circle cx="6" cy="6" r="1.1"/><circle cx="9.5" cy="6" r="1.1"/></svg>
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+                <circle cx="2.5" cy="6" r="1.1" />
+                <circle cx="6" cy="6" r="1.1" />
+                <circle cx="9.5" cy="6" r="1.1" />
+              </svg>
             </button>
             {menuOpen && (
               <div className="dc-menu" onPointerDown={(e) => e.stopPropagation()}>
                 <button onClick={() => doExport('png')}>Download PNG</button>
                 <button onClick={() => doExport('html')}>Download HTML</button>
                 <hr />
-                <button className="dc-danger"
-                  onClick={() => { if (confirming) { setMenuOpen(false); onDelete(); } else setConfirming(true); }}>
+                <button
+                  className="dc-danger"
+                  onClick={() => {
+                    if (confirming) {
+                      setMenuOpen(false);
+                      onDelete();
+                    } else setConfirming(true);
+                  }}
+                >
                   {confirming ? 'Click again to delete' : 'Delete'}
                 </button>
               </div>
             )}
           </div>
           <button className="dc-expand" onClick={onFocus} title="Focus">
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M7 1h4v4M5 11H1V7M11 1L7.5 4.5M1 11l3.5-3.5"/></svg>
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 12 12"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+            >
+              <path d="M7 1h4v4M5 11H1V7M11 1L7.5 4.5M1 11l3.5-3.5" />
+            </svg>
           </button>
         </div>
       </div>
-      <div ref={cardRef} className="dc-card"
-        style={{ borderRadius: 2, boxShadow: '0 1px 3px rgba(0,0,0,.08),0 4px 16px rgba(0,0,0,.06)', overflow: 'hidden', width, height, background: '#fff', ...style }}>
-        {children || <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#bbb', fontSize: 13, fontFamily: DC.font }}>{id}</div>}
+      <div
+        ref={cardRef}
+        className="dc-card"
+        style={{
+          borderRadius: 2,
+          boxShadow: '0 1px 3px rgba(0,0,0,.08),0 4px 16px rgba(0,0,0,.06)',
+          overflow: 'hidden',
+          width,
+          height,
+          background: '#fff',
+          ...style,
+        }}
+      >
+        {children || (
+          <div
+            style={{
+              height: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#bbb',
+              fontSize: 13,
+              fontFamily: DC.font,
+            }}
+          >
+            {id}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -773,12 +1040,23 @@ function DCArtboardFrame({ sectionId, artboard, label, order, onRename, onReorde
 function DCEditable({ value, onChange, style, tag = 'span', onClick }) {
   const T = tag;
   return (
-    <T className="dc-editable" contentEditable suppressContentEditableWarning
+    <T
+      className="dc-editable"
+      contentEditable
+      suppressContentEditableWarning
       onClick={onClick}
       onPointerDown={(e) => e.stopPropagation()}
       onBlur={(e) => onChange && onChange(e.currentTarget.textContent)}
-      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); } }}
-      style={style}>{value}</T>
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          e.currentTarget.blur();
+        }
+      }}
+      style={style}
+    >
+      {value}
+    </T>
   );
 }
 
@@ -796,7 +1074,10 @@ function DCFocusOverlay({ entry, sectionMeta, sectionOrder }) {
   const idx = peers.indexOf(aid);
   const secIdx = sectionOrder.indexOf(sectionId);
 
-  const go = (d) => { const n = peers[(idx + d + peers.length) % peers.length]; if (n) ctx.setFocus(`${sectionId}/${n}`); };
+  const go = (d) => {
+    const n = peers[(idx + d + peers.length) % peers.length];
+    if (n) ctx.setFocus(`${sectionId}/${n}`);
+  };
   const goSection = (d) => {
     // Sections whose artboards are all deleted have slotIds:[] — step past
     // them to the next non-empty section so ↑/↓ doesn't dead-end.
@@ -804,16 +1085,31 @@ function DCFocusOverlay({ entry, sectionMeta, sectionOrder }) {
     for (let i = 1; i < n; i++) {
       const ns = sectionOrder[(((secIdx + d * i) % n) + n) % n];
       const first = sectionMeta[ns] && sectionMeta[ns].slotIds[0];
-      if (first) { ctx.setFocus(`${ns}/${first}`); return; }
+      if (first) {
+        ctx.setFocus(`${ns}/${first}`);
+        return;
+      }
     }
   };
 
   React.useEffect(() => {
     const k = (e) => {
-      if (e.key === 'ArrowLeft') { e.preventDefault(); go(-1); }
-      if (e.key === 'ArrowRight') { e.preventDefault(); go(1); }
-      if (e.key === 'ArrowUp') { e.preventDefault(); goSection(-1); }
-      if (e.key === 'ArrowDown') { e.preventDefault(); goSection(1); }
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        go(-1);
+      }
+      if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        go(1);
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        goSection(-1);
+      }
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        goSection(1);
+      }
     };
     document.addEventListener('keydown', k);
     return () => document.removeEventListener('keydown', k);
@@ -821,80 +1117,255 @@ function DCFocusOverlay({ entry, sectionMeta, sectionOrder }) {
 
   const { width = 260, height = 480, children } = artboard.props;
   const [vp, setVp] = React.useState({ w: window.innerWidth, h: window.innerHeight });
-  React.useEffect(() => { const r = () => setVp({ w: window.innerWidth, h: window.innerHeight }); window.addEventListener('resize', r); return () => window.removeEventListener('resize', r); }, []);
+  React.useEffect(() => {
+    const r = () => setVp({ w: window.innerWidth, h: window.innerHeight });
+    window.addEventListener('resize', r);
+    return () => window.removeEventListener('resize', r);
+  }, []);
   const scale = Math.max(0.1, Math.min((vp.w - 200) / width, (vp.h - 260) / height, 2));
 
   const [ddOpen, setDd] = React.useState(false);
   const Arrow = ({ dir, onClick }) => (
-    <button onClick={(e) => { e.stopPropagation(); onClick(); }}
-      style={{ position: 'absolute', top: '50%', [dir]: 28, transform: 'translateY(-50%)',
-        border: 'none', background: 'rgba(255,255,255,.08)', color: 'rgba(255,255,255,.9)',
-        width: 44, height: 44, borderRadius: 22, fontSize: 18, cursor: 'pointer',
-        display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background .15s' }}
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+      style={{
+        position: 'absolute',
+        top: '50%',
+        [dir]: 28,
+        transform: 'translateY(-50%)',
+        border: 'none',
+        background: 'rgba(255,255,255,.08)',
+        color: 'rgba(255,255,255,.9)',
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        fontSize: 18,
+        cursor: 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        transition: 'background .15s',
+      }}
       onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,.18)')}
-      onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,.08)')}>
-      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-        <path d={dir === 'left' ? 'M11 3L5 9l6 6' : 'M7 3l6 6-6 6'} /></svg>
+      onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,.08)')}
+    >
+      <svg
+        width="18"
+        height="18"
+        viewBox="0 0 18 18"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      >
+        <path d={dir === 'left' ? 'M11 3L5 9l6 6' : 'M7 3l6 6-6 6'} />
+      </svg>
     </button>
   );
 
   // Portal to body so position:fixed is the real viewport regardless of any
   // transform on DesignCanvas's ancestors (including the canvas zoom itself).
   return ReactDOM.createPortal(
-    <div onClick={() => ctx.setFocus(null)}
+    <div
+      onClick={() => ctx.setFocus(null)}
       onWheel={(e) => e.preventDefault()}
-      style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(24,20,16,.6)', backdropFilter: 'blur(14px)',
-        fontFamily: DC.font, color: '#fff' }}>
-
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 100,
+        background: 'rgba(24,20,16,.6)',
+        backdropFilter: 'blur(14px)',
+        fontFamily: DC.font,
+        color: '#fff',
+      }}
+    >
       {/* top bar: section dropdown (left) · close (right) */}
-      <div onClick={(e) => e.stopPropagation()}
-        style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 72, display: 'flex', alignItems: 'flex-start', padding: '16px 20px 0', gap: 16 }}>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: 72,
+          display: 'flex',
+          alignItems: 'flex-start',
+          padding: '16px 20px 0',
+          gap: 16,
+        }}
+      >
         <div style={{ position: 'relative' }}>
-          <button onClick={() => setDd((o) => !o)}
-            style={{ border: 'none', background: 'transparent', color: '#fff', cursor: 'pointer', padding: '6px 8px',
-              borderRadius: 6, textAlign: 'left', fontFamily: 'inherit' }}>
+          <button
+            onClick={() => setDd((o) => !o)}
+            style={{
+              border: 'none',
+              background: 'transparent',
+              color: '#fff',
+              cursor: 'pointer',
+              padding: '6px 8px',
+              borderRadius: 6,
+              textAlign: 'left',
+              fontFamily: 'inherit',
+            }}
+          >
             <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 18, fontWeight: 600, letterSpacing: -0.3 }}>{meta.title}</span>
-              <svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" style={{ opacity: .7 }}><path d="M2 4l3.5 3.5L9 4"/></svg>
+              <span style={{ fontSize: 18, fontWeight: 600, letterSpacing: -0.3 }}>
+                {meta.title}
+              </span>
+              <svg
+                width="11"
+                height="11"
+                viewBox="0 0 11 11"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                style={{ opacity: 0.7 }}
+              >
+                <path d="M2 4l3.5 3.5L9 4" />
+              </svg>
             </span>
-            {meta.subtitle && <span style={{ display: 'block', fontSize: 13, opacity: .6, fontWeight: 400, marginTop: 2 }}>{meta.subtitle}</span>}
+            {meta.subtitle && (
+              <span
+                style={{
+                  display: 'block',
+                  fontSize: 13,
+                  opacity: 0.6,
+                  fontWeight: 400,
+                  marginTop: 2,
+                }}
+              >
+                {meta.subtitle}
+              </span>
+            )}
           </button>
           {ddOpen && (
-            <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: 4, background: '#2a251f', borderRadius: 8,
-              boxShadow: '0 8px 32px rgba(0,0,0,.4)', padding: 4, minWidth: 200, zIndex: 10 }}>
-              {sectionOrder.filter((sid) => sectionMeta[sid].slotIds.length).map((sid) => (
-                <button key={sid} onClick={() => { setDd(false); const f = sectionMeta[sid].slotIds[0]; if (f) ctx.setFocus(`${sid}/${f}`); }}
-                  style={{ display: 'block', width: '100%', textAlign: 'left', border: 'none', cursor: 'pointer',
-                    background: sid === sectionId ? 'rgba(255,255,255,.1)' : 'transparent', color: '#fff',
-                    padding: '8px 12px', borderRadius: 5, fontSize: 14, fontWeight: sid === sectionId ? 600 : 400, fontFamily: 'inherit' }}>
-                  {sectionMeta[sid].title}
-                </button>
-              ))}
+            <div
+              style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                marginTop: 4,
+                background: '#2a251f',
+                borderRadius: 8,
+                boxShadow: '0 8px 32px rgba(0,0,0,.4)',
+                padding: 4,
+                minWidth: 200,
+                zIndex: 10,
+              }}
+            >
+              {sectionOrder
+                .filter((sid) => sectionMeta[sid].slotIds.length)
+                .map((sid) => (
+                  <button
+                    key={sid}
+                    onClick={() => {
+                      setDd(false);
+                      const f = sectionMeta[sid].slotIds[0];
+                      if (f) ctx.setFocus(`${sid}/${f}`);
+                    }}
+                    style={{
+                      display: 'block',
+                      width: '100%',
+                      textAlign: 'left',
+                      border: 'none',
+                      cursor: 'pointer',
+                      background: sid === sectionId ? 'rgba(255,255,255,.1)' : 'transparent',
+                      color: '#fff',
+                      padding: '8px 12px',
+                      borderRadius: 5,
+                      fontSize: 14,
+                      fontWeight: sid === sectionId ? 600 : 400,
+                      fontFamily: 'inherit',
+                    }}
+                  >
+                    {sectionMeta[sid].title}
+                  </button>
+                ))}
             </div>
           )}
         </div>
         <div style={{ flex: 1 }} />
-        <button onClick={() => ctx.setFocus(null)}
+        <button
+          onClick={() => ctx.setFocus(null)}
           onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,.12)')}
           onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-          style={{ border: 'none', background: 'transparent', color: 'rgba(255,255,255,.7)', width: 32, height: 32,
-            borderRadius: 16, fontSize: 20, cursor: 'pointer', lineHeight: 1, transition: 'background .12s' }}>×</button>
+          style={{
+            border: 'none',
+            background: 'transparent',
+            color: 'rgba(255,255,255,.7)',
+            width: 32,
+            height: 32,
+            borderRadius: 16,
+            fontSize: 20,
+            cursor: 'pointer',
+            lineHeight: 1,
+            transition: 'background .12s',
+          }}
+        >
+          ×
+        </button>
       </div>
 
       {/* card centered, label + index below — only the card itself stops
           propagation so any backdrop click (including the margins around
           the card) exits focus */}
       <div
-        style={{ position: 'absolute', top: 64, bottom: 56, left: 100, right: 100, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
-        <div onClick={(e) => e.stopPropagation()} style={{ width: width * scale, height: height * scale, position: 'relative' }}>
-          <div style={{ width, height, transform: `scale(${scale})`, transformOrigin: 'top left', background: '#fff', borderRadius: 2, overflow: 'hidden',
-            boxShadow: '0 20px 80px rgba(0,0,0,.4)' }}>
-            {children || <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#bbb' }}>{aid}</div>}
+        style={{
+          position: 'absolute',
+          top: 64,
+          bottom: 56,
+          left: 100,
+          right: 100,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 16,
+        }}
+      >
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{ width: width * scale, height: height * scale, position: 'relative' }}
+        >
+          <div
+            style={{
+              width,
+              height,
+              transform: `scale(${scale})`,
+              transformOrigin: 'top left',
+              background: '#fff',
+              borderRadius: 2,
+              overflow: 'hidden',
+              boxShadow: '0 20px 80px rgba(0,0,0,.4)',
+            }}
+          >
+            {children || (
+              <div
+                style={{
+                  height: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#bbb',
+                }}
+              >
+                {aid}
+              </div>
+            )}
           </div>
         </div>
-        <div onClick={(e) => e.stopPropagation()} style={{ fontSize: 14, fontWeight: 500, opacity: .85, textAlign: 'center' }}>
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{ fontSize: 14, fontWeight: 500, opacity: 0.85, textAlign: 'center' }}
+        >
           {(sec.labels || {})[aid] ?? artboard.props.label}
-          <span style={{ opacity: .5, marginLeft: 10, fontVariantNumeric: 'tabular-nums' }}>{idx + 1} / {peers.length}</span>
+          <span style={{ opacity: 0.5, marginLeft: 10, fontVariantNumeric: 'tabular-nums' }}>
+            {idx + 1} / {peers.length}
+          </span>
         </div>
       </div>
 
@@ -902,12 +1373,31 @@ function DCFocusOverlay({ entry, sectionMeta, sectionOrder }) {
       <Arrow dir="right" onClick={() => go(1)} />
 
       {/* dots */}
-      <div onClick={(e) => e.stopPropagation()}
-        style={{ position: 'absolute', bottom: 20, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 8 }}>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          position: 'absolute',
+          bottom: 20,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          display: 'flex',
+          gap: 8,
+        }}
+      >
         {peers.map((p, i) => (
-          <button key={p} onClick={() => ctx.setFocus(`${sectionId}/${p}`)}
-            style={{ border: 'none', padding: 0, cursor: 'pointer', width: 6, height: 6, borderRadius: 3,
-              background: i === idx ? '#fff' : 'rgba(255,255,255,.3)' }} />
+          <button
+            key={p}
+            onClick={() => ctx.setFocus(`${sectionId}/${p}`)}
+            style={{
+              border: 'none',
+              padding: 0,
+              cursor: 'pointer',
+              width: 6,
+              height: 6,
+              borderRadius: 3,
+              background: i === idx ? '#fff' : 'rgba(255,255,255,.3)',
+            }}
+          />
         ))}
       </div>
     </div>,
@@ -920,17 +1410,28 @@ function DCFocusOverlay({ entry, sectionMeta, sectionOrder }) {
 // ─────────────────────────────────────────────────────────────
 function DCPostIt({ children, top, left, right, bottom, rotate = -2, width = 180 }) {
   return (
-    <div style={{
-      position: 'absolute', top, left, right, bottom, width,
-      background: DC.postitBg, padding: '14px 16px',
-      fontFamily: '"Comic Sans MS", "Marker Felt", "Segoe Print", cursive',
-      fontSize: 14, lineHeight: 1.4, color: DC.postitText,
-      boxShadow: '0 2px 8px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.08)',
-      transform: `rotate(${rotate}deg)`,
-      zIndex: 5,
-    }}>{children}</div>
+    <div
+      style={{
+        position: 'absolute',
+        top,
+        left,
+        right,
+        bottom,
+        width,
+        background: DC.postitBg,
+        padding: '14px 16px',
+        fontFamily: '"Comic Sans MS", "Marker Felt", "Segoe Print", cursive',
+        fontSize: 14,
+        lineHeight: 1.4,
+        color: DC.postitText,
+        boxShadow: '0 2px 8px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.08)',
+        transform: `rotate(${rotate}deg)`,
+        zIndex: 5,
+      }}
+    >
+      {children}
+    </div>
   );
 }
 
 Object.assign(window, { DesignCanvas, DCSection, DCArtboard, DCPostIt });
-

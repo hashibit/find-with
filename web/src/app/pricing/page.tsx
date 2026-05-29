@@ -56,10 +56,17 @@ export default function PricingPage() {
   return (
     <div className="min-h-screen">
       <nav className="flex items-center justify-between px-8 py-4 border-b">
-        <Link href="/" className="font-serif text-2xl font-bold text-brand-700">FindWith</Link>
+        <Link href="/" className="font-serif text-2xl font-bold text-brand-700">
+          FindWith
+        </Link>
         <div className="flex items-center gap-4">
-          <Link href="/login" className="text-gray-600 hover:text-gray-900">Log in</Link>
-          <Link href="/install" className="bg-brand-600 text-white px-4 py-2 rounded-lg hover:bg-brand-700">
+          <Link href="/login" className="text-gray-600 hover:text-gray-900">
+            Log in
+          </Link>
+          <Link
+            href="/install"
+            className="bg-brand-600 text-white px-4 py-2 rounded-lg hover:bg-brand-700"
+          >
             Install Extension
           </Link>
         </div>
@@ -113,7 +120,9 @@ export default function PricingPage() {
         </div>
 
         <div className="mt-16 overflow-x-auto">
-          <h2 className="font-serif text-2xl font-bold text-center mb-8">Full feature comparison</h2>
+          <h2 className="font-serif text-2xl font-bold text-center mb-8">
+            Full feature comparison
+          </h2>
           <table className="w-full text-sm border-collapse">
             <thead>
               <tr className="border-b">

@@ -7,10 +7,7 @@ import { ConvMessage } from '../../database/entities/conversation/message.entity
 import { AgentModule } from '../../agent/agent.module.js';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([ConvConversation, ConvMessage]),
-    AgentModule,
-  ],
+  imports: [TypeOrmModule.forFeature([ConvConversation, ConvMessage]), AgentModule],
   controllers: [ConversationController],
   providers: [ConversationService],
   exports: [ConversationService],

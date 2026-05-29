@@ -36,4 +36,7 @@ export class ConvMessage extends BaseEntity {
 
   @Column({ type: 'jsonb', nullable: true })
   meta: Record<string, unknown> | null;
+
+  @Column({ type: 'boolean', default: false })
+  archived: boolean;
 }

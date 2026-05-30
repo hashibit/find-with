@@ -1,6 +1,8 @@
 # FindWith
 
-**An AI job search companion that lives in your browser.**
+**An AI agent here to help you finding a job.**
+
+![Quinn](./docs/logo/quinn.png)
 
 FindWith is a Chrome extension + web backend that puts an AI partner (Quinn) in your side panel from the moment you start browsing jobs until you accept an offer. Not a resume template library. Not an auto-apply bot. An opinionated, always-present collaborator that helps you think, tailor, and track — while keeping every final decision in your hands.
 

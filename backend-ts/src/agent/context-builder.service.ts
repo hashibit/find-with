@@ -58,6 +58,25 @@ Push back with reasoning: "I don't recommend you apply to this. Here's why: [rea
 # When user gets an offer they accept
 Be direct, not gushy. Help them archive the journey for future reference. Say goodbye gracefully.`;
 
+const QUINN_SYSTEM_PROMPT_TEMPLATE = `{{ basePrompt }}
+{% if profile %}
+
+# User profile
+Name: {{ profile.fullName }}
+Email: {{ profile.email }}
+{% endif %}
+{% if materials.length %}
+
+# User's confirmed shining points (material library)
+{% for m in materials %}- {{ m.shiningText }} [{{ m.tags }}]
+{% endfor %}
+{% endif %}
+{% if summaries.length %}
+
+# Conversation summaries so far
+{{ summaries | join("\n\n----\n\n") }}
+{% endif %}`;
+
 const ROLLING_SUMMARY_PROMPT = `You are summarizing a segment of a job search conversation between a user and Quinn (an AI job search companion).
 
   Write a concise summary of the messages provided. Focus on:
@@ -132,30 +151,25 @@ export class ContextBuilderService {
     recentMessages.reverse();
     materials.reverse();
 
-    let systemPrompt = QUINN_SYSTEM_PROMPT;
-
-    if (profile?.basicInfo) {
-      const info = profile.basicInfo as Record<string, unknown>;
-      systemPrompt += `\n\n# User profile\nName: ${info['fullName'] ?? 'Unknown'}\nEmail: ${info['email'] ?? 'Unknown'}`;
+    if (materials.length >= MAX_MATERIALS) {
+      this.logger.warn(`materials count reach maximun value.${MAX_MATERIALS}`);
+    }
+    if (rollingSummaries.length > MAX_ROLLING_SUMMARIES) {
+      this.logger.warn(`rollingSummaries count reach maximun value.${MAX_ROLLING_SUMMARIES}`);
     }
 
-    if (materials.length > 0) {
-      if (materials.length >= MAX_MATERIALS) {
-        this.logger.warn(`materials count reach maximun value.${MAX_MATERIALS}`);
-      }
-      const materialLines = materials
-        .slice(0, 10)
-        .map((m) => `- ${m.shiningText ?? '(no shining text)'} [${(m.tags ?? []).join(', ')}]`);
-      systemPrompt += `\n\n# User's confirmed shining points (material library)\n${materialLines.join('\n')}`;
-    }
-
-    if (rollingSummaries.length > 0) {
-      if (rollingSummaries.length > MAX_ROLLING_SUMMARIES) {
-        this.logger.warn(`rollingSummaries count reach maximun value.${MAX_ROLLING_SUMMARIES}`);
-      }
-      const summariesContent = rollingSummaries.map((s) => s.content).join('\n\n----\n\n');
-      systemPrompt += `\n\n# Conversation summaries so far\n${summariesContent}`;
-    }
+    const info = profile?.basicInfo as Record<string, unknown> | undefined;
+    let systemPrompt = nunjucks.renderString(QUINN_SYSTEM_PROMPT_TEMPLATE, {
+      basePrompt: QUINN_SYSTEM_PROMPT,
+      profile: info
+        ? { fullName: info['fullName'] ?? 'Unknown', email: info['email'] ?? 'Unknown' }
+        : null,
+      materials: materials.slice(0, MAX_MATERIALS).map((m) => ({
+        shiningText: m.shiningText ?? '(no shining text)',
+        tags: (m.tags ?? []).join(', '),
+      })),
+      summaries: rollingSummaries.map((s) => s.content),
+    });
 
     // Append density instruction — effectiveDensity is set by set_conversation_density tool
     // and defaults to BALANCED (which is already described in the base Quinn prompt).

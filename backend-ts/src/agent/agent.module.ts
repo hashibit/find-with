@@ -10,6 +10,9 @@ import { DraftReplyTool } from './tools/draft-reply.tool.js';
 import { SetConversationDensityTool } from './tools/set-conversation-density.tool.js';
 import { ConvMessage } from '../database/entities/conversation/message.entity.js';
 import { ConvConversation } from '../database/entities/conversation/conversation.entity.js';
+import { ConvRollingSummary } from '../database/entities/conversation/rolling-summary.entity.js';
+import { UserGoalMemory } from '../database/entities/memory/user-goal-memory.entity.js';
+import { JobRadarItem } from '../database/entities/jobs/radar-item.entity.js';
 import { ProfileProfile } from '../database/entities/profile/profile.entity.js';
 import { ProfileMaterial } from '../database/entities/profile/material.entity.js';
 import { JobCompanyBrief } from '../database/entities/jobs/company-brief.entity.js';
@@ -27,12 +30,15 @@ import { type AppConfig } from '../config/configuration.js';
     TypeOrmModule.forFeature([
       ConvMessage,
       ConvConversation,
+      ConvRollingSummary,
       ProfileProfile,
       ProfileMaterial,
       JobCompanyBrief,
       JobParsedJd,
+      JobRadarItem,
       FollowupEmail,
       FollowupDraft,
+      UserGoalMemory,
     ]),
   ],
   providers: [

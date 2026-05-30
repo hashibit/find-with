@@ -1,6 +1,6 @@
 import { Injectable, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { IsNull, Not, Repository } from 'typeorm';
 import {
   type AssistantMessage,
   type Context,
@@ -14,6 +14,9 @@ import { ConvRollingSummary } from '@/database/entities/conversation/rolling-sum
 
 import { ProfileProfile } from '../database/entities/profile/profile.entity.js';
 import { ProfileMaterial } from '../database/entities/profile/material.entity.js';
+import { JobParsedJd } from '../database/entities/jobs/parsed-jd.entity.js';
+import { JobRadarItem } from '../database/entities/jobs/radar-item.entity.js';
+import { UserGoalMemory } from '../database/entities/memory/user-goal-memory.entity.js';
 import { resolveDensity, densityInstruction } from '../common/density-resolver.js';
 
 import nunjucks from 'nunjucks';
@@ -59,6 +62,14 @@ Push back with reasoning: "I don't recommend you apply to this. Here's why: [rea
 Be direct, not gushy. Help them archive the journey for future reference. Say goodbye gracefully.`;
 
 const QUINN_SYSTEM_PROMPT_TEMPLATE = `{{ basePrompt }}
+{% if goalMemory %}
+
+{{ goalMemory }}
+{% endif %}
+{% if crossSessionContext %}
+
+{{ crossSessionContext }}
+{% endif %}
 {% if profile %}
 
 # User profile
@@ -92,9 +103,31 @@ const ROLLING_SUMMARY_PROMPT = `You are summarizing a segment of a job search co
 
   Write in third-person, past tense. Plain text, no headers. Under 200 words.`;
 
+const GOAL_EXTRACTION_PROMPT = `Given the conversation transcript and the user's existing preferences, extract or update job search preferences.
+
+Return JSON only:
+{
+  "targetRoles": ["..."],
+  "targetIndustries": ["..."],
+  "locationPrefs": ["..."],
+  "dealBreakers": ["..."],
+  "preferredStages": ["..."],
+  "salaryFloorUsd": null,
+  "shortTermGoal": "...",
+  "rawStatements": ["direct quotes from user"]
+}
+
+Rules:
+- Only include fields where there is clear evidence in this conversation
+- Do NOT infer or hallucinate preferences not explicitly stated
+- dealBreakers: things user said they explicitly do not want
+- rawStatements: copy exact user phrases that reveal preferences
+- Return empty arrays for fields with no evidence`;
+
 export const MOST_RECENT_MESSAGES = 30;
 export const MAX_ROLLING_SUMMARIES = 20;
 export const MAX_MATERIALS = 20;
+export const SEMANTIC_MATERIALS_TOP_K = 8;
 export const TOKEN_COMPRESS_THRESHOLD = 10000;
 export const ROLLING_MESSAGES_WINDOW = 20;
 
@@ -103,6 +136,19 @@ type CompressableMessages = {
   end_message_id?: string;
   messages: string[];
 };
+
+function cosineSimilarity(a: number[], b: number[]): number {
+  let dot = 0;
+  let normA = 0;
+  let normB = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i]! * b[i]!;
+    normA += a[i]! * a[i]!;
+    normB += b[i]! * b[i]!;
+  }
+  if (normA === 0 || normB === 0) return 0;
+  return dot / (Math.sqrt(normA) * Math.sqrt(normB));
+}
 
 @Injectable()
 export class ContextBuilderService {
@@ -117,6 +163,12 @@ export class ContextBuilderService {
     private readonly profileRepo: Repository<ProfileProfile>,
     @InjectRepository(ProfileMaterial)
     private readonly materialRepo: Repository<ProfileMaterial>,
+    @InjectRepository(JobParsedJd)
+    private readonly parsedJdRepo: Repository<JobParsedJd>,
+    @InjectRepository(JobRadarItem)
+    private readonly radarItemRepo: Repository<JobRadarItem>,
+    @InjectRepository(UserGoalMemory)
+    private readonly goalMemoryRepo: Repository<UserGoalMemory>,
     @InjectPinoLogger(ContextBuilderService.name)
     private readonly logger: PinoLogger,
   ) {}
@@ -127,25 +179,29 @@ export class ContextBuilderService {
     conversationKind: string,
     anchorId?: string | null,
   ): Promise<Context> {
-    const [profile, materials, recentMessages, rollingSummaries, conversation] = await Promise.all([
-      this.profileRepo.findOne({ where: { userId } }),
-      this.materialRepo.find({
-        where: { userId, status: 'CONFIRMED' },
-        take: MAX_MATERIALS,
-        order: { createdAt: 'DESC' },
-      }),
-      this.messageRepo.find({
-        where: { conversationId, archived: false },
-        order: { createdAt: 'DESC' },
-        take: MOST_RECENT_MESSAGES,
-      }),
-      this.rollingSummayRepo.find({
-        where: { conversationId: conversationId },
-        take: MAX_ROLLING_SUMMARIES,
-        order: { createdAt: 'ASC' },
-      }),
-      this.convRepo.findOne({ where: { id: conversationId } }),
-    ]);
+    // Resolve JD embedding for semantic material search (Layer 3)
+    let jdEmbedding: number[] | null = null;
+    if (anchorId) {
+      jdEmbedding = await this.resolveJdEmbedding(anchorId);
+    }
+
+    const [profile, materials, recentMessages, rollingSummaries, conversation, goalMemory] =
+      await Promise.all([
+        this.profileRepo.findOne({ where: { userId } }),
+        this.loadMaterials(userId, jdEmbedding),
+        this.messageRepo.find({
+          where: { conversationId, archived: false },
+          order: { createdAt: 'DESC' },
+          take: MOST_RECENT_MESSAGES,
+        }),
+        this.rollingSummayRepo.find({
+          where: { conversationId: conversationId },
+          take: MAX_ROLLING_SUMMARIES,
+          order: { createdAt: 'ASC' },
+        }),
+        this.convRepo.findOne({ where: { id: conversationId } }),
+        this.goalMemoryRepo.findOne({ where: { userId } }),
+      ]);
 
     // from DESC to ASC;
     recentMessages.reverse();
@@ -158,9 +214,21 @@ export class ContextBuilderService {
       this.logger.warn(`rollingSummaries count reach maximun value.${MAX_ROLLING_SUMMARIES}`);
     }
 
+    // Layer 4: goal memory context
+    const goalMemorySection = this.buildGoalMemorySection(goalMemory);
+
+    // Layer 2 cross-session: summaries from recent conversations of the same kind
+    const crossSessionContext = await this.buildCrossSessionContext(
+      userId,
+      conversationKind,
+      conversationId,
+    );
+
     const info = profile?.basicInfo as Record<string, unknown> | undefined;
     let systemPrompt = nunjucks.renderString(QUINN_SYSTEM_PROMPT_TEMPLATE, {
       basePrompt: QUINN_SYSTEM_PROMPT,
+      goalMemory: goalMemorySection,
+      crossSessionContext,
       profile: info
         ? { fullName: info['fullName'] ?? 'Unknown', email: info['email'] ?? 'Unknown' }
         : null,
@@ -213,8 +281,8 @@ export class ContextBuilderService {
       return { messages: [] };
     }
 
-    const start_message_id = convMessages[0].id;
-    const end_message_id = convMessages[-1].id;
+    const start_message_id = convMessages[0]!.id;
+    const end_message_id = convMessages[convMessages.length - 1]!.id;
     const messages: string[] = [];
 
     const tokens = convMessages.reduce((sum, convMessage) => {
@@ -250,6 +318,165 @@ export class ContextBuilderService {
     return { messages: [] };
   }
 
+  /** Extract and upsert goal memory from a conversation's messages. */
+  async extractAndSaveGoalMemory(
+    conversationId: string,
+    userId: string,
+    llmComplete: (ctx: Context) => Promise<string>,
+  ): Promise<void> {
+    const messages = await this.messageRepo.find({
+      where: { conversationId },
+      order: { createdAt: 'ASC' },
+      take: 60,
+    });
+
+    const transcript = messages
+      .filter((m) => m.role === 'USER')
+      .map((m) => m.text ?? '')
+      .filter(Boolean)
+      .join('\n');
+
+    if (!transcript.trim()) return;
+
+    const existing = await this.goalMemoryRepo.findOne({ where: { userId } });
+
+    const existingJson = existing
+      ? JSON.stringify({
+          targetRoles: existing.targetRoles,
+          targetIndustries: existing.targetIndustries,
+          locationPrefs: existing.locationPrefs,
+          dealBreakers: existing.dealBreakers,
+          preferredStages: existing.preferredStages,
+          salaryFloorUsd: existing.salaryFloorUsd,
+          shortTermGoal: existing.shortTermGoal,
+        })
+      : '{}';
+
+    const result = await llmComplete({
+      systemPrompt: GOAL_EXTRACTION_PROMPT,
+      messages: [
+        {
+          role: 'user',
+          content: `Existing preferences: ${existingJson}\n\nConversation transcript:\n${transcript}`,
+          timestamp: Date.now(),
+        },
+      ],
+    });
+
+    let parsed: Partial<UserGoalMemory> = {};
+    try {
+      const m = result.match(/\{[\s\S]*\}/);
+      if (m) parsed = JSON.parse(m[0]) as Partial<UserGoalMemory>;
+    } catch {
+      return;
+    }
+
+    const merged: Partial<UserGoalMemory> = {
+      userId,
+      targetRoles: mergeStringArray(existing?.targetRoles, parsed.targetRoles),
+      targetIndustries: mergeStringArray(existing?.targetIndustries, parsed.targetIndustries),
+      locationPrefs: mergeStringArray(existing?.locationPrefs, parsed.locationPrefs),
+      dealBreakers: mergeStringArray(existing?.dealBreakers, parsed.dealBreakers),
+      preferredStages: mergeStringArray(existing?.preferredStages, parsed.preferredStages),
+      salaryFloorUsd: parsed.salaryFloorUsd ?? existing?.salaryFloorUsd ?? null,
+      shortTermGoal: parsed.shortTermGoal ?? existing?.shortTermGoal ?? null,
+      rawStatements: mergeStringArray(existing?.rawStatements, parsed.rawStatements),
+    };
+
+    await this.goalMemoryRepo.upsert(merged as UserGoalMemory, ['userId']);
+  }
+
+  private async resolveJdEmbedding(anchorId: string): Promise<number[] | null> {
+    // anchorId is a radar_item_id — resolve to parsedJdId then get the embedding
+    const radarItem = await this.radarItemRepo.findOne({ where: { id: anchorId } });
+    if (!radarItem?.parsedJdId) return null;
+    const jd = await this.parsedJdRepo.findOne({ where: { id: radarItem.parsedJdId } });
+    return jd?.jdEmbedding ?? null;
+  }
+
+  private async loadMaterials(
+    userId: string,
+    jdEmbedding: number[] | null,
+  ): Promise<ProfileMaterial[]> {
+    if (jdEmbedding) {
+      // Layer 3: semantic search — load materials with embeddings and rank by cosine similarity
+      const withEmbeddings = await this.materialRepo.find({
+        where: { userId, status: 'CONFIRMED' },
+        order: { createdAt: 'DESC' },
+        take: 100,
+      });
+
+      const scored = withEmbeddings
+        .filter((m) => m.embedding && m.embedding.length > 0)
+        .map((m) => ({ m, score: cosineSimilarity(jdEmbedding, m.embedding!) }))
+        .sort((a, b) => b.score - a.score)
+        .slice(0, SEMANTIC_MATERIALS_TOP_K)
+        .map((x) => x.m);
+
+      // Fall back to time-ordered if too few semantic results
+      if (scored.length >= 3) return scored;
+    }
+
+    // Fallback: time-ordered top 20
+    return this.materialRepo.find({
+      where: { userId, status: 'CONFIRMED' },
+      order: { createdAt: 'DESC' },
+      take: MAX_MATERIALS,
+    });
+  }
+
+  private buildGoalMemorySection(goals: UserGoalMemory | null): string {
+    if (!goals) return '';
+
+    const parts: string[] = [];
+    if (goals.targetRoles.length) parts.push(`Target roles: ${goals.targetRoles.join(', ')}`);
+    if (goals.targetIndustries.length)
+      parts.push(`Target industries: ${goals.targetIndustries.join(', ')}`);
+    if (goals.locationPrefs.length) parts.push(`Location: ${goals.locationPrefs.join(', ')}`);
+    if (goals.dealBreakers.length)
+      parts.push(`Deal breakers: ${goals.dealBreakers.join(', ')}`);
+    if (goals.preferredStages.length)
+      parts.push(`Preferred stages: ${goals.preferredStages.join(', ')}`);
+    if (goals.salaryFloorUsd) parts.push(`Minimum salary: $${goals.salaryFloorUsd.toLocaleString()}`);
+    if (goals.shortTermGoal) parts.push(`Short-term goal: ${goals.shortTermGoal}`);
+
+    if (!parts.length) return '';
+    return `## What I know about your preferences\n${parts.join('\n')}`;
+  }
+
+  private async buildCrossSessionContext(
+    userId: string,
+    kind: string,
+    excludeId: string,
+  ): Promise<string> {
+    // Get the latest rolling summary from each of the 2 most recent conversations of the same kind
+    const recentConvs = await this.convRepo.find({
+      where: { userId, kind },
+      order: { updatedAt: 'DESC' },
+      take: 5,
+    });
+
+    const othersWithSummaries: string[] = [];
+    for (const conv of recentConvs) {
+      if (conv.id === excludeId) continue;
+      const latestSummary = await this.rollingSummayRepo.findOne({
+        where: { conversationId: conv.id },
+        order: { createdAt: 'DESC' },
+      });
+      if (latestSummary?.content) {
+        othersWithSummaries.push(latestSummary.content);
+      }
+      if (othersWithSummaries.length >= 2) break;
+    }
+
+    if (!othersWithSummaries.length) return '';
+
+    const summaries = othersWithSummaries
+      .map((s, i) => `[Session ${i + 1} ago]: ${s}`)
+      .join('\n\n');
+    return `## Context from previous sessions\n${summaries}`;
+  }
+
   private estimateStringTokens(text: string | null | undefined): number {
     return (text?.length ?? 0) / 3;
   }
@@ -282,6 +509,7 @@ export class ContextBuilderService {
         return null;
     }
   }
+
   async buildForCompress(
     conversationId: string,
     toCompressed: CompressableMessages,
@@ -323,4 +551,11 @@ export class ContextBuilderService {
       ],
     };
   }
+}
+
+function mergeStringArray(existing: string[] | undefined, incoming: unknown): string[] {
+  const base = existing ?? [];
+  if (!Array.isArray(incoming)) return base;
+  const merged = new Set([...base, ...(incoming as string[])]);
+  return Array.from(merged);
 }

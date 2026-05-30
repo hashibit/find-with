@@ -254,6 +254,13 @@ export class AgentService {
       // TODO seperate to async thread.
       await this.compressIfNeeded(conversationId);
 
+      // Layer 4: extract goal preferences async (fire-and-forget, non-blocking)
+      void this.contextBuilder
+        .extractAndSaveGoalMemory(conversationId, userId, (ctx) =>
+          this.llm.completeContext(ctx),
+        )
+        .catch((err) => this.logger.error('Goal memory extraction failed', err));
+
       await this.convRepo.update({ id: conversationId }, { lastActivity: new Date() });
 
       subject.next({ data: JSON.stringify({ kind: 'done', promptTokens, completionTokens }) });

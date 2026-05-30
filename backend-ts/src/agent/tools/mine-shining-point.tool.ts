@@ -74,6 +74,14 @@ Example shiningText: "Redesigned onboarding process within first 60 days, reduci
 
     await this.repo.save(material);
 
+    // Layer 3: embed immediately after save so semantic search is available
+    try {
+      const embedding = await this.llm.embed(material.shiningText ?? raw_text);
+      await this.repo.update(material.id, { embedding });
+    } catch {
+      // embedding failure is non-blocking
+    }
+
     return {
       content: [
         {

@@ -88,6 +88,26 @@ Return JSON:
       await this.jdRepo.save(parsedJd);
     }
 
+    // Layer 3: embed JD text for semantic material matching (non-blocking)
+    if (!parsedJd.jdEmbedding) {
+      try {
+        const jdEmbedText = [
+          parsedJd.title,
+          parsedJd.company,
+          ...(parsedJd.hardSkills ?? []),
+          ...(parsedJd.softSkills ?? []),
+          parsedJd.buzzwordTranslation,
+        ]
+          .filter(Boolean)
+          .join(' ');
+        const jdEmbedding = await this.llm.embed(jdEmbedText);
+        await this.jdRepo.update(parsedJd.id, { jdEmbedding });
+        parsedJd.jdEmbedding = jdEmbedding;
+      } catch {
+        // embedding failure is non-blocking
+      }
+    }
+
     // 2. Company research (with TTL cache — already effectively checkpointed at DB level)
     const company = parsedJd.company;
     if (company) {

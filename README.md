@@ -204,6 +204,49 @@ Unit tests live alongside source files as `*.spec.ts`. Integration tests are in 
 
 ---
 
+## Memory architecture
+
+Quinn's context is built from four layers, assembled on every agent turn:
+
+```
+┌────────────────────────────────────────────────────────┐
+│ Layer 4: Goal Memory (UserGoalMemory)                  │
+│ Permanent, per-user. Extracted from conversation text. │
+│ "target roles, deal breakers, salary floor, etc."      │
+├────────────────────────────────────────────────────────┤
+│ Layer 3: Semantic Memory (ProfileMaterial.embedding)   │
+│ pgvector cosine search anchored to the current JD.     │
+│ "the 8 most relevant shining points for this role"     │
+├────────────────────────────────────────────────────────┤
+│ Layer 2: Episodic Memory (ConvRollingSummary)          │
+│ Rolling compression once active messages exceed the    │
+│ token threshold. Summaries persist across sessions.    │
+│ "what happened in earlier parts of this conversation"  │
+├────────────────────────────────────────────────────────┤
+│ Layer 1: Working Memory (conv_messages, archived=false)│
+│ The live context window — most recent messages only.   │
+└────────────────────────────────────────────────────────┘
+```
+
+### How each layer works
+
+**Layer 1 — Working memory.** `ContextBuilderService` queries `conv_messages` filtered to `archived = false`, ordered DESC, capped at 30. Only the live tail of the conversation enters the prompt.
+
+**Layer 2 — Episodic memory.** After every agent turn, `compressIfNeeded` checks token volume. When it exceeds `TOKEN_COMPRESS_THRESHOLD` (10 000 tokens), the oldest messages are summarised by an LLM call, written to `conv_rolling_summary`, and their originals are flipped to `archived = true`. Summaries from prior sessions of the same conversation `kind` are injected as cross-session context for new conversations.
+
+**Layer 3 — Semantic memory.** When `MineShiningPointTool` saves a material it immediately generates and stores a `text-embedding-3-small` embedding. When the `JobsProcessor` parses a JD it embeds the title + skills text and stores `jdEmbedding`. At context-build time, if the conversation has an anchor (a radar item), `ContextBuilderService` resolves its JD embedding and ranks all confirmed materials by cosine similarity, injecting the top-8 instead of the default time-ordered top-20.
+
+**Layer 4 — Goal memory.** After every agent turn, `extractAndSaveGoalMemory` runs an async LLM call over the user's messages to extract structured preferences (`targetRoles`, `locationPrefs`, `dealBreakers`, `salaryFloorUsd`, etc.) and upserts them into `user_goal_memory`. These are injected at the top of every system prompt so Quinn always knows the user's standing preferences, even in a brand-new conversation.
+
+### Database tables added
+
+| Table | Purpose |
+|---|---|
+| `conv_rolling_summary` | Layer 2 — one row per compression event |
+| `user_goal_memory` | Layer 4 — one row per user, upserted each turn |
+
+---
+
 ## Key design decisions
 
 **Quota consumed at export, not at tailoring creation.** A user can generate multiple tailored resumes and only pays (in quota) when they export one as PDF. Matches the Python implementation's `consume_on_export` semantics. `QuotaConsumeLog.tailoredResumeId` has a UNIQUE constraint to prevent double-charges on retry.

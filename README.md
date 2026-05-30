@@ -1,10 +1,11 @@
-# FindWith
+# Quinn
 
 **An AI agent here to help you finding a job.**
 
-![Quinn](./docs/logo/quinn.png)
 
-FindWith is a Chrome extension + web backend that puts an AI partner (Quinn) in your side panel from the moment you start browsing jobs until you accept an offer. Not a resume template library. Not an auto-apply bot. An opinionated, always-present collaborator that helps you think, tailor, and track — while keeping every final decision in your hands.
+<img src="https://raw.githubusercontent.com/hashibit/find-with/refs/heads/main/docs/logo/quinn.png" width="128" height="128" valign="middle">
+
+Your AI partner (Quinn) an opinionated, always-present collaborator that helps you think, tailor, and track — while keeping every final decision in your hands.
 
 ---
 
@@ -210,8 +211,6 @@ Unit tests live alongside source files as `*.spec.ts`. Integration tests are in 
 **No Gmail API.** Email reading works by having the user open the email in their browser and letting the content script read the DOM. No OAuth, no stored email content beyond conversation context. This is a deliberate product choice.
 
 **Field encryption at the application layer.** `ProfileMaterial.rawText` and `FollowupEmail.bodyText` are AES-256-GCM encrypted as `bytea` columns. Wire format: `nonce[12] + ciphertext + authTag[16]`. The database never sees plaintext for these fields.
-
-**ULID primary keys.** All entities use ULID (not UUID) for sortable, collision-resistant IDs without a sequence.
 
 **`UserOwnedSingletonEntity` for 1:1 entities.** `IamSettings`, `ProfileProfile`, and `QuotaUsageCounter` use `userId` as the primary key. They are not versioned/audited rows — there is exactly one per user.
 

@@ -1,6 +1,6 @@
 import { Injectable, Logger, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Between, Repository } from 'typeorm';
 import { Observable, Subject } from 'rxjs';
 import {
   type AssistantMessage,
@@ -25,6 +25,7 @@ import { ClassifyEmailTool } from './tools/classify-email.tool.js';
 import { DraftReplyTool } from './tools/draft-reply.tool.js';
 import { SetConversationDensityTool } from './tools/set-conversation-density.tool.js';
 import { ulid } from 'ulid';
+import { ConvRollingSummary } from '@/database/entities/conversation/rolling-summary.entity.js';
 
 export interface AgentSseEvent {
   data: string;
@@ -73,6 +74,8 @@ export class AgentService {
   constructor(
     @InjectRepository(ConvMessage) private readonly messageRepo: Repository<ConvMessage>,
     @InjectRepository(ConvConversation) private readonly convRepo: Repository<ConvConversation>,
+    @InjectRepository(ConvRollingSummary)
+    private readonly convRollingSummary: Repository<ConvRollingSummary>,
     @Inject(LLM_PROVIDER) private readonly llm: LlmProvider,
     private readonly contextBuilder: ContextBuilderService,
     private readonly searchCompanyTool: SearchCompanyTool,
@@ -248,15 +251,8 @@ export class AgentService {
         }
       }
 
-      const tobeCompressed = await this.contextBuilder.findMessagesToCompress(conversationId);
-      if (tobeCompressed.messages.length > 0) {
-        // start compress
-        const compressConext = await this.contextBuilder.buildForCompress(
-          conversationId,
-          tobeCompressed,
-        );
-        this.llm.completeContext(compressConext);
-      }
+      // TODO seperate to async thread.
+      await this.compressIfNeeded(conversationId);
 
       await this.convRepo.update({ id: conversationId }, { lastActivity: new Date() });
 
@@ -299,5 +295,37 @@ export class AgentService {
         description: tool.description,
         parameters: tool.parameters as Record<string, unknown>,
       }));
+  }
+
+  private async compressIfNeeded(conversationId: string) {
+    const toCompressed = await this.contextBuilder.findMessagesToCompress(conversationId);
+    if (toCompressed.messages.length > 0) {
+      // start compress
+      const context = await this.contextBuilder.buildForCompress(conversationId, toCompressed);
+      const summarized = await this.llm.completeContext(context);
+
+      const start_message_id = toCompressed.start_message_id!;
+      const end_message_id = toCompressed.end_message_id!;
+
+      // save rolling summary and archive messages
+      await this.convRollingSummary.save(
+        this.convRollingSummary.create({
+          id: ulid(),
+          conversationId,
+          start_message_id,
+          end_message_id,
+          content: summarized,
+        }),
+      );
+      await this.messageRepo.update(
+        {
+          conversationId,
+          id: Between(start_message_id, end_message_id),
+        },
+        {
+          archived: true,
+        },
+      );
+    }
   }
 }

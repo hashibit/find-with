@@ -16,6 +16,8 @@ import { ProfileProfile } from '../database/entities/profile/profile.entity.js';
 import { ProfileMaterial } from '../database/entities/profile/material.entity.js';
 import { resolveDensity, densityInstruction } from '../common/density-resolver.js';
 
+import nunjucks from 'nunjucks';
+
 import { PinoLogger, InjectPinoLogger } from 'nestjs-pino';
 import { convertTools } from 'node_modules/@earendil-works/pi-ai/dist/providers/google-shared.js';
 
@@ -56,8 +58,20 @@ Push back with reasoning: "I don't recommend you apply to this. Here's why: [rea
 # When user gets an offer they accept
 Be direct, not gushy. Help them archive the journey for future reference. Say goodbye gracefully.`;
 
-const QUINN_COMPAT_PROMPT = `You are Quinn,
-an AI job search companion built into the FindWith Chrome extension. The user is a job seeker in North America.`;
+const ROLLING_SUMMARY_PROMPT = `You are summarizing a segment of a job search conversation between a user and Quinn (an AI job search companion).
+
+  Write a concise summary of the messages provided. Focus on:
+  - Jobs or companies discussed, and the user's interest level (decided to apply / skipped / undecided)
+  - Key facts the user stated about their experience or background
+  - Decisions made
+  - Open threads — things that were raised but not resolved
+
+  Do NOT include:
+  - General preferences or personality traits — those are tracked elsewhere
+  - Filler turns (greetings, acknowledgements)
+  - Information already covered in the background context
+
+  Write in third-person, past tense. Plain text, no headers. Under 200 words.`;
 
 export const MOST_RECENT_MESSAGES = 30;
 export const MAX_ROLLING_SUMMARIES = 20;
@@ -256,8 +270,43 @@ export class ContextBuilderService {
   }
   async buildForCompress(
     conversationId: string,
-    compressable: CompressableMessages,
+    toCompressed: CompressableMessages,
   ): Promise<Context> {
-    return { systemPrompt: QUINN_COMPAT_PROMPT, messages: [] };
+    const lastRolling = await this.rollingSummayRepo.findOne({
+      where: {
+        conversationId,
+      },
+      order: {
+        id: 'DESC',
+      },
+    });
+    const userMessageTmpl = `
+  {% if lastContent %}
+  ## Background context
+  Use this ONLY to resolve references. Do NOT repeat or restate it.
+
+  {{ lastContent }}
+
+  ---
+  {% endif %}
+
+  ## Messages to summarize
+  {{ messages }}
+  `;
+    const userMessage = nunjucks.renderString(userMessageTmpl, {
+      lastContent: lastRolling?.content,
+      messages: toCompressed.messages.join('\n'),
+    });
+
+    return {
+      systemPrompt: ROLLING_SUMMARY_PROMPT,
+      messages: [
+        {
+          role: 'user' as const,
+          content: userMessage,
+          timestamp: Date.now(),
+        },
+      ],
+    };
   }
 }

@@ -19,6 +19,7 @@ import { ApplyModule } from './contexts/apply/apply.module.js';
 import { FollowupModule } from './contexts/followup/followup.module.js';
 import { RecommendationModule } from './contexts/recommendation/recommendation.module.js';
 import { InfraModule } from './contexts/infra/infra.module.js';
+import { MemoryModule } from './contexts/memory/memory.module.js';
 import { type AppConfig } from './config/configuration.js';
 
 @Module({
@@ -53,6 +54,7 @@ import { type AppConfig } from './config/configuration.js';
     FollowupModule,
     RecommendationModule,
     InfraModule,
+    MemoryModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: UserAuthGuard }],
 })

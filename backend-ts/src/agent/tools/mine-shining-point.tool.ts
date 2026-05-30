@@ -2,9 +2,12 @@ import { Injectable, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Type } from '@sinclair/typebox';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 import { ProfileMaterial } from '../../database/entities/profile/material.entity.js';
 import { LLM_PROVIDER, type LlmProvider } from '../../llm/llm-provider.interface.js';
 import { FIELD_CRYPTO, type FieldCrypto } from '../../common/crypto/crypto.interface.js';
+import { MEMORY_QUEUE, type MemoryJobData } from '../../contexts/memory/memory.constants.js';
 import { ulid } from 'ulid';
 
 export const MINE_SHINING_POINT_TOOL_NAME = 'mine_shining_point';
@@ -16,6 +19,7 @@ export class MineShiningPointTool {
     private readonly repo: Repository<ProfileMaterial>,
     @Inject(LLM_PROVIDER) private readonly llm: LlmProvider,
     @Inject(FIELD_CRYPTO) private readonly crypto: FieldCrypto,
+    @InjectQueue(MEMORY_QUEUE) private readonly memoryQueue: Queue<MemoryJobData>,
   ) {}
 
   readonly name = MINE_SHINING_POINT_TOOL_NAME;
@@ -74,13 +78,8 @@ Example shiningText: "Redesigned onboarding process within first 60 days, reduci
 
     await this.repo.save(material);
 
-    // Layer 3: embed immediately after save so semantic search is available
-    try {
-      const embedding = await this.llm.embed(material.shiningText ?? raw_text);
-      await this.repo.update(material.id, { embedding });
-    } catch {
-      // embedding failure is non-blocking
-    }
+    // Layer 3: enqueue embedding — handled by MemoryProcessor with retry
+    await this.memoryQueue.add('embed-material', { type: 'EMBED_MATERIAL', materialId: material.id });
 
     return {
       content: [

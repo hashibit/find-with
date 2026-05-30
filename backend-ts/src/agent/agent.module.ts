@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { BullModule } from '@nestjs/bullmq';
+import { MEMORY_QUEUE } from '../contexts/memory/memory.constants.js';
 import { AgentService } from './agent.service.js';
 import { ContextBuilderService } from './context-builder.service.js';
 import { SearchCompanyTool } from './tools/search-company.tool.js';
@@ -27,6 +29,7 @@ import { type AppConfig } from '../config/configuration.js';
 
 @Module({
   imports: [
+    BullModule.registerQueue({ name: MEMORY_QUEUE }),
     TypeOrmModule.forFeature([
       ConvMessage,
       ConvConversation,
@@ -61,6 +64,6 @@ import { type AppConfig } from '../config/configuration.js';
     DraftReplyTool,
     SetConversationDensityTool,
   ],
-  exports: [AgentService],
+  exports: [AgentService, ContextBuilderService],
 })
 export class AgentModule {}

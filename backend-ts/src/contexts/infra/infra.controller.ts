@@ -6,10 +6,13 @@ import Stripe from 'stripe';
 import { Webhook } from 'svix';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 import { TelemetryEvent } from '../../database/entities/telemetry/telemetry-event.entity.js';
 import { IamService } from '../iam/iam.service.js';
 import { BillingService } from '../iam/billing.service.js';
 import { type AppConfig } from '../../config/configuration.js';
+import { MEMORY_QUEUE, type MemoryJobData } from '../memory/memory.constants.js';
 import { ulid } from 'ulid';
 
 @ApiTags('infra')
@@ -23,6 +26,7 @@ export class InfraController {
     private readonly billingService: BillingService,
     @InjectRepository(TelemetryEvent)
     private readonly telemetryRepo: Repository<TelemetryEvent>,
+    @InjectQueue(MEMORY_QUEUE) private readonly memoryQueue: Queue<MemoryJobData>,
   ) {
     const stripeConfig = this.config.get('stripe', { infer: true })!;
     this.stripe = new Stripe(stripeConfig.secretKey, { apiVersion: '2024-06-20' });
@@ -54,7 +58,9 @@ export class InfraController {
       const email =
         (d['email_addresses'] as Array<{ email_address: string }>)?.[0]?.email_address ?? '';
       const fullName = [d['first_name'], d['last_name']].filter(Boolean).join(' ') || undefined;
-      await this.iamService.upsert(d['id'] as string, email, fullName);
+      const user = await this.iamService.upsert(d['id'] as string, email, fullName);
+      // Backfill embeddings for any existing materials (no-op for new users)
+      await this.memoryQueue.add('backfill', { type: 'BACKFILL_EMBEDDINGS', userId: user.id });
     }
 
     if (event.type === 'user.deleted') {

@@ -1,6 +1,6 @@
 import { Injectable, Logger, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Between, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import { Observable, Subject } from 'rxjs';
 import {
   type AssistantMessage,
@@ -9,15 +9,12 @@ import {
   type Tool,
   type ToolResultMessage,
 } from '@earendil-works/pi-ai';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 import { ConvMessage } from '../database/entities/conversation/message.entity.js';
 import { ConvConversation } from '../database/entities/conversation/conversation.entity.js';
 import { LLM_PROVIDER, type LlmProvider } from '../llm/llm-provider.interface.js';
-import {
-  TOKEN_COMPRESS_THRESHOLD,
-  MOST_RECENT_MESSAGES,
-  ContextBuilderService,
-  ROLLING_MESSAGES_WINDOW,
-} from './context-builder.service.js';
+import { ContextBuilderService } from './context-builder.service.js';
 import { SearchCompanyTool } from './tools/search-company.tool.js';
 import { MineShiningPointTool } from './tools/mine-shining-point.tool.js';
 import { DraftMotivationTool } from './tools/draft-motivation.tool.js';
@@ -25,18 +22,12 @@ import { ClassifyEmailTool } from './tools/classify-email.tool.js';
 import { DraftReplyTool } from './tools/draft-reply.tool.js';
 import { SetConversationDensityTool } from './tools/set-conversation-density.tool.js';
 import { ulid } from 'ulid';
-import { ConvRollingSummary } from '@/database/entities/conversation/rolling-summary.entity.js';
+import { MEMORY_QUEUE, type MemoryJobData } from '../contexts/memory/memory.constants.js';
 
 export interface AgentSseEvent {
   data: string;
   type?: string;
 }
-
-type ToCompressedMessages = {
-  start_message_id?: string;
-  end_message_id?: string;
-  messages: string[];
-};
 
 interface ToolExecutor {
   readonly name: string;
@@ -74,9 +65,8 @@ export class AgentService {
   constructor(
     @InjectRepository(ConvMessage) private readonly messageRepo: Repository<ConvMessage>,
     @InjectRepository(ConvConversation) private readonly convRepo: Repository<ConvConversation>,
-    @InjectRepository(ConvRollingSummary)
-    private readonly convRollingSummary: Repository<ConvRollingSummary>,
     @Inject(LLM_PROVIDER) private readonly llm: LlmProvider,
+    @InjectQueue(MEMORY_QUEUE) private readonly memoryQueue: Queue<MemoryJobData>,
     private readonly contextBuilder: ContextBuilderService,
     private readonly searchCompanyTool: SearchCompanyTool,
     private readonly mineShiningPointTool: MineShiningPointTool,
@@ -251,15 +241,11 @@ export class AgentService {
         }
       }
 
-      // TODO seperate to async thread.
-      await this.compressIfNeeded(conversationId);
-
-      // Layer 4: extract goal preferences async (fire-and-forget, non-blocking)
-      void this.contextBuilder
-        .extractAndSaveGoalMemory(conversationId, userId, (ctx) =>
-          this.llm.completeContext(ctx),
-        )
-        .catch((err) => this.logger.error('Goal memory extraction failed', err));
+      // Enqueue async memory jobs — non-blocking, retried by BullMQ on failure
+      await Promise.all([
+        this.memoryQueue.add('compress', { type: 'COMPRESS_CONVERSATION', conversationId }),
+        this.memoryQueue.add('extract', { type: 'EXTRACT_PREFERENCES', conversationId, userId }),
+      ]);
 
       await this.convRepo.update({ id: conversationId }, { lastActivity: new Date() });
 
@@ -304,35 +290,4 @@ export class AgentService {
       }));
   }
 
-  private async compressIfNeeded(conversationId: string) {
-    const toCompressed = await this.contextBuilder.findMessagesToCompress(conversationId);
-    if (toCompressed.messages.length > 0) {
-      // start compress
-      const context = await this.contextBuilder.buildForCompress(conversationId, toCompressed);
-      const summarized = await this.llm.completeContext(context);
-
-      const start_message_id = toCompressed.start_message_id!;
-      const end_message_id = toCompressed.end_message_id!;
-
-      // save rolling summary and archive messages
-      await this.convRollingSummary.save(
-        this.convRollingSummary.create({
-          id: ulid(),
-          conversationId,
-          start_message_id,
-          end_message_id,
-          content: summarized,
-        }),
-      );
-      await this.messageRepo.update(
-        {
-          conversationId,
-          id: Between(start_message_id, end_message_id),
-        },
-        {
-          archived: true,
-        },
-      );
-    }
-  }
 }

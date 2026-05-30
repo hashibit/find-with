@@ -49,4 +49,12 @@ export class ConversationService {
       take: 50,
     });
   }
+
+  /** Returns the conversation if it belongs to userId, throws otherwise. */
+  async close(userId: string, id: string): Promise<ConvConversation> {
+    const conv = await this.convRepo.findOne({ where: { id } });
+    if (!conv) throw new NotFoundException('Conversation not found');
+    if (conv.userId !== userId) throw new ForbiddenException();
+    return conv;
+  }
 }

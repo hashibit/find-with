@@ -1,6 +1,6 @@
 import { Injectable, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, Not, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import {
   type AssistantMessage,
   type Context,
@@ -102,27 +102,6 @@ const ROLLING_SUMMARY_PROMPT = `You are summarizing a segment of a job search co
   - Information already covered in the background context
 
   Write in third-person, past tense. Plain text, no headers. Under 200 words.`;
-
-const GOAL_EXTRACTION_PROMPT = `Given the conversation transcript and the user's existing preferences, extract or update job search preferences.
-
-Return JSON only:
-{
-  "targetRoles": ["..."],
-  "targetIndustries": ["..."],
-  "locationPrefs": ["..."],
-  "dealBreakers": ["..."],
-  "preferredStages": ["..."],
-  "salaryFloorUsd": null,
-  "shortTermGoal": "...",
-  "rawStatements": ["direct quotes from user"]
-}
-
-Rules:
-- Only include fields where there is clear evidence in this conversation
-- Do NOT infer or hallucinate preferences not explicitly stated
-- dealBreakers: things user said they explicitly do not want
-- rawStatements: copy exact user phrases that reveal preferences
-- Return empty arrays for fields with no evidence`;
 
 export const MOST_RECENT_MESSAGES = 30;
 export const MAX_ROLLING_SUMMARIES = 20;
@@ -318,74 +297,6 @@ export class ContextBuilderService {
     return { messages: [] };
   }
 
-  /** Extract and upsert goal memory from a conversation's messages. */
-  async extractAndSaveGoalMemory(
-    conversationId: string,
-    userId: string,
-    llmComplete: (ctx: Context) => Promise<string>,
-  ): Promise<void> {
-    const messages = await this.messageRepo.find({
-      where: { conversationId },
-      order: { createdAt: 'ASC' },
-      take: 60,
-    });
-
-    const transcript = messages
-      .filter((m) => m.role === 'USER')
-      .map((m) => m.text ?? '')
-      .filter(Boolean)
-      .join('\n');
-
-    if (!transcript.trim()) return;
-
-    const existing = await this.goalMemoryRepo.findOne({ where: { userId } });
-
-    const existingJson = existing
-      ? JSON.stringify({
-          targetRoles: existing.targetRoles,
-          targetIndustries: existing.targetIndustries,
-          locationPrefs: existing.locationPrefs,
-          dealBreakers: existing.dealBreakers,
-          preferredStages: existing.preferredStages,
-          salaryFloorUsd: existing.salaryFloorUsd,
-          shortTermGoal: existing.shortTermGoal,
-        })
-      : '{}';
-
-    const result = await llmComplete({
-      systemPrompt: GOAL_EXTRACTION_PROMPT,
-      messages: [
-        {
-          role: 'user',
-          content: `Existing preferences: ${existingJson}\n\nConversation transcript:\n${transcript}`,
-          timestamp: Date.now(),
-        },
-      ],
-    });
-
-    let parsed: Partial<UserGoalMemory> = {};
-    try {
-      const m = result.match(/\{[\s\S]*\}/);
-      if (m) parsed = JSON.parse(m[0]) as Partial<UserGoalMemory>;
-    } catch {
-      return;
-    }
-
-    const merged: Partial<UserGoalMemory> = {
-      userId,
-      targetRoles: mergeStringArray(existing?.targetRoles, parsed.targetRoles),
-      targetIndustries: mergeStringArray(existing?.targetIndustries, parsed.targetIndustries),
-      locationPrefs: mergeStringArray(existing?.locationPrefs, parsed.locationPrefs),
-      dealBreakers: mergeStringArray(existing?.dealBreakers, parsed.dealBreakers),
-      preferredStages: mergeStringArray(existing?.preferredStages, parsed.preferredStages),
-      salaryFloorUsd: parsed.salaryFloorUsd ?? existing?.salaryFloorUsd ?? null,
-      shortTermGoal: parsed.shortTermGoal ?? existing?.shortTermGoal ?? null,
-      rawStatements: mergeStringArray(existing?.rawStatements, parsed.rawStatements),
-    };
-
-    await this.goalMemoryRepo.upsert(merged as UserGoalMemory, ['userId']);
-  }
-
   private async resolveJdEmbedding(anchorId: string): Promise<number[] | null> {
     // anchorId is a radar_item_id — resolve to parsedJdId then get the embedding
     const radarItem = await this.radarItemRepo.findOne({ where: { id: anchorId } });
@@ -553,9 +464,3 @@ export class ContextBuilderService {
   }
 }
 
-function mergeStringArray(existing: string[] | undefined, incoming: unknown): string[] {
-  const base = existing ?? [];
-  if (!Array.isArray(incoming)) return base;
-  const merged = new Set([...base, ...(incoming as string[])]);
-  return Array.from(merged);
-}

@@ -1,7 +1,12 @@
 import { Injectable, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { type Context, type Message } from '@earendil-works/pi-ai';
+import {
+  type AssistantMessage,
+  type Context,
+  type Message,
+  type ToolResultMessage,
+} from '@earendil-works/pi-ai';
 
 import { ConvMessage } from '../database/entities/conversation/message.entity.js';
 import { ConvConversation } from '../database/entities/conversation/conversation.entity.js';
@@ -51,9 +56,20 @@ Push back with reasoning: "I don't recommend you apply to this. Here's why: [rea
 # When user gets an offer they accept
 Be direct, not gushy. Help them archive the journey for future reference. Say goodbye gracefully.`;
 
+const QUINN_COMPAT_PROMPT = `You are Quinn,
+an AI job search companion built into the FindWith Chrome extension. The user is a job seeker in North America.`;
+
 export const MOST_RECENT_MESSAGES = 30;
 export const MAX_ROLLING_SUMMARIES = 20;
 export const MAX_MATERIALS = 20;
+export const TOKEN_COMPRESS_THRESHOLD = 10000;
+export const ROLLING_MESSAGES_WINDOW = 20;
+
+type CompressableMessages = {
+  start_message_id?: string;
+  end_message_id?: string;
+  messages: string[];
+};
 
 @Injectable()
 export class ContextBuilderService {
@@ -152,5 +168,96 @@ export class ContextBuilderService {
     });
 
     return { systemPrompt, messages };
+  }
+
+  async findMessagesToCompress(conversationId: string): Promise<CompressableMessages> {
+    const query = {
+      where: { conversationId: conversationId, archived: false },
+      order: { createdAt: 'ASC' },
+    };
+    const count = await this.messageRepo.count(query as any);
+    if (count < ROLLING_MESSAGES_WINDOW) {
+      return { messages: [] };
+    }
+
+    const convMessages = await this.messageRepo.find(query as any);
+    if (convMessages.length < ROLLING_MESSAGES_WINDOW) {
+      return { messages: [] };
+    }
+
+    const start_message_id = convMessages[0].id;
+    const end_message_id = convMessages[-1].id;
+    const messages: string[] = [];
+
+    const tokens = convMessages.reduce((sum, convMessage) => {
+      const brief = this.messageBrief(convMessage);
+      if (brief) {
+        messages.push(brief);
+      }
+      if (convMessage.role == 'USER') {
+        return sum + this.estimateStringTokens(convMessage.text);
+      }
+      if (convMessage.role == 'ASSISTANT') {
+        return sum + (convMessage.payload as AssistantMessage).usage.totalTokens;
+      }
+      if (convMessage.role == 'TOOL_RESULT') {
+        const content = (convMessage.payload as ToolResultMessage).content;
+        const tool_tokens = content.reduce((v, c) => {
+          if (c.type == 'text') return v + this.estimateStringTokens(c.text);
+          return v + c.data.length / 3;
+        }, 0);
+        return sum + tool_tokens;
+      }
+      return sum;
+    }, 0);
+
+    if (tokens > TOKEN_COMPRESS_THRESHOLD) {
+      return {
+        start_message_id,
+        end_message_id,
+        messages,
+      };
+    }
+
+    return { messages: [] };
+  }
+
+  private estimateStringTokens(text: string | null | undefined): number {
+    return (text?.length ?? 0) / 3;
+  }
+
+  private messageBrief(message: ConvMessage): string | null {
+    switch (message.role) {
+      case 'USER':
+        return `User: ${message.text}`;
+      case 'ASSISTANT':
+        const assistant = message.payload as AssistantMessage;
+        const contents = assistant.content.map((c) => {
+          switch (c.type) {
+            case 'text':
+              return c.text;
+            case 'toolCall':
+              return `[Call tool: ${c.name}]`;
+            case 'thinking':
+              return null;
+          }
+        });
+        return `Quinn: ${contents.join('\n')}`;
+      case 'TOOL_RESULT':
+        const toolResult = message.payload as ToolResultMessage;
+        const block = toolResult.content[0];
+        if (block.type == 'text') {
+          return `[Tool Result for ${toolResult.toolName}: ${block.text}]`;
+        }
+        return null;
+      default:
+        return null;
+    }
+  }
+  async buildForCompress(
+    conversationId: string,
+    compressable: CompressableMessages,
+  ): Promise<Context> {
+    return { systemPrompt: QUINN_COMPAT_PROMPT, messages: [] };
   }
 }

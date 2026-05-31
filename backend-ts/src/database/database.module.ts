@@ -5,6 +5,10 @@ import { type AppConfig } from '../config/configuration.js';
 import { DatabaseService } from './database.service.js';
 import { IamUser } from './entities/iam/iam-user.entity.js';
 import { IamSettings } from './entities/iam/iam-settings.entity.js';
+import { IamWebhookEvent } from './entities/iam/webhook-event.entity.js';
+import { AccountPurgeSaga } from './entities/iam/account-purge-saga.entity.js';
+import { GdprPurgeLog } from './entities/iam/gdpr-purge-log.entity.js';
+import { PendingToolResult } from './entities/agent/pending-tool-result.entity.js';
 import { ProfileResumeSource } from './entities/profile/resume-source.entity.js';
 import { ProfileProfile } from './entities/profile/profile.entity.js';
 import { ProfileEducation } from './entities/profile/education.entity.js';
@@ -39,6 +43,10 @@ import { IdempotencyKey } from './entities/idempotency/idempotency-key.entity.js
 export const ALL_ENTITIES = [
   IamUser,
   IamSettings,
+  IamWebhookEvent,
+  AccountPurgeSaga,
+  GdprPurgeLog,
+  PendingToolResult,
   ProfileResumeSource,
   ProfileProfile,
   ProfileEducation,

@@ -9,14 +9,8 @@ export class AddEncryptedMessageTextColumn1780096000000 implements MigrationInte
       `ALTER TABLE "conv_messages" ADD "encryptedText" bytea`,
     );
 
-    // Copy existing text to encrypted_text (encrypted with dummy key for migration)
-    // In production, this would use actual encryption
-    await queryRunner.query(
-      `UPDATE "conv_messages" SET "encryptedText" = pgp_encrypt(text::bytea, DecryptKey()) WHERE text IS NOT NULL`,
-    );
-
-    // Make text nullable (will keep for backward compatibility initially)
-    // In a subsequent migration, we can drop text if needed
+    // Backfill of existing rows is omitted — encryptedText for pre-migration
+    // messages will be NULL until re-encrypted by the application layer.
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {

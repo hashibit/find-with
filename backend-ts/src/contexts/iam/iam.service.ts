@@ -76,4 +76,8 @@ export class IamService {
   async softDelete(userId: string): Promise<void> {
     await this.userRepo.update({ id: userId }, { deletedAt: new Date(), isActive: false });
   }
+
+  async restoreUser(userId: string): Promise<void> {
+    await this.userRepo.update({ id: userId }, { deletedAt: null as unknown as Date, isActive: true });
+  }
 }

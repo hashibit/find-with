@@ -21,6 +21,7 @@ import { DraftMotivationTool } from './tools/draft-motivation.tool.js';
 import { ClassifyEmailTool } from './tools/classify-email.tool.js';
 import { DraftReplyTool } from './tools/draft-reply.tool.js';
 import { SetConversationDensityTool } from './tools/set-conversation-density.tool.js';
+import { FarewellTool } from './tools/farewell.tool.js';
 import { ulid } from 'ulid';
 import { MEMORY_QUEUE, type MemoryJobData } from '../contexts/memory/memory.constants.js';
 import { PendingToolResult } from '../database/entities/agent/pending-tool-result.entity.js';
@@ -54,6 +55,7 @@ const TOOL_SCENES: Record<string, string[]> = {
   classify_email: ['FOLLOWUP'],
   draft_reply: ['FOLLOWUP'],
   set_conversation_density: ['ALL'],
+  farewell_recap: ['FREE_CHAT', 'OFFER_ACCEPTED'],
 };
 
 const MAX_ITERATION = 10;
@@ -77,6 +79,7 @@ export class AgentService {
     private readonly classifyEmailTool: ClassifyEmailTool,
     private readonly draftReplyTool: DraftReplyTool,
     private readonly setDensityTool: SetConversationDensityTool,
+    private readonly farewellTool: FarewellTool,
   ) {
     this.toolMap = new Map([
       [this.searchCompanyTool.name, this.searchCompanyTool as unknown as ToolExecutor],
@@ -85,6 +88,7 @@ export class AgentService {
       [this.classifyEmailTool.name, this.classifyEmailTool as unknown as ToolExecutor],
       [this.draftReplyTool.name, this.draftReplyTool as unknown as ToolExecutor],
       [this.setDensityTool.name, this.setDensityTool as unknown as ToolExecutor],
+      [this.farewellTool.name, this.farewellTool as unknown as ToolExecutor],
     ]);
   }
 

@@ -10,6 +10,7 @@ import { DraftMotivationTool } from './tools/draft-motivation.tool.js';
 import { ClassifyEmailTool } from './tools/classify-email.tool.js';
 import { DraftReplyTool } from './tools/draft-reply.tool.js';
 import { SetConversationDensityTool } from './tools/set-conversation-density.tool.js';
+import { FarewellTool } from './tools/farewell.tool.js';
 import { ConvMessage } from '../database/entities/conversation/message.entity.js';
 import { ConvConversation } from '../database/entities/conversation/conversation.entity.js';
 import { ConvRollingSummary } from '../database/entities/conversation/rolling-summary.entity.js';
@@ -63,6 +64,7 @@ import { type AppConfig } from '../config/configuration.js';
     ClassifyEmailTool,
     DraftReplyTool,
     SetConversationDensityTool,
+    FarewellTool,
   ],
   exports: [AgentService, ContextBuilderService],
 })

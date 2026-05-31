@@ -8,11 +8,14 @@ services:
       POSTGRES_PASSWORD: findwith_test
       POSTGRES_DB: findwith_test
     # No volume — ephemeral, wiped on down
+    volumes:
+      - ./infra/init-test-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U findwith_test']
       interval: 5s
       timeout: 3s
-      retries: 5
+      retries: 10
+      start_period: 10s
 
   redis-test:
     image: redis:7-alpine

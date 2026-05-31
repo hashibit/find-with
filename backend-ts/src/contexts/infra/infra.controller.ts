@@ -9,6 +9,7 @@ import { Repository } from 'typeorm';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { TelemetryEvent } from '../../database/entities/telemetry/telemetry-event.entity.js';
+import { IamWebhookEvent } from '../../database/entities/iam/webhook-event.entity.js';
 import { IamService } from '../iam/iam.service.js';
 import { BillingService } from '../iam/billing.service.js';
 import { type AppConfig } from '../../config/configuration.js';
@@ -26,10 +27,24 @@ export class InfraController {
     private readonly billingService: BillingService,
     @InjectRepository(TelemetryEvent)
     private readonly telemetryRepo: Repository<TelemetryEvent>,
+    @InjectRepository(IamWebhookEvent)
+    private readonly webhookEventRepo: Repository<IamWebhookEvent>,
     @InjectQueue(MEMORY_QUEUE) private readonly memoryQueue: Queue<MemoryJobData>,
   ) {
     const stripeConfig = this.config.get('stripe', { infer: true })!;
     this.stripe = new Stripe(stripeConfig.secretKey, { apiVersion: '2024-06-20' });
+  }
+
+  /** Returns false if the event was already processed (duplicate). */
+  private async dedup(provider: string, eventId: string, eventType: string): Promise<boolean> {
+    const result = await this.webhookEventRepo
+      .createQueryBuilder()
+      .insert()
+      .into(IamWebhookEvent)
+      .values({ id: ulid(), provider, eventId, eventType })
+      .orIgnore()
+      .execute();
+    return (result.raw?.rowCount ?? result.identifiers.length) > 0;
   }
 
   @Post('webhooks/clerk')
@@ -52,6 +67,11 @@ export class InfraController {
     });
 
     const event = body as { type: string; data: Record<string, unknown> };
+
+    // Idempotency: skip already-processed events
+    if (svixId && !(await this.dedup('clerk', svixId, event.type))) {
+      return { ok: true };
+    }
 
     if (event.type === 'user.created') {
       const d = event.data;
@@ -85,6 +105,12 @@ export class InfraController {
     const stripeConfig = this.config.get('stripe', { infer: true })!;
     const rawBody = req.rawBody ?? Buffer.from('');
     const event = this.stripe.webhooks.constructEvent(rawBody, sig, stripeConfig.webhookSecret);
+
+    // Idempotency: skip already-processed events
+    if (!(await this.dedup('stripe', event.id, event.type))) {
+      return { ok: true };
+    }
+
     await this.billingService.handleStripeEvent(
       event as unknown as Parameters<typeof this.billingService.handleStripeEvent>[0],
     );

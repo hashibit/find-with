@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
@@ -14,6 +14,12 @@ class CreateCheckoutDto extends createZodDto(
 ) {}
 
 class CreatePortalDto extends createZodDto(z.object({ returnUrl: z.string() })) {}
+
+class FinalizeCheckoutDto extends createZodDto(
+  z.object({
+    sessionId: z.string(),
+  }),
+) {}
 
 @ApiTags('billing')
 @ApiBearerAuth()
@@ -38,9 +44,21 @@ export class BillingController {
     );
   }
 
+  @Post('checkout/finalize')
+  @ApiOperation({ summary: 'Finalize checkout session after Stripe redirect' })
+  async finalize(@CurrentUser() user: AuthenticatedUser, @Body() dto: FinalizeCheckoutDto) {
+    return this.service.finalizeCheckout(user.userId, dto.sessionId);
+  }
+
   @Post('portal')
   @ApiOperation({ summary: 'Create Stripe billing portal session' })
   async portal(@CurrentUser() user: AuthenticatedUser, @Body() dto: CreatePortalDto) {
     return this.service.createPortalSession(user.userId, dto.returnUrl);
+  }
+
+  @Post('resume')
+  @ApiOperation({ summary: 'Resume a paused subscription' })
+  async resume(@CurrentUser() user: AuthenticatedUser) {
+    return this.service.resumeSubscription(user.userId);
   }
 }

@@ -5,6 +5,7 @@ import { UserAuthGuard } from './common/guards/user-auth.guard.js';
 import { BullModule } from '@nestjs/bullmq';
 import { LoggerModule } from 'nestjs-pino';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { ScheduleModule } from '@nestjs/schedule';
 import { AppConfigModule } from './config/config.module.js';
 import { DatabaseModule } from './database/database.module.js';
 import { RedisModule } from './redis/redis.module.js';
@@ -29,6 +30,7 @@ import { type AppConfig } from './config/configuration.js';
     DatabaseModule,
     RedisModule,
     LlmModule,
+    ScheduleModule.forRoot(),
     LoggerModule.forRoot({
       pinoHttp: {
         transport: process.env.NODE_ENV !== 'production' ? { target: 'pino-pretty' } : undefined,

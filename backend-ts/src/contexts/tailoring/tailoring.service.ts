@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, UnprocessableEntityException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { InjectQueue } from '@nestjs/bullmq';
@@ -40,10 +40,13 @@ export class TailoringService {
     tailoredResumeId: string,
     bulletId: string,
     newText: string,
+    // kind is accepted for forward-compatibility; both 'direct' and 'natural_request'
+    // perform direct replacement in v0.1 — LLM-mediated editing is a future TODO.
+    _kind: 'direct' | 'natural_request' = 'direct',
   ): Promise<TailoringResume> {
     const resume = await this.findOne(userId, tailoredResumeId);
     const sections = (resume.sections ?? []) as Array<{
-      bullets: Array<{ id: string; text: string; source: string }>;
+      bullets: Array<{ id: string; text: string; source: string; status?: string }>;
     }>;
 
     let updated = false;
@@ -52,6 +55,7 @@ export class TailoringService {
         if (bullet.id === bulletId) {
           bullet.text = newText;
           bullet.source = 'USER_EDITED';
+          (bullet as Record<string, unknown>).status = 'USER_EDITED';
           updated = true;
         }
       }
@@ -63,21 +67,86 @@ export class TailoringService {
   }
 
   /**
+   * Shared type for resume sections with bullet status.
+   */
+  private getSections(resume: TailoringResume) {
+    return (resume.sections ?? []) as Array<{
+      title: string;
+      bullets: Array<{ id: string; text: string; status: string }>;
+    }>;
+  }
+
+  /**
+   * Guard: throws 422 if any bullet is still in PENDING state.
+   */
+  private assertNoPendingBullets(
+    sections: Array<{ title: string; bullets: Array<{ id: string; text: string; status: string }> }>,
+  ): void {
+    const pendingBulletIds = sections.flatMap((s) =>
+      s.bullets.filter((b) => b.status === 'PENDING').map((b) => b.id),
+    );
+    if (pendingBulletIds.length > 0) {
+      throw new UnprocessableEntityException({
+        message: 'Resume has unconfirmed bullets that must be resolved before export',
+        pendingBulletIds,
+      });
+    }
+  }
+
+  /**
+   * Build plain-text resume content from sections.
+   */
+  private buildPlainText(
+    sections: Array<{ title: string; bullets: Array<{ text: string }> }>,
+  ): string {
+    return sections
+      .map((s) => `${s.title}\n${s.bullets.map((b) => `• ${b.text}`).join('\n')}`)
+      .join('\n\n');
+  }
+
+  /**
    * Export consumes quota (not creation). §quota: consume_on_export.
    */
   async exportPlainText(userId: string, tailoredResumeId: string): Promise<string> {
     const resume = await this.findOne(userId, tailoredResumeId);
+    const sections = this.getSections(resume);
+
+    // Guard: reject if any bullets are still PENDING
+    this.assertNoPendingBullets(sections);
 
     // Consume quota slot (idempotent on retry)
     await this.quota.consumeOnExport(userId, tailoredResumeId);
 
-    const sections = (resume.sections ?? []) as Array<{
-      title: string;
-      bullets: Array<{ text: string }>;
-    }>;
+    return this.buildPlainText(sections);
+  }
 
-    return sections
-      .map((s) => `${s.title}\n${s.bullets.map((b) => `• ${b.text}`).join('\n')}`)
-      .join('\n\n');
+  /**
+   * Unified export method used by POST :id/exports.
+   * fmt='pdf' returns a text/plain download for now.
+   * TODO: replace with actual PDF generation (add pdf-lib to dependencies).
+   */
+  async exportResume(
+    userId: string,
+    tailoredResumeId: string,
+    fmt: string | undefined,
+  ): Promise<{ content: string; filename: string; contentType: string }> {
+    const resume = await this.findOne(userId, tailoredResumeId);
+    const sections = this.getSections(resume);
+
+    // Guard: reject if any bullets are still PENDING
+    this.assertNoPendingBullets(sections);
+
+    // Consume quota slot (idempotent on retry)
+    await this.quota.consumeOnExport(userId, tailoredResumeId);
+
+    const content = this.buildPlainText(sections);
+
+    // TODO: When pdf-lib is added, branch on fmt === 'pdf' to return a real PDF Buffer.
+    // For v0.1 both fmt values return plain text with a .txt filename.
+    return {
+      content,
+      contentType: 'text/plain; charset=utf-8',
+      filename: 'resume.txt',
+    };
   }
 }

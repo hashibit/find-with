@@ -1,14 +1,18 @@
 import { randomBytes } from 'crypto';
-import { Body, Controller, Get, Patch, Post, BadRequestException } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Patch, Post, BadRequestException, Inject, NotFoundException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 import { CurrentUser, type AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { IamService } from './iam.service.js';
 import { AUTH_VERIFIER, type AuthVerifier } from '../../adapters/auth/auth.interface.js';
-import { Inject } from '@nestjs/common';
 import { NonceStore } from './services/nonce.store.js';
+import { AccountPurgeSagaService } from './services/account-purge-saga.service.js';
 import { RedisService } from '../../redis/redis.module.js';
+import { BillingSubscription } from '../../database/entities/billing/subscription.entity.js';
+import { QuotaUsageCounter } from '../../database/entities/quota/quota-counter.entity.js';
 
 const SESSION_TTL_SECONDS = 86400; // 24 hours
 
@@ -61,7 +65,12 @@ export class IamController {
     private readonly service: IamService,
     @Inject(AUTH_VERIFIER) private readonly authVerifier: AuthVerifier,
     private readonly nonceStore: NonceStore,
+    private readonly purgeSaga: AccountPurgeSagaService,
     private readonly redisService: RedisService,
+    @InjectRepository(BillingSubscription)
+    private readonly billingRepo: Repository<BillingSubscription>,
+    @InjectRepository(QuotaUsageCounter)
+    private readonly quotaRepo: Repository<QuotaUsageCounter>,
   ) {}
 
   @Post('me')
@@ -74,6 +83,31 @@ export class IamController {
   @ApiOperation({ summary: 'Get current user' })
   async me(@CurrentUser() user: AuthenticatedUser) {
     return this.service.findByClerkId(user.userId);
+  }
+
+  @Get('me/entitlements')
+  @ApiOperation({ summary: 'Get current user entitlements and quota' })
+  async entitlements(@CurrentUser() user: AuthenticatedUser) {
+    const iamUser = await this.service.findByClerkId(user.userId);
+
+    const sub = await this.billingRepo.findOne({ where: { userId: iamUser.id } });
+    if (!sub) throw new NotFoundException('No subscription record found');
+
+    const quota = await this.quotaRepo.findOne({ where: { userId: iamUser.id } });
+
+    const tailoringLimit = quota?.tailoringLimit ?? 3;
+    const tailoringCompleted = quota?.tailoringCompleted ?? 0;
+    const remaining = Math.max(0, tailoringLimit - tailoringCompleted);
+
+    return {
+      tier: sub.tier,
+      state: sub.state,
+      quota: {
+        tailoringLimit,
+        tailoringCompleted,
+        remaining,
+      },
+    };
   }
 
   @Get('settings')
@@ -106,6 +140,21 @@ export class IamController {
     await this.redisService.client.setex(`session:${token}`, SESSION_TTL_SECONDS, userId);
 
     return { token, expires_at: expiresAt, user_id: userId };
+  }
+
+  @Delete('account')
+  @ApiOperation({ summary: 'Initiate account deletion (24h grace period)' })
+  async deleteAccount(@CurrentUser() user: AuthenticatedUser) {
+    const iamUser = await this.service.findByClerkId(user.userId);
+    return this.purgeSaga.initiate(iamUser.id);
+  }
+
+  @Post('account/cancel-deletion')
+  @ApiOperation({ summary: 'Cancel pending account deletion if within grace period' })
+  async cancelDeletion(@CurrentUser() user: AuthenticatedUser) {
+    const iamUser = await this.service.findByClerkId(user.userId);
+    await this.purgeSaga.cancelDeletion(iamUser.id);
+    return { ok: true };
   }
 
   @Post('auth/verify')

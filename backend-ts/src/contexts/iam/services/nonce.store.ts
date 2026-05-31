@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { RedisService } from '../../redis/redis.module.js';
+import { RedisService } from '../../../redis/redis.module.js';
 
 /**
  * NonceStore provides Redis-based nonce validation with TTL.

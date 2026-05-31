@@ -1,0 +1,26 @@
+services:
+  postgres-test:
+    image: pgvector/pgvector:pg15
+    ports:
+      - '5433:5432'
+    environment:
+      POSTGRES_USER: findwith_test
+      POSTGRES_PASSWORD: findwith_test
+      POSTGRES_DB: findwith_test
+    # No volume — ephemeral, wiped on down
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U findwith_test']
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  redis-test:
+    image: redis:7-alpine
+    ports:
+      - '6380:6379'
+    command: redis-server --save "" --appendonly no
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 5

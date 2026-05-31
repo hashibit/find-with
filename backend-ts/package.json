@@ -15,6 +15,7 @@
     "test:watch": "vitest",
     "test:cov": "vitest run --coverage",
     "test:int": "vitest run --config test/vitest.integration.config.ts",
+    "test:int:migrate": "dotenv -e .env.test -- pnpm run typeorm migration:run -d src/database/data-source.ts",
     "typeorm": "tsx ./node_modules/typeorm/cli.js",
     "migration:generate": "sh -c 'tsx ./node_modules/typeorm/cli.js migration:generate -d src/database/data-source.ts \"$1\" && sed -i \"\" \"s/import { MigrationInterface, QueryRunner }/import { type MigrationInterface, type QueryRunner }/\" src/database/migrations/*.ts' --",
     "migration:run": "pnpm run typeorm migration:run -d src/database/data-source.ts",

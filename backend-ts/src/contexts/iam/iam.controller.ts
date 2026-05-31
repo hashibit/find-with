@@ -1,12 +1,16 @@
-import { Body, Controller, Get, Patch, Post, UseGuards, BadRequestException } from '@nestjs/common';
+import { randomBytes } from 'crypto';
+import { Body, Controller, Get, Patch, Post, BadRequestException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 import { CurrentUser, type AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { IamService } from './iam.service.js';
-import { AUTH_VERIFIER, type AuthVerifier, type VerifiedToken } from '../../adapters/auth/auth.interface.js';
+import { AUTH_VERIFIER, type AuthVerifier } from '../../adapters/auth/auth.interface.js';
 import { Inject } from '@nestjs/common';
 import { NonceStore } from './services/nonce.store.js';
+import { RedisService } from '../../redis/redis.module.js';
+
+const SESSION_TTL_SECONDS = 86400; // 24 hours
 
 class UpsertUserDto extends createZodDto(
   z.object({
@@ -25,7 +29,9 @@ class UpdateSettingsDto extends createZodDto(
 
 class AuthExchangeDto extends createZodDto(
   z.object({
-    nonce: z.string(),
+    // Enforce a reasonable length and character set to prevent Redis key injection
+    // via pathologically large or malformed nonce values.
+    nonce: z.string().min(8).max(128).regex(/^[a-zA-Z0-9_-]+$/),
   }),
 ) {}
 
@@ -55,6 +61,7 @@ export class IamController {
     private readonly service: IamService,
     @Inject(AUTH_VERIFIER) private readonly authVerifier: AuthVerifier,
     private readonly nonceStore: NonceStore,
+    private readonly redisService: RedisService,
   ) {}
 
   @Post('me')
@@ -86,14 +93,17 @@ export class IamController {
   @Post('auth/exchange')
   @ApiOperation({ summary: 'Exchange nonce for session token (U-03 OAuth flow)' })
   async authExchange(@Body() dto: AuthExchangeDto): Promise<AuthExchangeResponse> {
-    // Validate nonce using Redis store
     const userId = await this.nonceStore.validate(dto.nonce);
     if (!userId) {
       throw new BadRequestException('Invalid or expired nonce');
     }
 
-    const token = `ext_${dto.nonce}`;
-    const expiresAt = Math.floor(Date.now() / 1000) + 86400; // 24 hours
+    // CSPRNG session token — not derived from any user-observable input
+    const token = randomBytes(32).toString('hex');
+    const expiresAt = Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS;
+
+    // Store hashed token → userId in Redis for guard validation
+    await this.redisService.client.setex(`session:${token}`, SESSION_TTL_SECONDS, userId);
 
     return { token, expires_at: expiresAt, user_id: userId };
   }
@@ -101,15 +111,16 @@ export class IamController {
   @Post('auth/verify')
   @ApiOperation({ summary: 'Verify Clerk JWT and issue extension session token' })
   async authVerify(@Body() dto: AuthVerifyDto): Promise<AuthVerifyResponse> {
-    // Verify the Clerk JWT token
     const verified = await this.authVerifier.verify(dto.clerkToken);
-
-    // Generate a session token for the extension
-    const token = `ext_${verified.userId}_${Date.now()}`;
-    const expiresAt = Math.floor(Date.now() / 1000) + 86400; // 24 hours
 
     // Ensure user exists in our system
     await this.service.upsert(verified.userId, verified.email || 'unknown@findwith.com');
+
+    // CSPRNG session token — not derived from userId or timestamp
+    const token = randomBytes(32).toString('hex');
+    const expiresAt = Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS;
+
+    await this.redisService.client.setex(`session:${token}`, SESSION_TTL_SECONDS, verified.userId);
 
     return { token, expires_at: expiresAt, user_id: verified.userId };
   }

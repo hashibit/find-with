@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { IsNull, Repository } from 'typeorm';
 import { ulid } from 'ulid';
 
 import { OutboxEvent } from '../../database/entities/outbox/outbox-event.entity.js';
@@ -35,7 +35,7 @@ export class OutboxPublisher {
       UPDATE outbox_events
       SET "dispatchedAt" = NOW()
       WHERE id IN (SELECT id FROM locked)
-      RETURNING outbox_events.id, event_type, payload, "consumerGroup"
+      RETURNING outbox_events.id, event_type AS "eventType", payload, "consumerGroup"
     `;
 
     const result = await this.outboxRepo.query(query, [consumerGroup, limit]);
@@ -105,7 +105,7 @@ export class OutboxPublisher {
    */
   async countPending(consumerGroup: string): Promise<number> {
     return this.outboxRepo.count({
-      where: { consumerGroup, dispatchedAt: undefined },
+      where: { consumerGroup, dispatchedAt: IsNull() },
     });
   }
 

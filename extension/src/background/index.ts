@@ -25,7 +25,9 @@ chrome.runtime.onMessageExternal.addListener((msg, sender, sendResponse) => {
   }
 
   if (msg.type === 'AUTH_TOKEN') {
-    handleAuthToken(msg.token).then(sendResponse);
+    // expires_at and user_id come from the API response relayed by the website.
+    // The token string itself is opaque (CSPRNG) and carries no parseable fields.
+    handleAuthToken(msg.token, msg.expires_at, msg.user_id).then(sendResponse);
     return true;
   }
 

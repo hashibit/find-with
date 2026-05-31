@@ -1,5 +1,5 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
-import { Logger, Inject, BadRequestException } from '@nestjs/common';
+import { Logger, Inject } from '@nestjs/common';
 import { Job } from 'bullmq';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -143,13 +143,6 @@ Rules:
         title: (section.title as string) ?? 'Work Experience',
         bullets,
       });
-    }
-
-    // Add ULIDs to bullets that don't have them (defensive, should already be done above)
-    for (const section of validatedSections) {
-      for (const bullet of section.bullets) {
-        if (!bullet.id) bullet.id = ulid();
-      }
     }
 
     tailored.sections = validatedSections;

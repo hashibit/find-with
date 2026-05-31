@@ -99,7 +99,7 @@ export function Radar() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {radarItems.length === 0 ? (
           <div style={{ textAlign: 'center', padding: 40, color: '#9ca3af' }}>
-            <div style={{ fontSize: 24, marginBottom: 8 }}>_empty_state_</div>
+            <div style={{ fontSize: 32, marginBottom: 8 }}>○</div>
             <div style={{ fontSize: 14 }}>No jobs yet. Browse LinkedIn and click "Ask Quinn"</div>
           </div>
         ) : (

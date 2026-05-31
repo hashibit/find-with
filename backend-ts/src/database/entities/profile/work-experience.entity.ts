@@ -22,6 +22,18 @@ export class ProfileWorkExperience extends BaseEntity {
   @Column({ type: 'varchar', length: 7, nullable: true })
   end: string | null;
 
+  // Explicit current-job flag. Using end === null is unreliable because end may be
+  // null when the date is simply unknown rather than because the role is ongoing.
+  @Column({ type: 'boolean', default: false })
+  isCurrent: boolean;
+
+  @Column({ type: 'boolean', nullable: true })
+  isRemote: boolean | null;
+
+  // FULL_TIME | PART_TIME | CONTRACT | INTERNSHIP | FREELANCE
+  @Column({ type: 'varchar', length: 20, nullable: true })
+  employmentType: string | null;
+
   @Column({ type: 'jsonb', nullable: true })
   bullets: string[] | null;
 

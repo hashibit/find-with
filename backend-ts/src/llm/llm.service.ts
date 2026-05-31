@@ -58,11 +58,10 @@ export class LlmService implements LlmProvider {
   }
 
   async ready(): Promise<void> {
-    // Basic health check: try to ping OpenAI embeddings
-    try {
-      await this.embed('health check');
-    } catch (error) {
-      throw new Error(`LLM provider unavailable: ${error instanceof Error ? error.message : 'unknown'}`);
+    // Lightweight check: verify the API key is configured without making a live API call.
+    // A real embedding call on every /health poll generates constant paid API traffic.
+    if (!process.env.OPENAI_API_KEY) {
+      throw new Error('OPENAI_API_KEY is not configured');
     }
   }
 

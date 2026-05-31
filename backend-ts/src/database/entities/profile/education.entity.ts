@@ -22,6 +22,11 @@ export class ProfileEducation extends BaseEntity {
   @Column({ type: 'varchar', length: 7, nullable: true })
   end: string | null;
 
+  // Whether the student is currently enrolled. end === null is ambiguous
+  // (could be graduated with unknown date, or simply not yet filled in).
+  @Column({ type: 'boolean', default: false })
+  isCurrentlyEnrolled: boolean;
+
   @Column({ type: 'varchar', length: 10, nullable: true })
   gpa: string | null;
 

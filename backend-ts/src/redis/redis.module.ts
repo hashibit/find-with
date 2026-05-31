@@ -11,12 +11,12 @@ export const REDIS_CLIENT = Symbol('REDIS_CLIENT');
  */
 @Injectable()
 export class RedisService {
-  constructor(@Inject(REDIS_CLIENT) private readonly redis: any) {}
+  constructor(@Inject(REDIS_CLIENT) private readonly redis: Redis) {}
 
   /**
    * Get the underlying Redis client.
    */
-  get client(): any {
+  get client(): Redis {
     return this.redis;
   }
 

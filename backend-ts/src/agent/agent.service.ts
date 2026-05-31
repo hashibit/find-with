@@ -1,7 +1,7 @@
 import { Injectable, Logger, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Observable, Subject, timeout } from 'rxjs';
+import { Observable, Subject } from 'rxjs';
 import {
   type AssistantMessage,
   type Context,
@@ -270,18 +270,6 @@ export class AgentService {
     const executor = this.toolMap.get(toolName);
     if (!executor) return { ok: false, data: {}, error: `Unknown tool: ${toolName}` };
 
-    // Create pending tool result record for long-running tools
-    const pendingResult = this.pendingToolRepo.create({
-      id: ulid(),
-      conversationId: ctx.conversationId,
-      toolName,
-      toolCallId: callId,
-      result: null,
-      error: null,
-      acknowledged: false,
-    });
-    await this.pendingToolRepo.save(pendingResult);
-
     try {
       // Execute with 90s timeout
       const result = await Promise.race([
@@ -293,22 +281,36 @@ export class AgentService {
       const text = result.content.map((c) => c.text).join('\n');
       const successResult = { ok: true, data: { text, ...result.details }, error: '' };
 
-      // Mark as acknowledged and update result
-      await this.pendingToolRepo.update(pendingResult.id, {
-        acknowledged: true,
-        result: successResult.data,
-      });
+      // Persist asynchronously — off the hot path so tool latency is not inflated
+      // by synchronous DB round-trips. Tool results are also persisted to conv_messages.
+      void this.pendingToolRepo.save(
+        this.pendingToolRepo.create({
+          id: ulid(),
+          conversationId: ctx.conversationId,
+          toolName,
+          toolCallId: callId,
+          result: successResult.data,
+          error: null,
+          acknowledged: true,
+        }),
+      );
 
       return successResult;
     } catch (err) {
       this.logger.error(`Tool ${toolName} failed`, err);
       const errorResult = { ok: false, data: {}, error: String(err) };
 
-      // Update pending result with error
-      await this.pendingToolRepo.update(pendingResult.id, {
-        acknowledged: true,
-        error: { message: errorResult.error },
-      });
+      void this.pendingToolRepo.save(
+        this.pendingToolRepo.create({
+          id: ulid(),
+          conversationId: ctx.conversationId,
+          toolName,
+          toolCallId: callId,
+          result: null,
+          error: { message: errorResult.error },
+          acknowledged: true,
+        }),
+      );
 
       return errorResult;
     }

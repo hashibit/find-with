@@ -13,6 +13,10 @@ import { MaterialManager } from '../profile/material-manager.service.js';
 import { JOB_ANALYZE_QUEUE } from './jobs.service.js';
 import { ulid } from 'ulid';
 
+// Number of top-scoring materials to use for deep match scoring.
+// Larger values pull in more context but dilute the signal from the closest matches.
+const TOP_K = 8;
+
 @Processor(JOB_ANALYZE_QUEUE)
 export class JobsProcessor extends WorkerHost {
   private readonly logger = new Logger(JobsProcessor.name);
@@ -160,35 +164,23 @@ Return JSON:
       let deepHits: string[] = [];
 
       if (jdEmbedding && materials.some((m) => m.embedding && m.embedding.length > 0)) {
-        // Compute cosine similarity between JD embedding and each material's embedding
-        const cosineSimilarity = (a: number[], b: number[]): number => {
-          let dot = 0;
-          let normA = 0;
-          let normB = 0;
-          for (let i = 0; i < a.length; i++) {
-            dot += a[i]! * b[i]!;
-            normA += a[i]! * a[i]!;
-            normB += b[i]! * b[i]!;
-          }
-          if (normA === 0 || normB === 0) return 0;
-          return dot / (Math.sqrt(normA) * Math.sqrt(normB));
-        };
-
         // Score each material by its similarity to JD
         const materialScores = materials
           .filter((m) => m.embedding && m.embedding.length > 0)
           .map((m) => ({
             material: m,
-            score: cosineSimilarity(jdEmbedding, m.embedding!),
+            score: this.cosineSimilarity(jdEmbedding, m.embedding!),
             text: (m.shiningText ?? '') + ' ' + (m.tags ?? []).join(' '),
           }))
           .sort((a, b) => b.score - a.score);
 
-        // Deep score: average of top-k material similarities (scaled to 0-100)
-        const topK = materialScores.slice(0, 8);
+        // Deep score: average of top-k material similarities (scaled to 0-100).
+        // Cosine similarity is in [-1, 1]; clamp to 0 so negative values
+        // (semantically dissimilar materials) don't produce meaningless negative scores.
+        const topK = materialScores.slice(0, TOP_K);
         if (topK.length > 0) {
           const avgSimilarity = topK.reduce((sum, m) => sum + m.score, 0) / topK.length;
-          deepScore = Math.round(avgSimilarity * 100);
+          deepScore = Math.max(0, Math.round(avgSimilarity * 100));
         }
 
         // Deep hits: skills that appear in top materials (still uses keywords for interpretability)
@@ -239,5 +231,18 @@ Return JSON:
     this.logger.log(
       `Job analyzed: ${parsedJd.title} @ ${parsedJd.company} (surface=${matchResult.surfaceScore}%)`,
     );
+  }
+
+  private cosineSimilarity(a: number[], b: number[]): number {
+    let dot = 0;
+    let normA = 0;
+    let normB = 0;
+    for (let i = 0; i < a.length; i++) {
+      dot += a[i]! * b[i]!;
+      normA += a[i]! * a[i]!;
+      normB += b[i]! * b[i]!;
+    }
+    if (normA === 0 || normB === 0) return 0;
+    return dot / (Math.sqrt(normA) * Math.sqrt(normB));
   }
 }

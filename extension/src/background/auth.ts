@@ -4,7 +4,8 @@ export async function getToken(): Promise<string | null> {
   const data = await chrome.storage.local.get(['token', 'expires_at']);
   if (!data.token) return null;
 
-  // Check expiry (with 5min buffer for proactive refresh)
+  // Check expiry (with 5min buffer for proactive refresh).
+  // expires_at is stored in Unix seconds; Date.now() / 1000 converts to the same unit.
   if (data.expires_at && Date.now() / 1000 > data.expires_at - 300) {
     // Token expiring soon — request refresh from Side Panel
     // (SW can't refresh Clerk token directly; needs DOM context)
@@ -16,25 +17,17 @@ export async function getToken(): Promise<string | null> {
   return data.token;
 }
 
-export async function handleAuthToken(token: string): Promise<{ ok: boolean }> {
+/**
+ * Store an extension session token received from the website.
+ * The caller (website) is responsible for providing expires_at (Unix seconds)
+ * and user_id from the API response — do NOT re-derive these from the token string.
+ */
+export async function handleAuthToken(
+  token: string,
+  expiresAt: number,
+  userId: string,
+): Promise<{ ok: boolean }> {
   try {
-    // Parse the token to extract user_id and expires_at
-    // Token format: ext_<userId>_<timestamp>
-    const parts = token.split('_');
-    if (parts.length < 3) {
-      return { ok: false };
-    }
-
-    // Extract timestamp (last part) and calculate expiry
-    const timestamp = parseInt(parts[parts.length - 1], 10);
-    const userId = parts[1];
-    const expiresAt = timestamp + 86400; // 24 hours
-
-    if (isNaN(timestamp)) {
-      return { ok: false };
-    }
-
-    // Store token and user info in chrome storage
     await chrome.storage.local.set({
       token,
       expires_at: expiresAt,

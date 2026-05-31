@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { BullModule } from '@nestjs/bullmq';
 import { JobsController } from './jobs.controller.js';
+import { SelectorsController } from './selectors.controller.js';
 import { JobsService, JOB_ANALYZE_QUEUE } from './jobs.service.js';
 import { JobsProcessor } from './jobs.processor.js';
 import { JobCapture } from '../../database/entities/jobs/job-capture.entity.js';
@@ -23,7 +24,7 @@ import { ProfileModule } from '../profile/profile.module.js';
     BullModule.registerQueue({ name: JOB_ANALYZE_QUEUE }),
     ProfileModule,
   ],
-  controllers: [JobsController],
+  controllers: [JobsController, SelectorsController],
   providers: [JobsService, JobsProcessor],
   exports: [JobsService],
 })

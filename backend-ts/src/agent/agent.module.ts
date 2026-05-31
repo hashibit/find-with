@@ -11,6 +11,8 @@ import { ClassifyEmailTool } from './tools/classify-email.tool.js';
 import { DraftReplyTool } from './tools/draft-reply.tool.js';
 import { SetConversationDensityTool } from './tools/set-conversation-density.tool.js';
 import { FarewellTool } from './tools/farewell.tool.js';
+import { RecomputeMatchTool } from './tools/recompute-match.tool.js';
+import { JobMatchResult } from '../database/entities/jobs/match-result.entity.js';
 import { ConvMessage } from '../database/entities/conversation/message.entity.js';
 import { ConvConversation } from '../database/entities/conversation/conversation.entity.js';
 import { ConvRollingSummary } from '../database/entities/conversation/rolling-summary.entity.js';
@@ -40,6 +42,7 @@ import { type AppConfig } from '../config/configuration.js';
       JobCompanyBrief,
       JobParsedJd,
       JobRadarItem,
+      JobMatchResult,
       FollowupEmail,
       FollowupDraft,
       UserGoalMemory,
@@ -65,6 +68,7 @@ import { type AppConfig } from '../config/configuration.js';
     DraftReplyTool,
     SetConversationDensityTool,
     FarewellTool,
+    RecomputeMatchTool,
   ],
   exports: [AgentService, ContextBuilderService],
 })

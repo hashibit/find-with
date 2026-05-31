@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, Res } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, Patch, Post, Query, Res } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
@@ -17,6 +17,12 @@ class EditBulletDto extends createZodDto(
   z.object({
     text: z.string(),
     kind: z.enum(['direct', 'natural_request']).default('direct').optional(),
+  }),
+) {}
+
+class ReApplyMaterialDto extends createZodDto(
+  z.object({
+    materialId: z.string(),
   }),
 ) {}
 
@@ -47,6 +53,18 @@ export class TailoringController {
     @Body() dto: EditBulletDto,
   ) {
     return this.service.editBullet(user.userId, id, bulletId, dto.text, dto.kind);
+  }
+
+  @Post(':id/bullets/:bulletId/source')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Bind a confirmed material to a pending bullet' })
+  async reApplyMaterial(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Param('bulletId') bulletId: string,
+    @Body() dto: ReApplyMaterialDto,
+  ) {
+    return this.service.reApplyMaterial(user.userId, id, bulletId, dto.materialId);
   }
 
   @Get(':id/export')

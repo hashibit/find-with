@@ -1,10 +1,11 @@
-import { Injectable, NotFoundException, ForbiddenException, UnprocessableEntityException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, UnprocessableEntityException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { TailoringResume } from '../../database/entities/tailoring/tailoring-resume.entity.js';
 import { TailoringSnapshot } from '../../database/entities/tailoring/tailoring-snapshot.entity.js';
+import { ProfileMaterial } from '../../database/entities/profile/material.entity.js';
 import { QuotaService } from '../quota/quota.service.js';
 import { ulid } from 'ulid';
 
@@ -17,6 +18,8 @@ export class TailoringService {
     private readonly resumeRepo: Repository<TailoringResume>,
     @InjectRepository(TailoringSnapshot)
     private readonly snapshotRepo: Repository<TailoringSnapshot>,
+    @InjectRepository(ProfileMaterial)
+    private readonly materialRepo: Repository<ProfileMaterial>,
     private readonly quota: QuotaService,
     @InjectQueue(TAILORING_QUEUE) private readonly queue: Queue,
   ) {}
@@ -56,6 +59,42 @@ export class TailoringService {
           bullet.text = newText;
           bullet.source = 'USER_EDITED';
           (bullet as Record<string, unknown>).status = 'USER_EDITED';
+          updated = true;
+        }
+      }
+    }
+
+    if (!updated) throw new NotFoundException('Bullet not found');
+    resume.sections = sections;
+    return this.resumeRepo.save(resume);
+  }
+
+  async reApplyMaterial(
+    userId: string,
+    tailoredResumeId: string,
+    bulletId: string,
+    materialId: string,
+  ): Promise<TailoringResume> {
+    const resume = await this.findOne(userId, tailoredResumeId);
+
+    const material = await this.materialRepo.findOne({ where: { id: materialId } });
+    if (!material || material.userId !== userId) {
+      throw new NotFoundException('Material not found');
+    }
+    if (material.status !== 'CONFIRMED' && material.status !== 'USER_EDITED') {
+      throw new BadRequestException('Material not confirmed');
+    }
+
+    const sections = (resume.sections ?? []) as Array<{
+      bullets: Array<{ id: string; text: string; sourceId?: string; status?: string }>;
+    }>;
+
+    let updated = false;
+    for (const section of sections) {
+      for (const bullet of section.bullets) {
+        if (bullet.id === bulletId) {
+          bullet.sourceId = materialId;
+          bullet.status = 'CONFIRMED';
           updated = true;
         }
       }

@@ -8,12 +8,13 @@ import { TailoringResume } from '../../database/entities/tailoring/tailoring-res
 import { TailoringSnapshot } from '../../database/entities/tailoring/tailoring-snapshot.entity.js';
 import { JobParsedJd } from '../../database/entities/jobs/parsed-jd.entity.js';
 import { ProfileBaseResume } from '../../database/entities/profile/base-resume.entity.js';
+import { ProfileMaterial } from '../../database/entities/profile/material.entity.js';
 import { QuotaModule } from '../quota/quota.module.js';
 import { ProfileModule } from '../profile/profile.module.js';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([TailoringResume, TailoringSnapshot, JobParsedJd, ProfileBaseResume]),
+    TypeOrmModule.forFeature([TailoringResume, TailoringSnapshot, JobParsedJd, ProfileBaseResume, ProfileMaterial]),
     BullModule.registerQueue({ name: TAILORING_QUEUE }),
     QuotaModule,
     ProfileModule,

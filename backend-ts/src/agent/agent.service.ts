@@ -14,6 +14,7 @@ import { Queue } from 'bullmq';
 import { ConvMessage } from '../database/entities/conversation/message.entity.js';
 import { ConvConversation } from '../database/entities/conversation/conversation.entity.js';
 import { LLM_PROVIDER, type LlmProvider } from '../llm/llm-provider.interface.js';
+import { FIELD_CRYPTO, type FieldCrypto } from '../common/crypto/crypto.interface.js';
 import { ContextBuilderService } from './context-builder.service.js';
 import { SearchCompanyTool } from './tools/search-company.tool.js';
 import { MineShiningPointTool } from './tools/mine-shining-point.tool.js';
@@ -73,6 +74,7 @@ export class AgentService {
     @InjectRepository(ConvConversation) private readonly convRepo: Repository<ConvConversation>,
     @InjectRepository(PendingToolResult) private readonly pendingToolRepo: Repository<PendingToolResult>,
     @Inject(LLM_PROVIDER) private readonly llm: LlmProvider,
+    @Inject(FIELD_CRYPTO) private readonly fieldCrypto: FieldCrypto,
     @InjectQueue(MEMORY_QUEUE) private readonly memoryQueue: Queue<MemoryJobData>,
     private readonly contextBuilder: ContextBuilderService,
     private readonly searchCompanyTool: SearchCompanyTool,
@@ -128,9 +130,16 @@ export class AgentService {
     const toolCtx: ToolContext = { userId, conversationId };
 
     try {
-      // 1. Persist user message
+      // 1. Persist user message — text is encrypted at rest (U-10)
+      const encryptedUserText = await this.fieldCrypto.encrypt(userMessage);
       await this.messageRepo.save(
-        this.messageRepo.create({ id: ulid(), conversationId, role: 'USER', text: userMessage }),
+        this.messageRepo.create({
+          id: ulid(),
+          conversationId,
+          role: 'USER',
+          text: null,
+          encryptedText: encryptedUserText,
+        }),
       );
 
       // 2. Build pi-ai Context (system prompt + history)
@@ -188,13 +197,17 @@ export class AgentService {
           .map((b) => b.text)
           .join('');
 
-        // 3. Persist assistant message with full payload
+        // 3. Persist assistant message with full payload — text encrypted at rest (U-10)
+        const encryptedAssistantText = fullText
+          ? await this.fieldCrypto.encrypt(fullText)
+          : null;
         await this.messageRepo.save(
           this.messageRepo.create({
             id: ulid(),
             conversationId,
             role: 'ASSISTANT',
-            text: fullText || null,
+            text: null,
+            encryptedText: encryptedAssistantText,
             payload: finalMessage,
           }),
         );

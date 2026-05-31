@@ -20,11 +20,26 @@ import { DevAuthAdapter } from '../../adapters/auth/dev-auth.adapter.js';
 import { NonceStore } from './services/nonce.store.js';
 import { AccountPurgeSagaService } from './services/account-purge-saga.service.js';
 import { AccountPurgeSaga } from '../../database/entities/iam/account-purge-saga.entity.js';
+import { ProfileProfile } from '../../database/entities/profile/profile.entity.js';
+import { ProfileMaterial } from '../../database/entities/profile/material.entity.js';
+import { JobRadarItem } from '../../database/entities/jobs/radar-item.entity.js';
+import { ConvConversation } from '../../database/entities/conversation/conversation.entity.js';
 import { RedisModule } from '../../redis/redis.module.js';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([IamUser, IamSettings, IamWebhookEvent, AccountPurgeSaga, BillingSubscription, QuotaUsageCounter]),
+    TypeOrmModule.forFeature([
+      IamUser,
+      IamSettings,
+      IamWebhookEvent,
+      AccountPurgeSaga,
+      BillingSubscription,
+      QuotaUsageCounter,
+      ProfileProfile,
+      ProfileMaterial,
+      JobRadarItem,
+      ConvConversation,
+    ]),
     RedisModule,
   ],
   controllers: [IamController, BillingController],

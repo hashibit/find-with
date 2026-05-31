@@ -6,9 +6,26 @@ import { openSseStream } from './sse';
 // Open Side Panel on action click
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
 
+// Port connections (SW ↔ Side Panel) — declared early so handlers below can reference it
+const connectedPorts: Set<chrome.runtime.Port> = new Set();
+
+chrome.runtime.onConnect.addListener((port) => {
+  connectedPorts.add(port);
+  port.onDisconnect.addListener(() => connectedPorts.delete(port));
+
+  port.onMessage.addListener(async (msg) => {
+    if (msg.type === 'REQ_REFRESH_TOKEN') {
+      // Side Panel has refreshed token via Clerk
+      if (msg.token) {
+        await chrome.storage.local.set({ token: msg.token, expires_at: msg.expires_at });
+      }
+    }
+  });
+});
+
 // Message handler: content scripts → SW
 chrome.runtime.onMessage.addListener((msg: BgMsg, sender, sendResponse) => {
-  handleMessage(msg, sender).then(sendResponse);
+  handleMessage(msg, sender, connectedPorts).then(sendResponse);
   return true; // async
 });
 
@@ -40,10 +57,15 @@ chrome.runtime.onMessageExternal.addListener((msg, sender, sendResponse) => {
 
 // Alarms for SSE keepalive (MV3 SW 30s kill workaround)
 chrome.alarms.create('sse-keepalive', { periodInMinutes: 0.4 }); // ~25s
+// Periodic entitlements refresh — ensures quota/tier stays fresh without a push (U-09)
+chrome.alarms.create('entitlements-refresh', { periodInMinutes: 1 });
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === 'sse-keepalive') {
     // Touch SSE connection or reconnect if needed
     console.log('[SW] keepalive tick');
+  }
+  if (alarm.name === 'entitlements-refresh') {
+    void refreshEntitlements();
   }
 });
 
@@ -65,22 +87,5 @@ async function refreshEntitlements() {
     console.error('[SW] entitlements refresh failed', e);
   }
 }
-
-// Port connections (SW ↔ Side Panel)
-const connectedPorts: Set<chrome.runtime.Port> = new Set();
-
-chrome.runtime.onConnect.addListener((port) => {
-  connectedPorts.add(port);
-  port.onDisconnect.addListener(() => connectedPorts.delete(port));
-
-  port.onMessage.addListener(async (msg) => {
-    if (msg.type === 'REQ_REFRESH_TOKEN') {
-      // Side Panel has refreshed token via Clerk
-      if (msg.token) {
-        await chrome.storage.local.set({ token: msg.token, expires_at: msg.expires_at });
-      }
-    }
-  });
-});
 
 console.log('[FindWith SW] initialized');

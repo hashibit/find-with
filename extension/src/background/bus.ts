@@ -2,12 +2,14 @@ export type BgMsg =
   | { type: 'JOB_CAPTURE'; payload: any }
   | { type: 'EMAIL_CAPTURE'; payload: any }
   | { type: 'EASY_APPLY_FORM'; payload: { fields: any[] } }
+  | { type: 'EASY_APPLY_SUBMITTED' }
   | { type: 'OPEN_SIDEPANEL'; payload: { route?: string } }
   | { type: 'SSE_EVENT'; payload: any };
 
 export async function handleMessage(
   msg: BgMsg,
   sender: chrome.runtime.MessageSender,
+  connectedPorts: Set<chrome.runtime.Port>,
 ): Promise<any> {
   switch (msg.type) {
     case 'JOB_CAPTURE':
@@ -15,6 +17,12 @@ export async function handleMessage(
     case 'EMAIL_CAPTURE':
       return handleEmailCapture(msg.payload);
     case 'EASY_APPLY_FORM':
+      return { received: true };
+    case 'EASY_APPLY_SUBMITTED':
+      // Forward to Side Panel so it can record the application and update radar
+      connectedPorts.forEach((port) =>
+        port.postMessage({ type: 'EASY_APPLY_SUBMITTED' }),
+      );
       return { received: true };
     case 'OPEN_SIDEPANEL':
       if (sender.tab?.windowId) {

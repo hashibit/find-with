@@ -45,13 +45,52 @@ function scanEasyApplyFields(): FormField[] {
   return fields;
 }
 
+/**
+ * Detect the LinkedIn "Application sent" confirmation dialog and notify the SW.
+ * LinkedIn renders a [role="dialog"] with a heading containing "Application sent"
+ * or "Your application was sent" after a successful Easy Apply submission.
+ */
+function isSubmitConfirmationDialog(node: Element): boolean {
+  if (node.getAttribute('role') !== 'dialog') return false;
+  const heading = node.querySelector('h2, h3, [data-test-modal-close-btn]');
+  const text = (heading?.textContent ?? node.textContent ?? '').toLowerCase();
+  return text.includes('application sent') || text.includes('your application was sent');
+}
+
 function observeEasyApplyModal() {
-  const observer = new MutationObserver(() => {
-    const modal = document.querySelector('.jobs-easy-apply-modal');
-    if (modal) {
-      const fields = scanEasyApplyFields();
-      if (fields.length > 0) {
-        chrome.runtime.sendMessage({ type: 'EASY_APPLY_FORM', payload: { fields } });
+  let formReported = false;
+
+  const observer = new MutationObserver((mutations) => {
+    for (const mutation of mutations) {
+      for (const node of Array.from(mutation.addedNodes)) {
+        if (!(node instanceof Element)) continue;
+
+        // Detect submit confirmation dialog
+        if (isSubmitConfirmationDialog(node)) {
+          chrome.runtime.sendMessage({ type: 'EASY_APPLY_SUBMITTED' });
+          formReported = false; // reset so next application is tracked fresh
+          return;
+        }
+
+        // Also check descendants for the confirmation dialog
+        const dialog = node.querySelector('[role="dialog"]');
+        if (dialog && isSubmitConfirmationDialog(dialog)) {
+          chrome.runtime.sendMessage({ type: 'EASY_APPLY_SUBMITTED' });
+          formReported = false;
+          return;
+        }
+      }
+    }
+
+    // Form field scan (existing behavior) — only report once per modal open
+    if (!formReported) {
+      const modal = document.querySelector('.jobs-easy-apply-modal');
+      if (modal) {
+        const fields = scanEasyApplyFields();
+        if (fields.length > 0) {
+          chrome.runtime.sendMessage({ type: 'EASY_APPLY_FORM', payload: { fields } });
+          formReported = true;
+        }
       }
     }
   });

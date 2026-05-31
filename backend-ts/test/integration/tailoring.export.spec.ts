@@ -54,7 +54,8 @@ beforeAll(async () => {
   logRepo = ds.getRepository(QuotaConsumeLog);
 
   const quota = new QuotaService(counterRepo, logRepo);
-  service = new TailoringService(resumeRepo, snapshotRepo, quota, mockQueue);
+  const mockMaterialRepo = { findOne: async () => null, find: async () => [] } as any;
+  service = new TailoringService(resumeRepo, snapshotRepo, mockMaterialRepo, quota, mockQueue);
 });
 
 afterAll(async () => {

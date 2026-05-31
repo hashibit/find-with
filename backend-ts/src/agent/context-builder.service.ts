@@ -7,6 +7,7 @@ import {
   type Message,
   type ToolResultMessage,
 } from '@earendil-works/pi-ai';
+import { FIELD_CRYPTO, type FieldCrypto } from '../common/crypto/crypto.interface.js';
 
 import { ConvMessage } from '../database/entities/conversation/message.entity.js';
 import { ConvConversation } from '../database/entities/conversation/conversation.entity.js';
@@ -148,6 +149,8 @@ export class ContextBuilderService {
     private readonly radarItemRepo: Repository<JobRadarItem>,
     @InjectRepository(UserGoalMemory)
     private readonly goalMemoryRepo: Repository<UserGoalMemory>,
+    @Inject(FIELD_CRYPTO)
+    private readonly fieldCrypto: FieldCrypto,
     @InjectPinoLogger(ContextBuilderService.name)
     private readonly logger: PinoLogger,
   ) {}
@@ -226,21 +229,26 @@ export class ContextBuilderService {
 
     // Reconstruct history from DB records. USER messages have no payload (legacy text-only).
     // ASSISTANT and TOOL_RESULT messages carry the full pi-ai Message object in payload.
-    const messages: Message[] = recentMessages.flatMap((msg) => {
-      if (msg.role === 'USER') {
-        return [
-          {
-            role: 'user' as const,
-            content: msg.text ?? '',
-            timestamp: msg.createdAt.getTime(),
-          },
-        ];
-      }
-      if (msg.payload) {
-        return [msg.payload as Message];
-      }
-      return [];
-    });
+    // Text fields may be AES-256 encrypted (U-10) — decrypt before use.
+    const messages: Message[] = await Promise.all(
+      recentMessages.flatMap((msg) => {
+        if (msg.role === 'USER') {
+          return [
+            (async () => ({
+              role: 'user' as const,
+              content: msg.encryptedText
+                ? await this.fieldCrypto.decrypt(msg.encryptedText)
+                : (msg.text ?? ''),
+              timestamp: msg.createdAt.getTime(),
+            }))(),
+          ];
+        }
+        if (msg.payload) {
+          return [Promise.resolve(msg.payload as Message)];
+        }
+        return [];
+      }),
+    );
 
     return { systemPrompt, messages };
   }
@@ -395,7 +403,9 @@ export class ContextBuilderService {
   private messageBrief(message: ConvMessage): string | null {
     switch (message.role) {
       case 'USER':
-        return `User: ${message.text}`;
+        // encryptedText is intentionally not decrypted in brief — brief is used
+        // for token counting only, so a placeholder is fine.
+        return `User: ${message.text ?? '[encrypted]'}`;
       case 'ASSISTANT':
         const assistant = message.payload as AssistantMessage;
         const contents = assistant.content.map((c) => {

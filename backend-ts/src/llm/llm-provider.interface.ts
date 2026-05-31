@@ -26,4 +26,7 @@ export interface LlmProvider {
 
   /** Circuit-breaker: clear error count after a successful response. */
   clearErrors(): void;
+
+  /** Health check: returns ok if the provider is ready. */
+  ready(): Promise<void>;
 }

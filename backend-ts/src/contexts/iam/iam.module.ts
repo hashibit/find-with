@@ -16,15 +16,19 @@ import { type AppConfig } from '../../config/configuration.js';
 import { AUTH_VERIFIER } from '../../adapters/auth/auth.interface.js';
 import { ClerkAuthAdapter } from '../../adapters/auth/clerk-auth.adapter.js';
 import { DevAuthAdapter } from '../../adapters/auth/dev-auth.adapter.js';
+import { NonceStore } from './services/nonce.store.js';
+import { RedisModule } from '../../redis/redis.module.js';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([IamUser, IamSettings, BillingSubscription, QuotaUsageCounter]),
+    RedisModule,
   ],
   controllers: [IamController, BillingController],
   providers: [
     IamService,
     BillingService,
+    NonceStore,
     {
       provide: AUTH_VERIFIER,
       inject: [ConfigService],
@@ -42,6 +46,6 @@ import { DevAuthAdapter } from '../../adapters/auth/dev-auth.adapter.js';
       },
     },
   ],
-  exports: [IamService, BillingService, AUTH_VERIFIER, PAYMENT_GATEWAY],
+  exports: [IamService, BillingService, AUTH_VERIFIER, PAYMENT_GATEWAY, NonceStore],
 })
 export class IamModule {}

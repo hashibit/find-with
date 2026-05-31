@@ -1,6 +1,6 @@
 /// <reference types="chrome" />
 import { handleMessage, type BgMsg } from './bus';
-import { initAuth, getToken, handleAuthNonce } from './auth';
+import { initAuth, getToken, handleAuthNonce, handleAuthToken } from './auth';
 import { openSseStream } from './sse';
 
 // Open Side Panel on action click
@@ -12,7 +12,7 @@ chrome.runtime.onMessage.addListener((msg: BgMsg, sender, sendResponse) => {
   return true; // async
 });
 
-// External messages: website → SW (U-03 nonce flow)
+// External messages: website → SW (U-03 auth flow)
 chrome.runtime.onMessageExternal.addListener((msg, sender, sendResponse) => {
   // Origin check
   if (sender.origin !== 'https://findwith.com' && sender.origin !== 'http://localhost:14666') {
@@ -21,6 +21,11 @@ chrome.runtime.onMessageExternal.addListener((msg, sender, sendResponse) => {
 
   if (msg.type === 'AUTH_NONCE') {
     handleAuthNonce(msg.nonce).then(sendResponse);
+    return true;
+  }
+
+  if (msg.type === 'AUTH_TOKEN') {
+    handleAuthToken(msg.token).then(sendResponse);
     return true;
   }
 

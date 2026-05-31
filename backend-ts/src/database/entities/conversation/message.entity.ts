@@ -14,6 +14,10 @@ export class ConvMessage extends BaseEntity {
   @Column({ type: 'text', nullable: true })
   text: string | null;
 
+  // Encrypted text using AES-256. For PII protection.
+  @Column({ type: 'bytea', nullable: true })
+  encryptedText: Buffer | null;
+
   // Full pi-ai Message object. Null only for legacy USER messages.
   @Column({ type: 'jsonb', nullable: true })
   payload: unknown | null;

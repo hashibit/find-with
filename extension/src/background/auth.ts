@@ -16,6 +16,39 @@ export async function getToken(): Promise<string | null> {
   return data.token;
 }
 
+export async function handleAuthToken(token: string): Promise<{ ok: boolean }> {
+  try {
+    // Parse the token to extract user_id and expires_at
+    // Token format: ext_<userId>_<timestamp>
+    const parts = token.split('_');
+    if (parts.length < 3) {
+      return { ok: false };
+    }
+
+    // Extract timestamp (last part) and calculate expiry
+    const timestamp = parseInt(parts[parts.length - 1], 10);
+    const userId = parts[1];
+    const expiresAt = timestamp + 86400; // 24 hours
+
+    if (isNaN(timestamp)) {
+      return { ok: false };
+    }
+
+    // Store token and user info in chrome storage
+    await chrome.storage.local.set({
+      token,
+      expires_at: expiresAt,
+      user_id: userId,
+    });
+
+    chrome.action.setBadgeText({ text: '' });
+    return { ok: true };
+  } catch (e) {
+    console.error('[Auth] token handler failed', e);
+    return { ok: false };
+  }
+}
+
 export async function handleAuthNonce(nonce: string): Promise<{ ok: boolean }> {
   try {
     const resp = await fetch(`${API_BASE}/v1/iam/auth/exchange`, {

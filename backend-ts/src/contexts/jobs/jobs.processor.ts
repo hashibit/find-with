@@ -146,20 +146,67 @@ Return JSON:
       const materials = await this.materialManager.confirmedForUser(userId);
       const hardSkills = (parsedJd.hardSkills as string[] | null) ?? [];
 
-      const materialTexts = materials
-        .map((m) => (m.shiningText ?? '') + ' ' + (m.tags ?? []).join(' '))
-        .join(' ')
-        .toLowerCase();
-
-      const surfaceHits = hardSkills.filter((s) => text.toLowerCase().includes(s.toLowerCase()));
-      const deepHits = hardSkills.filter((s) => materialTexts.includes(s.toLowerCase()));
-
+      // Layer 1: Surface match - pure keyword substring on JD text
+      const textLower = text.toLowerCase();
+      const surfaceHits = hardSkills.filter((s) => textLower.includes(s.toLowerCase()));
       const surfaceScore =
         hardSkills.length > 0 ? (surfaceHits.length / hardSkills.length) * 100 : 0;
-      const deepScore =
-        hardSkills.length > 0
-          ? (Math.max(surfaceHits.length, deepHits.length) / hardSkills.length) * 100
-          : 0;
+
+      // Layer 2 & 3: Deep match with semantic search using embeddings
+      // First, compute JD embedding if not already done (handled in Layer 3 embedding above)
+      const jdEmbedding = parsedJd.jdEmbedding ?? null;
+
+      let deepScore = 0;
+      let deepHits: string[] = [];
+
+      if (jdEmbedding && materials.some((m) => m.embedding && m.embedding.length > 0)) {
+        // Compute cosine similarity between JD embedding and each material's embedding
+        const cosineSimilarity = (a: number[], b: number[]): number => {
+          let dot = 0;
+          let normA = 0;
+          let normB = 0;
+          for (let i = 0; i < a.length; i++) {
+            dot += a[i]! * b[i]!;
+            normA += a[i]! * a[i]!;
+            normB += b[i]! * b[i]!;
+          }
+          if (normA === 0 || normB === 0) return 0;
+          return dot / (Math.sqrt(normA) * Math.sqrt(normB));
+        };
+
+        // Score each material by its similarity to JD
+        const materialScores = materials
+          .filter((m) => m.embedding && m.embedding.length > 0)
+          .map((m) => ({
+            material: m,
+            score: cosineSimilarity(jdEmbedding, m.embedding!),
+            text: (m.shiningText ?? '') + ' ' + (m.tags ?? []).join(' '),
+          }))
+          .sort((a, b) => b.score - a.score);
+
+        // Deep score: average of top-k material similarities (scaled to 0-100)
+        const topK = materialScores.slice(0, 8);
+        if (topK.length > 0) {
+          const avgSimilarity = topK.reduce((sum, m) => sum + m.score, 0) / topK.length;
+          deepScore = Math.round(avgSimilarity * 100);
+        }
+
+        // Deep hits: skills that appear in top materials (still uses keywords for interpretability)
+        const topMaterialTexts = topK.map((m) => m.text.toLowerCase()).join(' ');
+        deepHits = hardSkills.filter((s) => topMaterialTexts.includes(s.toLowerCase()));
+      } else {
+        // Fallback: pure substring matching if no embeddings available
+        const materialTexts = materials
+          .map((m) => (m.shiningText ?? '') + ' ' + (m.tags ?? []).join(' '))
+          .join(' ')
+          .toLowerCase();
+        deepHits = hardSkills.filter((s) => materialTexts.includes(s.toLowerCase()));
+        deepScore =
+          hardSkills.length > 0
+            ? (Math.max(surfaceHits.length, deepHits.length) / hardSkills.length) * 100
+            : 0;
+      }
+
       const gaps = hardSkills.filter((s) => !deepHits.includes(s) && !surfaceHits.includes(s));
       const overallAdvice = surfaceScore >= 70 ? 'APPLY' : surfaceScore >= 40 ? 'CAUTIOUS' : 'SKIP';
 
@@ -173,7 +220,7 @@ Return JSON:
         hitsSurface: surfaceHits,
         hitsDeep: deepHits,
         overallAdvice,
-        adviceRationale: `${surfaceHits.length}/${hardSkills.length} hard skills matched on resume`,
+        adviceRationale: `${surfaceHits.length}/${hardSkills.length} hard skills matched on resume; deep=${deepHits.length} via semantic search`,
       });
       await this.matchRepo.save(matchResult);
     }

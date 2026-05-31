@@ -1,7 +1,7 @@
 import { Injectable, Logger, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Observable, Subject } from 'rxjs';
+import { Observable, Subject, timeout } from 'rxjs';
 import {
   type AssistantMessage,
   type Context,
@@ -23,6 +23,7 @@ import { DraftReplyTool } from './tools/draft-reply.tool.js';
 import { SetConversationDensityTool } from './tools/set-conversation-density.tool.js';
 import { ulid } from 'ulid';
 import { MEMORY_QUEUE, type MemoryJobData } from '../contexts/memory/memory.constants.js';
+import { PendingToolResult } from '../database/entities/agent/pending-tool-result.entity.js';
 
 export interface AgentSseEvent {
   data: string;
@@ -56,6 +57,7 @@ const TOOL_SCENES: Record<string, string[]> = {
 };
 
 const MAX_ITERATION = 10;
+const TOOL_TIMEOUT_MS = 90_000; // 90 seconds
 
 @Injectable()
 export class AgentService {
@@ -65,6 +67,7 @@ export class AgentService {
   constructor(
     @InjectRepository(ConvMessage) private readonly messageRepo: Repository<ConvMessage>,
     @InjectRepository(ConvConversation) private readonly convRepo: Repository<ConvConversation>,
+    @InjectRepository(PendingToolResult) private readonly pendingToolRepo: Repository<PendingToolResult>,
     @Inject(LLM_PROVIDER) private readonly llm: LlmProvider,
     @InjectQueue(MEMORY_QUEUE) private readonly memoryQueue: Queue<MemoryJobData>,
     private readonly contextBuilder: ContextBuilderService,
@@ -267,13 +270,47 @@ export class AgentService {
     const executor = this.toolMap.get(toolName);
     if (!executor) return { ok: false, data: {}, error: `Unknown tool: ${toolName}` };
 
+    // Create pending tool result record for long-running tools
+    const pendingResult = this.pendingToolRepo.create({
+      id: ulid(),
+      conversationId: ctx.conversationId,
+      toolName,
+      toolCallId: callId,
+      result: null,
+      error: null,
+      acknowledged: false,
+    });
+    await this.pendingToolRepo.save(pendingResult);
+
     try {
-      const result = await executor.execute(callId, args, ctx);
+      // Execute with 90s timeout
+      const result = await Promise.race([
+        executor.execute(callId, args, ctx),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Tool timeout exceeded (90s)')), TOOL_TIMEOUT_MS),
+        ),
+      ]);
       const text = result.content.map((c) => c.text).join('\n');
-      return { ok: true, data: { text, ...result.details }, error: '' };
+      const successResult = { ok: true, data: { text, ...result.details }, error: '' };
+
+      // Mark as acknowledged and update result
+      await this.pendingToolRepo.update(pendingResult.id, {
+        acknowledged: true,
+        result: successResult.data,
+      });
+
+      return successResult;
     } catch (err) {
       this.logger.error(`Tool ${toolName} failed`, err);
-      return { ok: false, data: {}, error: String(err) };
+      const errorResult = { ok: false, data: {}, error: String(err) };
+
+      // Update pending result with error
+      await this.pendingToolRepo.update(pendingResult.id, {
+        acknowledged: true,
+        error: { message: errorResult.error },
+      });
+
+      return errorResult;
     }
   }
 

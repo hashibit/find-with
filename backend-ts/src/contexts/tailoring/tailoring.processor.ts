@@ -1,5 +1,5 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
-import { Logger, Inject } from '@nestjs/common';
+import { Logger, Inject, BadRequestException } from '@nestjs/common';
 import { Job } from 'bullmq';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -10,6 +10,13 @@ import { LLM_PROVIDER, type LlmProvider } from '../../llm/llm-provider.interface
 import { MaterialManager } from '../profile/material-manager.service.js';
 import { TAILORING_QUEUE } from './tailoring.service.js';
 import { ulid } from 'ulid';
+
+type BulletStatus = 'CONFIRMED' | 'PENDING' | 'USER_EDITED';
+type TailoringMaterial = {
+  id: string;
+  shiningText: string;
+  tags: string[];
+};
 
 @Processor(TAILORING_QUEUE)
 export class TailoringProcessor extends WorkerHost {
@@ -84,7 +91,7 @@ Rules:
 - Mark bullets you had to infer (not directly from materials) as status: "PENDING"`;
 
     const raw = await this.llm.completeContext({
-      systemPrompt: 'You write tailored resume sections. Use only provided materials. Output JSON.',
+      systemPrompt: 'You write tailored resume sections. Use only provided materials. Output JSON. BEFORE OUTPUTTING, ensure you are using materials from the list provided. If a bullet cannot reference an exact material, mark it as status: "PENDING".',
       messages: [{ role: 'user', content: prompt, timestamp: Date.now() }],
     });
 
@@ -96,14 +103,56 @@ Rules:
       this.logger.warn('Failed to parse tailoring output');
     }
 
-    // Add ULIDs to bullets that don't have them
-    for (const section of sections as Array<{ bullets: Array<{ id?: string }> }>) {
-      for (const bullet of section.bullets ?? []) {
+    // Validate and process sections with bullet-level validation
+    const materialIds = new Set(relevantMaterials.map((m) => m.id));
+    const validatedSections: Array<{
+      title: string;
+      bullets: Array<{ id: string; text: string; source: string; sourceId: string | null; status: BulletStatus }>;
+    }> = [];
+
+    for (const section of sections as Array<{ title?: string; bullets?: Array<{ id?: string; text?: string; source?: string; sourceId?: string; status?: BulletStatus }> }>) {
+      const bullets: Array<{ id: string; text: string; source: string; sourceId: string | null; status: BulletStatus }> = [];
+
+      for (const b of section.bullets ?? []) {
+        const id = b.id ?? ulid();
+        const text = (b.text as string) ?? '';
+        const source = (b.source as string) ?? '';
+        const sourceId = b.sourceId as string | undefined;
+        let status: BulletStatus = (b.status as BulletStatus) ?? 'PENDING';
+
+        // Bullet fail-fast validation: sourceId must reference a valid material
+        // If not, we must mark it as PENDING (model inferred rather than confirmed)
+        if (sourceId && materialIds.has(sourceId)) {
+          // Valid sourceId referencing a confirmed material - accept CONFIRMED status
+          if (status === 'PENDING') {
+            // LLM marked it as PENDING despite valid sourceId - trust the model
+            status = 'PENDING';
+          } else {
+            status = 'CONFIRMED';
+          }
+        } else {
+          // No valid sourceId - LLM fabricated or incorrectly referenced
+          this.logger.warn(`Bullet has no valid sourceId (sourceId=${sourceId}); marking as PENDING`);
+          status = 'PENDING';
+        }
+
+        bullets.push({ id, text, source, sourceId: sourceId ?? null, status });
+      }
+
+      validatedSections.push({
+        title: (section.title as string) ?? 'Work Experience',
+        bullets,
+      });
+    }
+
+    // Add ULIDs to bullets that don't have them (defensive, should already be done above)
+    for (const section of validatedSections) {
+      for (const bullet of section.bullets) {
         if (!bullet.id) bullet.id = ulid();
       }
     }
 
-    tailored.sections = sections;
+    tailored.sections = validatedSections;
     tailored.matchBefore = null;
     tailored.matchAfter = null;
     await this.resumeRepo.save(tailored);

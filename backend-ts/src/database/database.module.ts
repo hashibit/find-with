@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { type AppConfig } from '../config/configuration.js';
+import { DatabaseService } from './database.service.js';
 import { IamUser } from './entities/iam/iam-user.entity.js';
 import { IamSettings } from './entities/iam/iam-settings.entity.js';
 import { ProfileResumeSource } from './entities/profile/resume-source.entity.js';
@@ -88,6 +89,6 @@ export const ALL_ENTITIES = [
       },
     }),
   ],
-  exports: [TypeOrmModule],
+  exports: [TypeOrmModule, DatabaseService],
 })
 export class DatabaseModule {}

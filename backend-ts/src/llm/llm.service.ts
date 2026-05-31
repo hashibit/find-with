@@ -57,6 +57,15 @@ export class LlmService implements LlmProvider {
     this.errorCount = 0;
   }
 
+  async ready(): Promise<void> {
+    // Basic health check: try to ping OpenAI embeddings
+    try {
+      await this.embed('health check');
+    } catch (error) {
+      throw new Error(`LLM provider unavailable: ${error instanceof Error ? error.message : 'unknown'}`);
+    }
+  }
+
   private shouldFailover(): boolean {
     const now = Date.now();
     if (now - this.errorLastAt > FAILOVER_WINDOW_MS) this.errorCount = 0;

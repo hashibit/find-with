@@ -3,9 +3,9 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@clerk/nextjs';
 
-// This page handles the OAuth nonce flow for the Chrome extension.
-// Flow: extension opens this page → we get the Clerk session token →
-// send it to the extension via chrome.runtime.sendMessage → extension stores it.
+// This page handles the OAuth flow for the Chrome extension.
+// Flow: extension opens this page → web validates Clerk JWT → calls backend auth endpoint →
+// backend validates and returns session token → web sends AUTH_TOKEN to extension.
 
 const EXT_ID = process.env.NEXT_PUBLIC_EXTENSION_ID || '';
 
@@ -21,16 +21,35 @@ export default function ExtensionCallbackPage() {
       return;
     }
 
-    async function sendTokenToExtension() {
+    async function authenticateWithBackend() {
       try {
-        const token = await getToken();
-        if (!token) {
+        const clerkToken = await getToken();
+        if (!clerkToken) {
           setStatus('error');
           return;
         }
 
+        // Call backend to verify Clerk JWT and get extension session token
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:14667';
+
+        const resp = await fetch(`${baseUrl}/v1/iam/auth/verify`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ clerkToken }),
+        });
+
+        if (!resp.ok) {
+          console.error('Backend auth verify failed:', await resp.text());
+          setStatus('error');
+          return;
+        }
+
+        const data = await resp.json();
+        // data contains: { token, expires_at, user_id }
+
+        // Send token to extension
         if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage && EXT_ID) {
-          chrome.runtime.sendMessage(EXT_ID, { type: 'AUTH_TOKEN', token }, (response) => {
+          chrome.runtime.sendMessage(EXT_ID, { type: 'AUTH_TOKEN', token: data.token }, (response) => {
             if (chrome.runtime.lastError) {
               console.error('Extension messaging error:', chrome.runtime.lastError);
               setStatus('error');
@@ -41,17 +60,16 @@ export default function ExtensionCallbackPage() {
             }
           });
         } else {
-          // Extension not present or not in Chrome — show token for manual handling.
           console.warn('chrome.runtime not available; token not delivered to extension');
           setStatus('sent');
         }
       } catch (err) {
-        console.error('Failed to get token:', err);
+        console.error('Failed to authenticate:', err);
         setStatus('error');
       }
     }
 
-    sendTokenToExtension();
+    authenticateWithBackend();
   }, [isLoaded, isSignedIn, getToken]);
 
   return (

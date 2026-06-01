@@ -1,7 +1,7 @@
 import { vi } from 'vitest';
 
-// current-user.decorator.ts imports `express` types which can't be resolved by vitest.
-// Mock it here; redis.module is pre-mocked globally in test/setup.ts.
+// express and current-user.decorator.ts import express types which can't be resolved by vitest.
+vi.mock('express', () => ({}));
 vi.mock('../../../src/common/decorators/current-user.decorator.js', () => ({
   CurrentUser: () => () => {},
 }));
@@ -37,25 +37,46 @@ const makeRedisService = () => ({
   },
 });
 
+const makeStubRepo = () => ({ findOne: vi.fn().mockResolvedValue(null), find: vi.fn().mockResolvedValue([]) });
+
 function buildController(overrides: Partial<{
   iamService: ReturnType<typeof makeIamService>;
   authVerifier: ReturnType<typeof makeAuthVerifier>;
   nonceStore: ReturnType<typeof makeNonceStore>;
   redisService: ReturnType<typeof makeRedisService>;
+  purgeSaga: { initiate: ReturnType<typeof vi.fn>; cancelDeletion: ReturnType<typeof vi.fn> };
 }> = {}) {
   const iamService = overrides.iamService ?? makeIamService();
   const authVerifier = overrides.authVerifier ?? makeAuthVerifier();
   const nonceStore = overrides.nonceStore ?? makeNonceStore();
   const redisService = overrides.redisService ?? makeRedisService();
+  const purgeSaga = overrides.purgeSaga ?? {
+    initiate: vi.fn().mockResolvedValue({ expiresAt: new Date() }),
+    cancelDeletion: vi.fn().mockResolvedValue(undefined),
+  };
+  const billingRepo = makeStubRepo();
+  const quotaRepo = makeStubRepo();
+  const profileRepo = makeStubRepo();
+  const materialRepo = makeStubRepo();
+  const radarRepo = makeStubRepo();
+  const convRepo = makeStubRepo();
 
   const controller = new IamController(
     iamService as any,
     authVerifier as any,
     nonceStore as any,
+    purgeSaga as any,
     redisService as any,
+    billingRepo as any,
+    quotaRepo as any,
+    profileRepo as any,
+    materialRepo as any,
+    radarRepo as any,
+    convRepo as any,
   );
 
-  return { controller, iamService, authVerifier, nonceStore, redisService };
+  return { controller, iamService, authVerifier, nonceStore, redisService, purgeSaga,
+    billingRepo, quotaRepo, profileRepo, materialRepo, radarRepo, convRepo };
 }
 
 const MOCK_USER = { userId: 'clerk_u1' };
@@ -202,6 +223,45 @@ describe('IamController', () => {
       await expect(
         controller.authVerify({ clerkToken: 'bad.token' } as any),
       ).rejects.toThrow('Invalid JWT');
+    });
+  });
+
+  describe('exportAccount()', () => {
+    it('returns a JSON response with user data sections', async () => {
+      const iamService = makeIamService();
+      const { controller, billingRepo, quotaRepo, profileRepo, materialRepo, radarRepo, convRepo } =
+        buildController({ iamService });
+
+      billingRepo.findOne.mockResolvedValue({ tier: 'PRO', state: 'ACTIVE', periodEnd: null });
+      quotaRepo.findOne.mockResolvedValue({ tailoringLimit: 10, tailoringCompleted: 2 });
+      profileRepo.findOne.mockResolvedValue({ basicInfo: { fullName: 'Alice' } });
+      materialRepo.find.mockResolvedValue([{ id: 'm_01', shiningText: 'Led team' }]);
+      radarRepo.find.mockResolvedValue([]);
+      convRepo.find.mockResolvedValue([{ id: 'conv_01' }, { id: 'conv_02' }]);
+
+      const setHeader = vi.fn();
+      const json = vi.fn();
+      const mockRes = { setHeader, json } as any;
+
+      await controller.exportAccount(MOCK_USER as any, mockRes);
+
+      expect(setHeader).toHaveBeenCalledWith('Content-Type', 'application/json');
+      const payload = json.mock.calls[0][0];
+      expect(payload.user.id).toBe('db_user_01');
+      expect(payload.subscription).toMatchObject({ tier: 'PRO', state: 'ACTIVE' });
+      expect(payload.materials).toHaveLength(1);
+      expect(payload.conversationSummary.count).toBe(2);
+      expect(payload.schemaVersion).toBe('1.0');
+    });
+
+    it('includes Content-Disposition attachment header with user id', async () => {
+      const { controller } = buildController();
+      const setHeader = vi.fn();
+      const json = vi.fn();
+      await controller.exportAccount(MOCK_USER as any, { setHeader, json } as any);
+      const dispositionCall = setHeader.mock.calls.find(([k]) => k === 'Content-Disposition');
+      expect(dispositionCall?.[1]).toContain('attachment');
+      expect(dispositionCall?.[1]).toContain('db_user_01');
     });
   });
 });

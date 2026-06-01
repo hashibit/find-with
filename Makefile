@@ -18,10 +18,10 @@ lint-backend:
 	cd backend-ts && pnpm run lint
 
 lint-ext:
-	cd extension && ppnpm run lint 2>/dev/null || true
+	cd extension && pnpm run lint 2>/dev/null || true
 
 lint-web:
-	cd web && ppnpm run lint 2>/dev/null || true
+	cd web && pnpm run lint 2>/dev/null || true
 
 # Test
 test: test-backend test-ext test-web
@@ -30,18 +30,19 @@ test-backend:
 	cd backend-ts && pnpm test
 
 test-ext:
-	cd extension && ppnpm test 2>/dev/null || true
+	cd extension && pnpm test 2>/dev/null || true
 
 test-web:
-	cd web && ppnpm test 2>/dev/null || true
+	cd web && pnpm test 2>/dev/null || true
 
-# Integration tests (L3 — pulls testcontainers)
+# Integration tests (L3 — requires test containers)
 test-integration:
-	cd backend-ts && pnpm run test:int
+	docker compose -f docker-compose.test.yml up -d --wait
+	cd backend-ts && pnpm run test:int:migrate && pnpm run test:int
 
 # Extension build
 build-extension:
-	cd extension && ppnpm build
+	cd extension && pnpm build
 
 # Build backend
 build-backend:
@@ -50,7 +51,7 @@ build-backend:
 # E2E mocked (L4 — Playwright + extension)
 test-e2e-mock:
 	docker compose -f docker-compose.test.yml up -d --wait
-	ppnpm playwright test --project=e2e-mock || true
+	pnpm playwright test --project=e2e-mock || true
 	docker compose -f docker-compose.test.yml down
 
 # E2E OrbStack VM (L5)
@@ -59,8 +60,8 @@ e2e-orbstack:
 	orb start findwith-e2e 2>/dev/null || orb create ubuntu findwith-e2e
 	orb push findwith-e2e . /workspace
 	orb ssh findwith-e2e -- "cd /workspace && docker compose -f compose.e2e.yml up -d --wait"
-	orb ssh findwith-e2e -- "cd /workspace && ppnpm -C extension build"
-	orb ssh findwith-e2e -- "cd /workspace && ppnpm playwright test --project=e2e-orbstack"
+	orb ssh findwith-e2e -- "cd /workspace && pnpm -C extension build"
+	orb ssh findwith-e2e -- "cd /workspace && pnpm playwright test --project=e2e-orbstack"
 	orb stop findwith-e2e
 
 e2e-orbstack-shell:

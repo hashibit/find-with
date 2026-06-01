@@ -18,7 +18,7 @@ import { QuotaConsumeLog } from '../../src/database/entities/quota/quota-log.ent
 import { ALL_ENTITIES } from '../../src/database/database.module.js';
 import { ulid } from 'ulid';
 
-const USER = 'int_test_user_tailoring_export';
+const USER = 'int_test_tailor_export';
 
 // Queue is only used by TailoringService.start() — never called in export tests.
 const mockQueue = { add: vi.fn() } as any;

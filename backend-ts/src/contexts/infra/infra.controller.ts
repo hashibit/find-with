@@ -44,7 +44,11 @@ export class InfraController {
       .values({ id: ulid(), provider, eventId, eventType })
       .orIgnore()
       .execute();
-    return (result.raw?.rowCount ?? result.identifiers.length) > 0;
+    // TypeORM bug: identifiers contains the attempted ID even when ON CONFLICT DO NOTHING fires.
+    // Reliable signal: raw array is non-empty on success, empty array on conflict.
+    const rawArray = result.raw as unknown[];
+    const hasRealData = rawArray.length > 0 && Object.keys(rawArray[0] ?? {}).length > 0;
+    return hasRealData;
   }
 
   @Post('webhooks/clerk')

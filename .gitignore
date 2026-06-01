@@ -76,3 +76,4 @@ docker-compose.override.yml
 .claude/state/tool-failure-counter.txt
 backend/.claude/
 .claude
+.understand-anything

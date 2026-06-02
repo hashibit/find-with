@@ -5,6 +5,6 @@ export interface FieldCrypto {
   encrypt(plaintext: string): Promise<Buffer>;
   /** Decrypt nonce[12] + ciphertext bytes → plaintext string. */
   decrypt(data: Buffer): Promise<string>;
-  /** Verify the key pair is functional on startup. */
-  verify(): void;
+  /** Verify the key pair is functional on startup. Must be awaited by module bootstrap. */
+  verify(): Promise<void>;
 }

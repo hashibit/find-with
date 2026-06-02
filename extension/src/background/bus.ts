@@ -1,6 +1,5 @@
 import { getToken } from './auth.js';
-
-const API_BASE = 'http://localhost:14667/api/v1'; // dev; prod: https://api.findwith.com/api/v1
+import { API_V1 as API_BASE } from './config.js';
 
 export type BgMsg =
   | { type: 'JOB_CAPTURE'; payload: JobCapturePayload }

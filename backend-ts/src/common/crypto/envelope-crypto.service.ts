@@ -40,20 +40,30 @@ export class EnvelopeCryptoService implements FieldCrypto {
     return Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString('utf8');
   }
 
-  verify(): void {
-    // Sanity check on startup
+  async verify(): Promise<void> {
+    // Sanity check on startup — must be awaited by the module bootstrap hook.
+    // An unhandled rejection here means the DEK is misconfigured; the app must not start.
     const test = 'envelope-crypto-verify';
-    this.encrypt(test).then((enc) =>
-      this.decrypt(enc).then((dec) => {
-        if (dec !== test) throw new Error('EnvelopeCrypto self-test failed');
-      }),
-    );
+    const enc = await this.encrypt(test);
+    const dec = await this.decrypt(enc);
+    if (dec !== test) throw new Error('EnvelopeCrypto self-test failed: round-trip mismatch');
   }
 
   private decryptDek(): Buffer {
-    const cryptoConfig = this.config.get('crypto', { infer: true })!;
-    const kek = Buffer.from(cryptoConfig.kek, 'base64');
-    const dekBlob = Buffer.from(cryptoConfig.dekCiphertext, 'base64');
+    const cryptoConfig = this.config.get('crypto', { infer: true });
+    if (!cryptoConfig?.kek || !cryptoConfig?.dekCiphertext) {
+      throw new Error(
+        'Crypto config incomplete: CRYPTO_KEK and CRYPTO_DEK_CIPHERTEXT are required',
+      );
+    }
+    let kek: Buffer;
+    let dekBlob: Buffer;
+    try {
+      kek = Buffer.from(cryptoConfig.kek, 'base64');
+      dekBlob = Buffer.from(cryptoConfig.dekCiphertext, 'base64');
+    } catch (err) {
+      throw new Error(`Failed to decode crypto config as base64: ${(err as Error).message}`);
+    }
 
     const nonce = dekBlob.subarray(0, NONCE_LEN);
     const tag = dekBlob.subarray(dekBlob.length - TAG_LEN);

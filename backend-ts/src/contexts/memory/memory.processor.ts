@@ -145,9 +145,9 @@ export class MemoryProcessor extends WorkerHost {
     try {
       const m = result.match(/\{[\s\S]*\}/);
       if (m) parsed = JSON.parse(m[0]) as Partial<UserGoalMemory>;
-    } catch {
-      this.logger.warn(`Failed to parse goal extraction result for ${userId}`);
-      return;
+    } catch (err) {
+      this.logger.error({ err, userId }, 'Failed to parse goal extraction JSON from LLM — retrying via BullMQ');
+      throw err;
     }
 
     const merged = {

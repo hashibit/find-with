@@ -67,9 +67,14 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
       port.onMessage.addListener((msg) => {
         if (msg.type === 'SSE_EVENT') {
           try {
-            const event = JSON.parse(msg.data);
+            const parsed = JSON.parse(msg.data) as unknown;
+            if (typeof parsed !== 'object' || !parsed || !('kind' in parsed)) {
+              console.warn('[Conversation] Unexpected SSE event format', msg.data);
+              return;
+            }
+            const event = parsed as { kind: string; delta?: string; message?: string };
             if (event.kind === 'text_delta') {
-              assistantText += event.delta;
+              assistantText += event.delta ?? '';
               // Update the last assistant message or add a new one
               set((state) => {
                 const messages = [...state.messages];
@@ -98,7 +103,7 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
               set((state) => ({
                 messages: [
                   ...state.messages,
-                  { role: 'assistant', text: `Error: ${event.message}`, timestamp: Date.now() },
+                  { role: 'assistant', text: `Error: ${event.message ?? 'unknown'}`, timestamp: Date.now() },
                 ],
                 isStreaming: false,
               }));

@@ -15,7 +15,7 @@ export class EphemeralCryptoService implements FieldCrypto {
     return data.toString('utf8');
   }
 
-  verify(): void {
+  async verify(): Promise<void> {
     // No-op for dev
   }
 }

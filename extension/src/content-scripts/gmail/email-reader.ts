@@ -24,10 +24,12 @@ function scrapeOpenEmail(): EmailCapture | null {
 
   if (!subject && !from) return null;
 
+  // Cap body to prevent oversized payloads through the extension message channel
+  const MAX_BODY = 50_000;
   return {
     subject: sanitizeText(subject),
     from: sanitizeText(from),
-    body: sanitizeText(body),
+    body: sanitizeText(body).slice(0, MAX_BODY),
     source_url: window.location.href,
   };
 }

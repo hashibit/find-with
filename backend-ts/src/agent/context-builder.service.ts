@@ -244,7 +244,12 @@ export class ContextBuilderService {
           ];
         }
         if (msg.payload) {
-          return [Promise.resolve(msg.payload as Message)];
+          const p = msg.payload as unknown;
+          if (typeof p !== 'object' || !p || !('role' in p) || !('content' in p)) {
+            this.logger.warn({ msgId: msg.id }, 'Skipping malformed message payload in context build');
+            return [];
+          }
+          return [Promise.resolve(p as Message)];
         }
         return [];
       }),

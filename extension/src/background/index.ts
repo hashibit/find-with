@@ -2,21 +2,25 @@
 import { handleMessage, type BgMsg } from './bus';
 import { initAuth, getToken, handleAuthNonce, handleAuthToken } from './auth';
 import { openSseStream } from './sse';
+import { API_V1 } from './config.js';
 
 // Open Side Panel on action click
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
 
 // Port connections (SW ↔ Side Panel) — declared early so handlers below can reference it
 const connectedPorts: Set<chrome.runtime.Port> = new Set();
-const conversationPorts: Map<string, chrome.runtime.Port> = new Map(); // conversationId → port
+// conversationId → { port, ctrl } so we can abort the SSE stream on eviction.
+// disconnect() only fires onDisconnect on the *other* end, so ctrl must be aborted explicitly.
+const conversationPorts: Map<string, { port: chrome.runtime.Port; ctrl: AbortController }> = new Map();
 
 chrome.runtime.onConnect.addListener((port) => {
   connectedPorts.add(port);
   port.onDisconnect.addListener(() => {
     connectedPorts.delete(port);
-    // Clean up conversation port if it was one
-    for (const [convId, p] of conversationPorts.entries()) {
-      if (p === port) {
+    // Clean up conversation port if it was this port
+    for (const [convId, entry] of conversationPorts.entries()) {
+      if (entry.port === port) {
+        entry.ctrl.abort();
         conversationPorts.delete(convId);
         break;
       }
@@ -40,23 +44,39 @@ chrome.runtime.onConnect.addListener((port) => {
         return;
       }
 
-      // Register this port for the conversation
-      conversationPorts.set(conversationId, port);
+      // Evict any existing stream for this conversation before registering the new one.
+      // Must abort ctrl explicitly — calling port.disconnect() only fires onDisconnect
+      // on the remote end, not here, so the old SSE fetch would keep running otherwise.
+      const prev = conversationPorts.get(conversationId);
+      if (prev) {
+        prev.ctrl.abort();
+        connectedPorts.delete(prev.port);
+        try { prev.port.disconnect(); } catch { /* already disconnected */ }
+      }
 
       // Open SSE stream and forward events
       try {
         const ctrl = await openSseStream(
-          `http://localhost:14667/api/v1/conversations/${conversationId}/prompt?message=${encodeURIComponent(message)}`,
+          `${API_V1}/conversations/${conversationId}/prompt?message=${encodeURIComponent(message)}`,
           token,
           (event) => {
             port.postMessage({ type: 'SSE_EVENT', data: event.data });
           },
+          undefined,
+          (err) => {
+            port.postMessage({ type: 'SSE_ERROR', error: err.message });
+          },
         );
 
-        // Store abort controller for cleanup
+        // Register port + ctrl together
+        conversationPorts.set(conversationId, { port, ctrl });
+
         port.onDisconnect.addListener(() => {
-          ctrl.abort();
-          conversationPorts.delete(conversationId);
+          const entry = conversationPorts.get(conversationId);
+          if (entry?.port === port) {
+            entry.ctrl.abort();
+            conversationPorts.delete(conversationId);
+          }
         });
       } catch (e) {
         port.postMessage({ type: 'SSE_ERROR', error: String(e) });
@@ -115,7 +135,7 @@ async function refreshEntitlements() {
   try {
     const token = await getToken();
     if (!token) return;
-    const resp = await fetch('http://localhost:14667/api/v1/iam/me/entitlements', {
+    const resp = await fetch(`${API_V1}/iam/me/entitlements`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     if (resp.ok) {

@@ -1,4 +1,4 @@
-import { Injectable, Logger, Inject } from '@nestjs/common';
+import { Injectable, Logger, Inject, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Observable, Subject } from 'rxjs';
@@ -112,14 +112,14 @@ export class AgentService {
     private readonly configService: ConfigService<AppConfig>,
   ) {
     this.toolMap = new Map([
-      [this.searchCompanyTool.name, this.searchCompanyTool as unknown as ToolExecutor],
-      [this.mineShiningPointTool.name, this.mineShiningPointTool as unknown as ToolExecutor],
-      [this.draftMotivationTool.name, this.draftMotivationTool as unknown as ToolExecutor],
-      [this.classifyEmailTool.name, this.classifyEmailTool as unknown as ToolExecutor],
-      [this.draftReplyTool.name, this.draftReplyTool as unknown as ToolExecutor],
-      [this.setDensityTool.name, this.setDensityTool as unknown as ToolExecutor],
-      [this.farewellTool.name, this.farewellTool as unknown as ToolExecutor],
-      [this.recomputeMatchTool.name, this.recomputeMatchTool as unknown as ToolExecutor],
+      [this.searchCompanyTool.name, this.assertTool(this.searchCompanyTool)],
+      [this.mineShiningPointTool.name, this.assertTool(this.mineShiningPointTool)],
+      [this.draftMotivationTool.name, this.assertTool(this.draftMotivationTool)],
+      [this.classifyEmailTool.name, this.assertTool(this.classifyEmailTool)],
+      [this.draftReplyTool.name, this.assertTool(this.draftReplyTool)],
+      [this.setDensityTool.name, this.assertTool(this.setDensityTool)],
+      [this.farewellTool.name, this.assertTool(this.farewellTool)],
+      [this.recomputeMatchTool.name, this.assertTool(this.recomputeMatchTool)],
     ]);
 
     // Build models from configuration
@@ -187,6 +187,8 @@ export class AgentService {
     };
   }
 
+  private static readonly MAX_USER_MESSAGE = 8_000;
+
   respond(
     conversationId: string,
     userId: string,
@@ -194,6 +196,9 @@ export class AgentService {
     conversationKind = 'FREE_CHAT',
     anchorId?: string | null,
   ): Observable<AgentSseEvent> {
+    if (userMessage.length > AgentService.MAX_USER_MESSAGE) {
+      throw new BadRequestException(`Message exceeds ${AgentService.MAX_USER_MESSAGE} characters`);
+    }
     const subject = new Subject<AgentSseEvent>();
     void this.runAgentLoop(subject, {
       conversationId,
@@ -312,10 +317,9 @@ export class AgentService {
 
         for (const call of toolCalls) {
           if (call.type !== 'toolCall') continue;
-          // result.data should be clean enough.
           const result = await this.executeTool(
             call.name,
-            call.arguments as Record<string, unknown>,
+            this.validateToolArgs(call.name, call.arguments),
             call.id,
             toolCtx,
           );
@@ -427,6 +431,29 @@ export class AgentService {
 
       return errorResult;
     }
+  }
+
+  /** Assert tool implements ToolExecutor at registration time — catches missing methods early. */
+  private assertTool(tool: unknown): ToolExecutor {
+    const t = tool as Record<string, unknown>;
+    if (typeof t['name'] !== 'string' || !t['name']) {
+      throw new Error(`Tool registration error: missing string 'name' field`);
+    }
+    if (typeof t['execute'] !== 'function') {
+      throw new Error(`Tool registration error: '${t['name']}' missing 'execute' method`);
+    }
+    if (t['parameters'] === undefined || t['parameters'] === null) {
+      throw new Error(`Tool registration error: '${t['name']}' missing 'parameters' schema`);
+    }
+    return tool as ToolExecutor;
+  }
+
+  /** Validate tool args against required parameter keys before execution. */
+  private validateToolArgs(toolName: string, args: unknown): Record<string, unknown> {
+    if (typeof args !== 'object' || args === null || Array.isArray(args)) {
+      throw new BadRequestException(`Tool '${toolName}' received non-object arguments`);
+    }
+    return args as Record<string, unknown>;
   }
 
   private getToolsForScene(conversationKind: string): Tool[] {

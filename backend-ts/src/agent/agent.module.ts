@@ -54,11 +54,13 @@ import { type AppConfig } from '../config/configuration.js';
     {
       provide: FIELD_CRYPTO,
       inject: [ConfigService],
-      useFactory: (config: ConfigService<AppConfig>) => {
+      useFactory: async (config: ConfigService<AppConfig>) => {
         const env = config.get('env', { infer: true });
-        return env === 'production'
+        const service = env === 'production'
           ? new EnvelopeCryptoService(config)
           : new EphemeralCryptoService();
+        await service.verify();
+        return service;
       },
     },
     AgentService,

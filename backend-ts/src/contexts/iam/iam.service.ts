@@ -78,6 +78,6 @@ export class IamService {
   }
 
   async restoreUser(userId: string): Promise<void> {
-    await this.userRepo.update({ id: userId }, { deletedAt: null as unknown as Date, isActive: true });
+    await this.userRepo.update({ id: userId }, { deletedAt: null, isActive: true });
   }
 }

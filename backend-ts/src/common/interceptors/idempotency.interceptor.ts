@@ -1,4 +1,4 @@
-import { type CallHandler, type ExecutionContext, Injectable, type NestInterceptor } from '@nestjs/common';
+import { type CallHandler, type ExecutionContext, Injectable, Logger, type NestInterceptor } from '@nestjs/common';
 import { type Request, type Response } from 'express';
 import { Observable, tap } from 'rxjs';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -11,6 +11,8 @@ const TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 @Injectable()
 export class IdempotencyInterceptor implements NestInterceptor {
+  private readonly logger = new Logger(IdempotencyInterceptor.name);
+
   constructor(
     @InjectRepository(IdempotencyKey)
     private readonly repo: Repository<IdempotencyKey>,
@@ -45,7 +47,9 @@ export class IdempotencyInterceptor implements NestInterceptor {
           responseBody,
           expiresAt: new Date(Date.now() + TTL_MS),
         });
-        void this.repo.save(record);
+        this.repo.save(record).catch((err) => {
+          this.logger.error({ err, key }, 'Failed to persist idempotency key — duplicate requests may reprocess');
+        });
       }),
     );
   }

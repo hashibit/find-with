@@ -10,12 +10,14 @@ interface SseEvent {
 }
 
 type SseHandler = (event: SseEvent) => void;
+type SseErrorHandler = (error: Error) => void;
 
 export async function openSseStream(
   url: string,
   token: string,
   onEvent: SseHandler,
   lastEventId?: string,
+  onError?: SseErrorHandler,
 ): Promise<AbortController> {
   const ctrl = new AbortController();
 
@@ -64,6 +66,7 @@ export async function openSseStream(
     } catch (e) {
       if ((e as Error).name !== 'AbortError') {
         console.error('[SSE] stream error:', e);
+        onError?.(e as Error);
       }
     }
   })();

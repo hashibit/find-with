@@ -1,6 +1,5 @@
 import { DEV_MODE, DEV_USER_ID } from '../lib/auth';
-
-const API_BASE = 'http://localhost:14667'; // dev; prod: https://api.findwith.com
+import { API_BASE } from './config.js';
 
 export async function getToken(): Promise<string | null> {
   // Dev mode bypass: return mock userId as token

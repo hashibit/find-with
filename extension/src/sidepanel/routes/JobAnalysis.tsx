@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { getToken } from '../../lib/auth';
 
-const API_BASE = 'https://api.findwith.com/v1';
+const API_BASE = 'http://localhost:14667/v1'; // dev; prod: https://api.findwith.com/v1
 
 interface MatchResult {
   surfaceScore: number;
@@ -34,12 +35,6 @@ interface JobDetail {
   companyBrief?: CompanyBrief;
   parsedJd?: ParsedJd;
   matchResult?: MatchResult;
-}
-
-async function getToken(): Promise<string | null> {
-  return new Promise((resolve) => {
-    chrome.storage.local.get(['token'], (res) => resolve(res['token'] ?? null));
-  });
 }
 
 function ScoreBar({ label, score }: { label: string; score: number }) {

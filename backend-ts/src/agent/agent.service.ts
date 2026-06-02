@@ -8,9 +8,12 @@ import {
   type Message,
   type Tool,
   type ToolResultMessage,
+  type Model,
+  type Api,
 } from '@earendil-works/pi-ai';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
+import { ConfigService } from '@nestjs/config';
 import { ConvMessage } from '../database/entities/conversation/message.entity.js';
 import { ConvConversation } from '../database/entities/conversation/conversation.entity.js';
 import { LLM_PROVIDER, type LlmProvider } from '../llm/llm-provider.interface.js';
@@ -27,6 +30,7 @@ import { RecomputeMatchTool } from './tools/recompute-match.tool.js';
 import { ulid } from 'ulid';
 import { MEMORY_QUEUE, type MemoryJobData } from '../contexts/memory/memory.constants.js';
 import { PendingToolResult } from '../database/entities/agent/pending-tool-result.entity.js';
+import { type AppConfig } from '../config/configuration.js';
 
 export interface AgentSseEvent {
   data: string;
@@ -64,10 +68,30 @@ const TOOL_SCENES: Record<string, string[]> = {
 const MAX_ITERATION = 10;
 const TOOL_TIMEOUT_MS = 90_000; // 90 seconds
 
+// Default models for each provider
+const DEFAULT_MODELS = {
+  openai: { write: 'gpt-4.1', parse: 'gpt-4.1-mini' },
+  anthropic: { write: 'claude-sonnet-4-6', parse: 'claude-3-5-haiku-latest' },
+  openrouter: { write: 'anthropic/claude-sonnet-4', parse: 'openai/gpt-4.1-mini' },
+};
+
+// Base URLs for each provider
+const DEFAULT_BASE_URLS = {
+  openai: 'https://api.openai.com/v1',
+  anthropic: 'https://api.anthropic.com',
+  openrouter: 'https://openrouter.ai/api/v1',
+};
+
 @Injectable()
 export class AgentService {
   private readonly logger = new Logger(AgentService.name);
   private readonly toolMap: Map<string, ToolExecutor>;
+  private readonly writeModel: Model<Api>;
+  private readonly parseModel: Model<Api>;
+  private readonly fallbackModel?: Model<Api>;
+  private errorCount = 0;
+  private errorLastAt = 0;
+  private readonly embeddingModel: string;
 
   constructor(
     @InjectRepository(ConvMessage) private readonly messageRepo: Repository<ConvMessage>,
@@ -85,6 +109,7 @@ export class AgentService {
     private readonly setDensityTool: SetConversationDensityTool,
     private readonly farewellTool: FarewellTool,
     private readonly recomputeMatchTool: RecomputeMatchTool,
+    private readonly configService: ConfigService<AppConfig>,
   ) {
     this.toolMap = new Map([
       [this.searchCompanyTool.name, this.searchCompanyTool as unknown as ToolExecutor],
@@ -96,6 +121,70 @@ export class AgentService {
       [this.farewellTool.name, this.farewellTool as unknown as ToolExecutor],
       [this.recomputeMatchTool.name, this.recomputeMatchTool as unknown as ToolExecutor],
     ]);
+
+    // Build models from configuration
+    const llmConfig = this.configService.get('llm', { infer: true });
+    this.writeModel = this.buildModel(llmConfig, 'write');
+    this.parseModel = this.buildModel(llmConfig, 'parse');
+    this.fallbackModel = llmConfig.fallbackProvider !== 'none'
+      ? this.buildFallbackModel(llmConfig)
+      : undefined;
+    this.embeddingModel = llmConfig.embeddingModel;
+
+    this.logger.log(`LLM configured: provider=${llmConfig.provider}, model=${this.writeModel.id}, baseUrl=${this.writeModel.baseUrl}`);
+    if (this.fallbackModel) {
+      this.logger.log(`Fallback: provider=${llmConfig.fallbackProvider}, model=${this.fallbackModel.id}`);
+    }
+  }
+
+  private buildModel(llmConfig: AppConfig['llm'], usage: 'write' | 'parse'): Model<Api> {
+    const provider = llmConfig.provider;
+    const providerConfig = llmConfig[provider];
+    const defaultModel = DEFAULT_MODELS[provider][usage];
+    const defaultBaseUrl = DEFAULT_BASE_URLS[provider];
+
+    const modelId = providerConfig.model || defaultModel;
+    const baseUrl = providerConfig.baseUrl || defaultBaseUrl;
+
+    // Determine API type based on provider
+    const api: Api = provider === 'anthropic' ? 'anthropic-messages' : 'openai-completions';
+
+    return {
+      id: modelId,
+      name: modelId,
+      api,
+      provider,
+      baseUrl,
+      reasoning: provider === 'anthropic' || modelId.includes('o1') || modelId.includes('o3'),
+      input: ['text', 'image'],
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, // pi-ai handles pricing internally
+      contextWindow: 128000,
+      maxTokens: 16384,
+    };
+  }
+
+  private buildFallbackModel(llmConfig: AppConfig['llm']): Model<Api> {
+    const provider = llmConfig.fallbackProvider as 'openai' | 'anthropic' | 'openrouter';
+    const providerConfig = llmConfig[provider];
+    const defaultModel = DEFAULT_MODELS[provider].write;
+    const defaultBaseUrl = DEFAULT_BASE_URLS[provider];
+
+    const modelId = providerConfig.model || defaultModel;
+    const baseUrl = providerConfig.baseUrl || defaultBaseUrl;
+    const api: Api = provider === 'anthropic' ? 'anthropic-messages' : 'openai-completions';
+
+    return {
+      id: modelId,
+      name: modelId,
+      api,
+      provider,
+      baseUrl,
+      reasoning: provider === 'anthropic',
+      input: ['text', 'image'],
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+      contextWindow: 128000,
+      maxTokens: 16384,
+    };
   }
 
   respond(
@@ -161,9 +250,12 @@ export class AgentService {
 
       let iteration = 0;
       while (iteration++ < MAX_ITERATION) {
-        // 3. Stream LLM turn
+        // 3. Stream LLM turn - use fallback model if error threshold exceeded
+        const model = this.shouldFailover() && this.fallbackModel
+          ? this.fallbackModel
+          : this.writeModel;
 
-        const s = this.llm.streamContext(context);
+        const s = this.llm.streamContextWithModel(model, context);
 
         for await (const event of s) {
           if (event.type === 'text_delta') {
@@ -350,4 +442,9 @@ export class AgentService {
       }));
   }
 
+  private shouldFailover(): boolean {
+    const now = Date.now();
+    if (now - this.errorLastAt > 60000) this.errorCount = 0;
+    return this.errorCount >= 5;
+  }
 }

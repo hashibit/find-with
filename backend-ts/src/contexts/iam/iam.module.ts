@@ -65,6 +65,6 @@ import { RedisModule } from '../../redis/redis.module.js';
       },
     },
   ],
-  exports: [IamService, BillingService, AUTH_VERIFIER, PAYMENT_GATEWAY, NonceStore],
+  exports: [IamService, BillingService, AUTH_VERIFIER, PAYMENT_GATEWAY, NonceStore, AccountPurgeSagaService],
 })
 export class IamModule {}

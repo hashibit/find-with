@@ -1,4 +1,4 @@
-import { stream, type Context } from '@earendil-works/pi-ai';
+import { stream, type Context, type Model, type Api } from '@earendil-works/pi-ai';
 
 export const LLM_PROVIDER = Symbol('LLM_PROVIDER');
 
@@ -12,7 +12,10 @@ export const LLM_PROVIDER = Symbol('LLM_PROVIDER');
  * A StubLlmProvider can be injected in tests to eliminate network calls.
  */
 export interface LlmProvider {
-  /** Streaming turn — used by the agent loop. */
+  /** Streaming turn with a specific model — used by the agent loop. */
+  streamContextWithModel(model: Model<Api>, context: Context): ReturnType<typeof stream>;
+
+  /** Legacy streaming turn — kept for backward compatibility. */
   streamContext(context: Context): ReturnType<typeof stream>;
 
   /** One-shot completion — used by tools for structured JSON extraction. */

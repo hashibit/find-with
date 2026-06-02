@@ -5,21 +5,35 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { type Request } from 'express';
 import { AUTH_VERIFIER, type AuthVerifier } from '../../adapters/auth/auth.interface.js';
 import { RedisService } from '../../redis/redis.module.js';
 
 @Injectable()
 export class UserAuthGuard implements CanActivate {
+  private readonly devMode: boolean;
+  private readonly devUserId: string;
+
   constructor(
     @Inject(AUTH_VERIFIER) private readonly verifier: AuthVerifier,
     private readonly redisService: RedisService,
-  ) {}
+    private readonly configService: ConfigService,
+  ) {
+    this.devMode = this.configService.get('env') === 'development';
+    this.devUserId = 'dev_user_001';
+  }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<Request & { user?: unknown }>();
     const token = this.extractToken(request);
     if (!token) throw new UnauthorizedException('Missing Bearer token');
+
+    // Dev mode bypass: accept dev_user_001 as valid token
+    if (this.devMode && token === this.devUserId) {
+      request.user = { userId: this.devUserId };
+      return true;
+    }
 
     // Extension session tokens are 64 hex chars (32 CSPRNG bytes).
     // Validate against Redis — they are never sent to Clerk.

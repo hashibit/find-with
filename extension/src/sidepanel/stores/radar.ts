@@ -15,8 +15,21 @@ interface RadarState {
   isLoading: boolean;
   error: string | null;
   fetchRadar: () => Promise<void>;
-  updateItemStatus: (id: string, status: RadarItem['status']) => void;
+  updateItemStatus: (id: string, status: RadarItem['status']) => Promise<void>;
 }
+
+const STATUS_MAP: Record<string, RadarItem['status']> = {
+  BROWSED: 'saved',
+  ANALYZED: 'saved',
+  DECIDED: 'saved',
+  DECIDED_NO: 'saved',
+  APPLIED: 'applied',
+  INTERVIEWING: 'interview',
+  OFFER_RECEIVED: 'offer',
+  OFFER_ACCEPTED: 'offer',
+  OFFER_REJECTED: 'rejected',
+  REJECTED: 'rejected',
+};
 
 export const useRadarStore = create<RadarState>((set) => ({
   radarItems: [],
@@ -26,20 +39,49 @@ export const useRadarStore = create<RadarState>((set) => ({
   fetchRadar: async () => {
     set({ isLoading: true, error: null });
     try {
-      // Stub: real implementation fetches from SW via chrome.runtime.sendMessage
-      // which proxies to API /v1/radar
-      await new Promise((resolve) => setTimeout(resolve, 200));
-      set({ radarItems: [], isLoading: false });
+      const result = await chrome.runtime.sendMessage({ type: 'RADAR_FETCH' });
+      if (result.error) {
+        set({ error: result.error, isLoading: false });
+        return;
+      }
+      // Transform backend items to store format
+      const items: RadarItem[] = (result.items || result || []).map((item: any) => ({
+        id: item.id,
+        jobTitle: item.jobTitle || item.title || 'Unknown',
+        company: item.companyName || item.company || 'Unknown',
+        status: STATUS_MAP[item.status] || 'saved',
+        appliedAt: item.appliedAt ? new Date(item.appliedAt).getTime() : undefined,
+        lastActivity: item.lastActivity ? new Date(item.lastActivity).getTime() : undefined,
+        sourceUrl: item.sourceUrl,
+      }));
+      set({ radarItems: items, isLoading: false });
     } catch (e) {
       set({ error: String(e), isLoading: false });
     }
   },
 
-  updateItemStatus: (id: string, status: RadarItem['status']) => {
-    set((state) => ({
-      radarItems: state.radarItems.map((item) =>
-        item.id === id ? { ...item, status, lastActivity: Date.now() } : item,
-      ),
-    }));
+  updateItemStatus: async (id: string, status: RadarItem['status']) => {
+    // Map back to backend status
+    const backendStatusMap: Record<RadarItem['status'], string> = {
+      saved: 'ANALYZED',
+      applied: 'APPLIED',
+      interview: 'INTERVIEWING',
+      offer: 'OFFER_RECEIVED',
+      rejected: 'REJECTED',
+    };
+    try {
+      await chrome.runtime.sendMessage({
+        type: 'RADAR_UPDATE',
+        payload: { id, status: backendStatusMap[status] },
+      });
+      // Update local state
+      set((state) => ({
+        radarItems: state.radarItems.map((item) =>
+          item.id === id ? { ...item, status, lastActivity: Date.now() } : item,
+        ),
+      }));
+    } catch (e) {
+      console.error('[Radar] Failed to update status', e);
+    }
   },
 }));

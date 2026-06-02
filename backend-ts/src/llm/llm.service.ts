@@ -1,46 +1,129 @@
-import { Injectable } from '@nestjs/common';
-import { getModel, stream, complete, type Context } from '@earendil-works/pi-ai';
+import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { stream, complete, type Context, type Model, type Api } from '@earendil-works/pi-ai';
 import OpenAI from 'openai';
 import { type LlmProvider } from './llm-provider.interface.js';
-
-export const MODEL_PARSE = 'gpt-4.1-mini';
-export const MODEL_WRITE = 'gpt-4.1';
-export const MODEL_WRITE_FALLBACK = 'claude-sonnet-4-6';
+import { type AppConfig } from '../config/configuration.js';
 
 const FAILOVER_THRESHOLD = 5;
 const FAILOVER_WINDOW_MS = 60_000;
 
 @Injectable()
 export class LlmService implements LlmProvider {
-  // openai kept solely for embeddings — pi-ai does not cover the embeddings API
+  private readonly logger = new Logger(LlmService.name);
+  // OpenAI client for embeddings — pi-ai does not cover the embeddings API
   private readonly openai: OpenAI;
   private errorCount = 0;
   private errorLastAt = 0;
 
-  constructor() {
-    // pi-ai reads OPENAI_API_KEY + ANTHROPIC_API_KEY from process.env automatically
-    this.openai = new OpenAI();
+  // API keys for each provider
+  private readonly openaiApiKey?: string;
+  private readonly anthropicApiKey?: string;
+  private readonly openrouterApiKey?: string;
+
+  constructor(private readonly configService: ConfigService<AppConfig>) {
+    const llmConfig = this.configService.get('llm', { infer: true });
+
+    this.openaiApiKey = llmConfig.openai.apiKey;
+    this.anthropicApiKey = llmConfig.anthropic.apiKey;
+    this.openrouterApiKey = llmConfig.openrouter.apiKey;
+
+    // Set environment variables for pi-ai (it reads from process.env)
+    if (this.openaiApiKey) process.env.OPENAI_API_KEY = this.openaiApiKey;
+    if (this.anthropicApiKey) process.env.ANTHROPIC_API_KEY = this.anthropicApiKey;
+    if (this.openrouterApiKey) process.env.OPENROUTER_API_KEY = this.openrouterApiKey;
+
+    // OpenAI client for embeddings
+    this.openai = new OpenAI({
+      apiKey: this.openaiApiKey,
+      baseURL: llmConfig.openai.baseUrl,
+    });
+
+    this.logger.log(`LlmService initialized: provider=${llmConfig.provider}`);
   }
 
-  /** Returns a pi-ai stream. Caller iterates events and calls .result() for the final message. */
+  /** Stream with a specific model. Used by AgentService. */
+  streamContextWithModel(model: Model<Api>, context: Context): ReturnType<typeof stream> {
+    // Build options with apiKey based on provider
+    const options: Record<string, unknown> = {};
+
+    if (model.provider === 'openai' && this.openaiApiKey) {
+      options.apiKey = this.openaiApiKey;
+    } else if (model.provider === 'anthropic' && this.anthropicApiKey) {
+      options.apiKey = this.anthropicApiKey;
+    } else if (model.provider === 'openrouter' && this.openrouterApiKey) {
+      options.apiKey = this.openrouterApiKey;
+    }
+
+    return stream(model, context, options);
+  }
+
+  /** Legacy method - kept for compatibility. Returns a pi-ai stream. */
   streamContext(context: Context): ReturnType<typeof stream> {
-    const model = this.shouldFailover()
-      ? getModel('anthropic', MODEL_WRITE_FALLBACK)
-      : getModel('openai', MODEL_WRITE);
-    return stream(model, context);
+    // This method is no longer used by AgentService, but kept for backward compatibility
+    const llmConfig = this.configService.get('llm', { infer: true });
+    const provider = llmConfig.provider;
+    const providerConfig = llmConfig[provider];
+
+    const api: Api = provider === 'anthropic' ? 'anthropic-messages' : 'openai-completions';
+    const modelId = providerConfig.model || 'gpt-4.1';
+    const baseUrl = providerConfig.baseUrl || 'https://api.openai.com/v1';
+
+    const model: Model<Api> = {
+      id: modelId,
+      name: modelId,
+      api,
+      provider,
+      baseUrl,
+      reasoning: provider === 'anthropic',
+      input: ['text', 'image'],
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+      contextWindow: 128000,
+      maxTokens: 16384,
+    };
+
+    return this.streamContextWithModel(model, context);
   }
 
   /** One-shot completion — used by tools for structured JSON extraction. */
   async completeContext(context: Context): Promise<string> {
-    const model = getModel('openai', MODEL_PARSE);
-    const msg = await complete(model, context);
+    const llmConfig = this.configService.get('llm', { infer: true });
+    const provider = llmConfig.provider;
+    const providerConfig = llmConfig[provider];
+
+    const api: Api = provider === 'anthropic' ? 'anthropic-messages' : 'openai-completions';
+    const modelId = providerConfig.model || 'gpt-4.1-mini';
+    const baseUrl = providerConfig.baseUrl || 'https://api.openai.com/v1';
+
+    const model: Model<Api> = {
+      id: modelId,
+      name: modelId,
+      api,
+      provider,
+      baseUrl,
+      reasoning: false,
+      input: ['text'],
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+      contextWindow: 128000,
+      maxTokens: 4096,
+    };
+
+    const options: Record<string, unknown> = {};
+    if (provider === 'openai' && this.openaiApiKey) options.apiKey = this.openaiApiKey;
+    else if (provider === 'anthropic' && this.anthropicApiKey) options.apiKey = this.anthropicApiKey;
+    else if (provider === 'openrouter' && this.openrouterApiKey) options.apiKey = this.openrouterApiKey;
+
+    const msg = await complete(model, context, options);
     const block = msg.content.find((b) => b.type === 'text');
     return block?.type === 'text' ? block.text : '';
   }
 
   async embed(text: string): Promise<number[]> {
+    const llmConfig = this.configService.get('llm', { infer: true });
+    const embeddingModel = llmConfig.embeddingModel;
+
     const resp = await this.openai.embeddings.create({
-      model: 'text-embedding-3-small',
+      model: embeddingModel,
       input: text,
     });
     return resp.data[0]!.embedding;
@@ -58,16 +141,13 @@ export class LlmService implements LlmProvider {
   }
 
   async ready(): Promise<void> {
-    // Lightweight check: verify the API key is configured without making a live API call.
-    // A real embedding call on every /health poll generates constant paid API traffic.
-    if (!process.env.OPENAI_API_KEY) {
-      throw new Error('OPENAI_API_KEY is not configured');
-    }
-  }
+    // Lightweight check: verify at least one API key is configured
+    const llmConfig = this.configService.get('llm', { infer: true });
+    const provider = llmConfig.provider;
+    const apiKey = llmConfig[provider].apiKey;
 
-  private shouldFailover(): boolean {
-    const now = Date.now();
-    if (now - this.errorLastAt > FAILOVER_WINDOW_MS) this.errorCount = 0;
-    return this.errorCount >= FAILOVER_THRESHOLD;
+    if (!apiKey) {
+      throw new Error(`${provider.toUpperCase()}_API_KEY is not configured`);
+    }
   }
 }

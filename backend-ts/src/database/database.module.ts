@@ -97,6 +97,7 @@ export const ALL_ENTITIES = [
       },
     }),
   ],
+  providers: [DatabaseService],
   exports: [TypeOrmModule, DatabaseService],
 })
 export class DatabaseModule {}

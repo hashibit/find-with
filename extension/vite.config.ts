@@ -1,9 +1,20 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
+import hotReloadExtension from 'hot-reload-extension-vite';
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    hotReloadExtension({
+      log: true,
+      backgroundPath: 'src/background/index.ts',
+      sidePanel: {
+        path: 'src/sidepanel/index.tsx',
+        htmlPath: 'src/sidepanel/index.html',
+      },
+    }),
+  ],
   resolve: {
     alias: { '@': resolve(__dirname, 'src') },
   },

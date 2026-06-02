@@ -1,6 +1,13 @@
+import { DEV_MODE, DEV_USER_ID } from '../lib/auth';
+
 const API_BASE = 'http://localhost:14667'; // dev; prod: https://api.findwith.com
 
 export async function getToken(): Promise<string | null> {
+  // Dev mode bypass: return mock userId as token
+  if (DEV_MODE) {
+    return DEV_USER_ID;
+  }
+
   const data = await chrome.storage.local.get(['token', 'expires_at']);
   if (!data.token) return null;
 
@@ -68,6 +75,12 @@ export async function handleAuthNonce(nonce: string): Promise<{ ok: boolean }> {
 }
 
 export function initAuth() {
+  // Dev mode: no auth check needed
+  if (DEV_MODE) {
+    console.log('[Auth] Dev mode enabled, using mock user:', DEV_USER_ID);
+    return;
+  }
+
   // On startup, check if we have a valid token
   getToken().then((token) => {
     if (!token) {

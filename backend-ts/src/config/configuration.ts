@@ -10,8 +10,22 @@ const envSchema = z.object({
   S3_SECRET_ACCESS_KEY: z.string().min(1),
   S3_REGION: z.string().default('us-east-1'),
   S3_ENDPOINT: z.string().url().optional(),
-  OPENAI_API_KEY: z.string().min(1),
-  ANTHROPIC_API_KEY: z.string().min(1),
+  // LLM providers - support OpenAI, Anthropic, OpenRouter
+  OPENAI_API_KEY: z.string().min(1).optional(),
+  OPENAI_BASE_URL: z.string().url().optional(),
+  OPENAI_MODEL: z.string().optional(),
+  ANTHROPIC_API_KEY: z.string().min(1).optional(),
+  ANTHROPIC_BASE_URL: z.string().url().optional(),
+  ANTHROPIC_MODEL: z.string().optional(),
+  OPENROUTER_API_KEY: z.string().min(1).optional(),
+  OPENROUTER_BASE_URL: z.string().url().optional().default('https://openrouter.ai/api/v1'),
+  OPENROUTER_MODEL: z.string().optional(),
+  // Provider preference: openai | anthropic | openrouter
+  LLM_PROVIDER: z.enum(['openai', 'anthropic', 'openrouter']).default('openai'),
+  // Fallback provider when primary fails
+  LLM_FALLBACK_PROVIDER: z.enum(['openai', 'anthropic', 'openrouter', 'none']).default('anthropic'),
+  // Embedding provider (always OpenAI for now)
+  EMBEDDING_MODEL: z.string().default('text-embedding-3-small'),
   CLERK_SECRET_KEY: z.string().min(1),
   CLERK_JWKS_URL: z.string().url(),
   STRIPE_SECRET_KEY: z.string().min(1),
@@ -37,7 +51,14 @@ export interface AppConfig {
     region: string;
     endpoint?: string;
   };
-  llm: { openaiApiKey: string; anthropicApiKey: string };
+  llm: {
+    provider: 'openai' | 'anthropic' | 'openrouter';
+    fallbackProvider: 'openai' | 'anthropic' | 'openrouter' | 'none';
+    openai: { apiKey?: string; baseUrl?: string; model?: string };
+    anthropic: { apiKey?: string; baseUrl?: string; model?: string };
+    openrouter: { apiKey?: string; baseUrl: string; model?: string };
+    embeddingModel: string;
+  };
   clerk: { secretKey: string; jwksUrl: string };
   stripe: { secretKey: string; webhookSecret: string };
   svix: { signingSecret: string };
@@ -70,8 +91,24 @@ export const configuration = (): AppConfig => {
       endpoint: env.S3_ENDPOINT,
     },
     llm: {
-      openaiApiKey: env.OPENAI_API_KEY,
-      anthropicApiKey: env.ANTHROPIC_API_KEY,
+      provider: env.LLM_PROVIDER,
+      fallbackProvider: env.LLM_FALLBACK_PROVIDER,
+      openai: {
+        apiKey: env.OPENAI_API_KEY,
+        baseUrl: env.OPENAI_BASE_URL,
+        model: env.OPENAI_MODEL,
+      },
+      anthropic: {
+        apiKey: env.ANTHROPIC_API_KEY,
+        baseUrl: env.ANTHROPIC_BASE_URL,
+        model: env.ANTHROPIC_MODEL,
+      },
+      openrouter: {
+        apiKey: env.OPENROUTER_API_KEY,
+        baseUrl: env.OPENROUTER_BASE_URL,
+        model: env.OPENROUTER_MODEL,
+      },
+      embeddingModel: env.EMBEDDING_MODEL,
     },
     clerk: {
       secretKey: env.CLERK_SECRET_KEY,

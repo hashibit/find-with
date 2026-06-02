@@ -8,16 +8,58 @@ chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
 
 // Port connections (SW ↔ Side Panel) — declared early so handlers below can reference it
 const connectedPorts: Set<chrome.runtime.Port> = new Set();
+const conversationPorts: Map<string, chrome.runtime.Port> = new Map(); // conversationId → port
 
 chrome.runtime.onConnect.addListener((port) => {
   connectedPorts.add(port);
-  port.onDisconnect.addListener(() => connectedPorts.delete(port));
+  port.onDisconnect.addListener(() => {
+    connectedPorts.delete(port);
+    // Clean up conversation port if it was one
+    for (const [convId, p] of conversationPorts.entries()) {
+      if (p === port) {
+        conversationPorts.delete(convId);
+        break;
+      }
+    }
+  });
 
   port.onMessage.addListener(async (msg) => {
     if (msg.type === 'REQ_REFRESH_TOKEN') {
       // Side Panel has refreshed token via Clerk
       if (msg.token) {
         await chrome.storage.local.set({ token: msg.token, expires_at: msg.expires_at });
+      }
+    }
+
+    // Conversation SSE streaming
+    if (msg.type === 'CONVERSATION_PROMPT') {
+      const { conversationId, message } = msg.payload;
+      const token = await getToken();
+      if (!token) {
+        port.postMessage({ type: 'SSE_ERROR', error: 'not_authenticated' });
+        return;
+      }
+
+      // Register this port for the conversation
+      conversationPorts.set(conversationId, port);
+
+      // Open SSE stream and forward events
+      try {
+        const ctrl = await openSseStream(
+          `http://localhost:14667/api/v1/conversations/${conversationId}/prompt?message=${encodeURIComponent(message)}`,
+          token,
+          (event) => {
+            port.postMessage({ type: 'SSE_EVENT', data: event.data });
+          },
+        );
+
+        // Store abort controller for cleanup
+        port.onDisconnect.addListener(() => {
+          ctrl.abort();
+          conversationPorts.delete(conversationId);
+        });
+      } catch (e) {
+        port.postMessage({ type: 'SSE_ERROR', error: String(e) });
       }
     }
   });
@@ -73,7 +115,7 @@ async function refreshEntitlements() {
   try {
     const token = await getToken();
     if (!token) return;
-    const resp = await fetch('https://api.findwith.com/v1/me/entitlements', {
+    const resp = await fetch('http://localhost:14667/api/v1/iam/me/entitlements', {
       headers: { Authorization: `Bearer ${token}` },
     });
     if (resp.ok) {

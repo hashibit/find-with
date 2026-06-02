@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { getToken } from '../../lib/auth';
 
-const API_BASE = 'https://api.findwith.com/v1';
+const API_BASE = 'http://localhost:14667/v1'; // dev; prod: https://api.findwith.com/v1
 
 interface BasicInfo {
   fullName?: string;
@@ -13,12 +14,6 @@ interface ProfileData {
   basicInfo: BasicInfo | null;
   resumeUrl?: string;
   createdAt: string;
-}
-
-async function getToken(): Promise<string | null> {
-  return new Promise((resolve) => {
-    chrome.storage.local.get(['token'], (res) => resolve(res['token'] ?? null));
-  });
 }
 
 async function fetchProfile(token: string): Promise<ProfileData | null> {

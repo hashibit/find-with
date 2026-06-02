@@ -1,4 +1,7 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+
+const API_BASE = 'http://localhost:14667/api/v1';
 
 interface BulletState {
   id: string;
@@ -12,38 +15,75 @@ interface Section {
   bullets: BulletState[];
 }
 
+interface TailoringData {
+  id: string;
+  status: string;
+  baseResumeId: string;
+  parsedJdId: string;
+  sections: Section[];
+  matchScoreBefore: number;
+  matchScoreAfter: number;
+  jobTitle?: string;
+  company?: string;
+}
+
 export function Tailoring() {
-  const mockTailoring: Section[] = [
-    {
-      title: 'Work Experience',
-      bullets: [
-        {
-          id: 'bullet_1',
-          text: 'Led migration of legacy payment system to modern microservices architecture, reducing latency by 45%',
-          sourceId: 'mat_abc123',
-          status: 'CONFIRMED',
-        },
-        {
-          id: 'bullet_2',
-          text: 'Improved cross-team collaboration by implementing weekly sync cadence across 5 engineering teams',
-          sourceId: 'mat_def456',
-          status: 'CONFIRMED',
-        },
-        {
-          id: 'bullet_3',
-          text: 'Authored internal documentation that became team standard for API design',
-          sourceId: undefined,
-          status: 'PENDING',
-        },
-        {
-          id: 'bullet_4',
-          text: 'Mentored 3 junior engineers who all promoted within 12 months',
-          sourceId: 'mat_ghi789',
-          status: 'USER_EDITED',
-        },
-      ],
-    },
-  ];
+  const [params] = useSearchParams();
+  const tailoringId = params.get('id');
+
+  const [tailoring, setTailoring] = useState<TailoringData | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [editingBullet, setEditingBullet] = useState<string | null>(null);
+  const [editText, setEditText] = useState('');
+
+  useEffect(() => {
+    if (!tailoringId) return;
+    setLoading(true);
+    setError(null);
+
+    (async () => {
+      try {
+        const token = await getToken();
+        const resp = await fetch(`${API_BASE}/tailoring/${tailoringId}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        if (!resp.ok) throw new Error(`${resp.status} ${resp.statusText}`);
+        const data = await resp.json();
+        setTailoring(transformTailoringData(data));
+      } catch (e) {
+        setError(String(e));
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [tailoringId]);
+
+  if (!tailoringId) {
+    return (
+      <div style={{ padding: '24px 16px', color: '#6b7280', fontSize: 14 }}>
+        No tailoring session selected. Start from a job analysis.
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div style={{ padding: '24px 16px', color: '#6b7280', fontSize: 14 }}>
+        Loading tailored resume...
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={{ padding: '24px 16px', color: '#dc2626', fontSize: 14 }}>
+        Failed to load: {error}
+      </div>
+    );
+  }
+
+  if (!tailoring) return null;
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -58,89 +98,173 @@ export function Tailoring() {
     }
   };
 
+  const handleEditBullet = async (bulletId: string, newText: string) => {
+    try {
+      const token = await getToken();
+      const resp = await fetch(`${API_BASE}/tailoring/${tailoringId}/bullets/${bulletId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ text: newText }),
+      });
+      if (!resp.ok) throw new Error('Failed to edit');
+      // Update local state
+      setTailoring((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          sections: prev.sections.map((section) => ({
+            ...section,
+            bullets: section.bullets.map((b) =>
+              b.id === bulletId ? { ...b, text: newText, status: 'USER_EDITED' } : b,
+            ),
+          })),
+        };
+      });
+      setEditingBullet(null);
+      setEditText('');
+    } catch (e) {
+      console.error('Failed to edit bullet', e);
+    }
+  };
+
+  const handleExport = async (fmt: string = 'pdf') => {
+    try {
+      const token = await getToken();
+      const resp = await fetch(`${API_BASE}/tailoring/${tailoringId}/export`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!resp.ok) throw new Error('Failed to export');
+      const data = await resp.json();
+      // Copy text to clipboard
+      await navigator.clipboard.writeText(data.text);
+      alert('Resume text copied to clipboard!');
+    } catch (e) {
+      console.error('Failed to export', e);
+    }
+  };
+
   return (
     <div style={{ padding: '24px 16px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <h2 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>Tailoring</h2>
-        <span style={{ fontSize: 12, color: '#4f46e5', fontWeight: 500 }}>匹配度: 78%</span>
+        <span style={{ fontSize: 12, color: '#4f46e5', fontWeight: 500 }}>
+          Match: {tailoring.matchScoreAfter}%
+        </span>
       </div>
 
-      <p style={{ fontSize: 14, color: '#6b7280', marginBottom: 16 }}>
-        Tailored for <strong>Senior Product Engineer</strong> at <strong>Acme Corp</strong>
-      </p>
+      {tailoring.jobTitle && tailoring.company && (
+        <p style={{ fontSize: 14, color: '#6b7280', marginBottom: 16 }}>
+          Tailored for <strong>{tailoring.jobTitle}</strong> at <strong>{tailoring.company}</strong>
+        </p>
+      )}
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, padding: 12, background: '#f9fafb', borderRadius: 8 }}>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 12, color: '#6b7280' }}>Before</div>
           <div style={{ fontSize: 13, fontWeight: 500 }}>
-            <span style={{ color: '#dc2626' }}>42%</span> match
+            <span style={{ color: '#dc2626' }}>{tailoring.matchScoreBefore}%</span> match
           </div>
         </div>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 12, color: '#6b7280' }}>After</div>
           <div style={{ fontSize: 13, fontWeight: 500 }}>
-            <span style={{ color: '#22c55e' }}>78%</span> match
+            <span style={{ color: '#22c55e' }}>{tailoring.matchScoreAfter}%</span> match
           </div>
-        </div>
-      </div>
-
-      {/* Timeline */}
-      <div style={{ marginBottom: 16, padding: '12px 0' }}>
-        <div style={{ fontSize: 12, color: '#9ca3af', marginBottom: 8 }}>Source tracking</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ width: 32, height: 32, background: '#e5e7eb', borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>
-            1
-          </div>
-          <div style={{ flex: 1, height: 2, background: '#e5e7eb' }} />
-          <div style={{ width: 32, height: 32, background: '#4f46e5', borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: 'white' }}>
-            2
-          </div>
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#6b7280', marginTop: 4 }}>
-          <span>Onboarding</span>
-          <span>Tailoring</span>
         </div>
       </div>
 
       {/* Resume Sections */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        {mockTailoring.map((section, idx) => (
+        {tailoring.sections.map((section, idx) => (
           <div key={idx}>
             <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>{section.title}</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {section.bullets.map((bullet) => {
                 const statusStyle = getStatusColor(bullet.status);
+                const isEditing = editingBullet === bullet.id;
                 return (
                   <div key={bullet.id}>
-                    <div
-                      style={{
-                        padding: '12px 16px',
-                        borderRadius: 8,
-                        border: '1px solid #e5e7eb',
-                        background: statusStyle.bg,
-                        fontSize: 14,
-                        lineHeight: 1.6,
-                        position: 'relative',
-                      }}
-                    >
-                      {bullet.text}
-                      <span
+                    {isEditing ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <textarea
+                          value={editText}
+                          onChange={(e) => setEditText(e.target.value)}
+                          style={{
+                            padding: '12px 16px',
+                            borderRadius: 8,
+                            border: '1px solid #4f46e5',
+                            fontSize: 14,
+                            lineHeight: 1.6,
+                            minHeight: 80,
+                          }}
+                        />
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <button
+                            onClick={() => handleEditBullet(bullet.id, editText)}
+                            style={{
+                              padding: '8px 16px',
+                              background: '#4f46e5',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: 6,
+                              cursor: 'pointer',
+                              fontSize: 13,
+                            }}
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={() => { setEditingBullet(null); setEditText(''); }}
+                            style={{
+                              padding: '8px 16px',
+                              background: '#f3f4f6',
+                              color: '#374151',
+                              border: 'none',
+                              borderRadius: 6,
+                              cursor: 'pointer',
+                              fontSize: 13,
+                            }}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div
                         style={{
-                          position: 'absolute',
-                          top: 8,
-                          right: 8,
-                          background: 'white',
-                          padding: '2px 8px',
-                          borderRadius: 10,
-                          fontSize: 10,
-                          fontWeight: 600,
-                          color: statusStyle.text,
-                          border: `1px solid ${statusStyle.bg}`,
+                          padding: '12px 16px',
+                          borderRadius: 8,
+                          border: '1px solid #e5e7eb',
+                          background: statusStyle.bg,
+                          fontSize: 14,
+                          lineHeight: 1.6,
+                          position: 'relative',
+                          cursor: 'pointer',
                         }}
+                        onClick={() => { setEditingBullet(bullet.id); setEditText(bullet.text); }}
                       >
-                        {statusStyle.label}
-                      </span>
-                    </div>
+                        {bullet.text}
+                        <span
+                          style={{
+                            position: 'absolute',
+                            top: 8,
+                            right: 8,
+                            background: 'white',
+                            padding: '2px 8px',
+                            borderRadius: 10,
+                            fontSize: 10,
+                            fontWeight: 600,
+                            color: statusStyle.text,
+                            border: `1px solid ${statusStyle.bg}`,
+                          }}
+                        >
+                          {statusStyle.label}
+                        </span>
+                      </div>
+                    )}
                     <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4, paddingLeft: 8 }}>
                       {bullet.sourceId ? `Source: material_${bullet.sourceId.slice(-6)}` : 'Inferred by Quinn'}
                     </div>
@@ -154,6 +278,7 @@ export function Tailoring() {
 
       <div style={{ marginTop: 24, display: 'flex', gap: 8 }}>
         <button
+          onClick={() => handleExport('pdf')}
           style={{
             padding: '10px 20px',
             background: '#4f46e5',
@@ -165,23 +290,45 @@ export function Tailoring() {
             fontWeight: 500,
           }}
         >
-          Export PDF
-        </button>
-        <button
-          style={{
-            padding: '10px 20px',
-            background: '#f3f4f6',
-            color: '#374151',
-            border: 'none',
-            borderRadius: 8,
-            cursor: 'pointer',
-            fontSize: 14,
-            fontWeight: 500,
-          }}
-        >
-          Copy Text
+          Export (Copy Text)
         </button>
       </div>
     </div>
   );
+}
+
+function transformTailoringData(data: any): TailoringData {
+  // Transform backend response to component format
+  const sections: Section[] = (data.sections || []).map((s: any) => ({
+    title: s.title || s.sectionName || 'Experience',
+    bullets: (s.bullets || []).map((b: any) => ({
+      id: b.id,
+      text: b.text || b.shiningText || '',
+      sourceId: b.sourceId || b.materialId,
+      status: b.status || 'CONFIRMED',
+    })),
+  }));
+
+  return {
+    id: data.id,
+    status: data.status,
+    baseResumeId: data.baseResumeId,
+    parsedJdId: data.parsedJdId,
+    sections,
+    matchScoreBefore: data.matchScoreBefore || 0,
+    matchScoreAfter: data.matchScoreAfter || 0,
+    jobTitle: data.job?.title || data.parsedJd?.title,
+    company: data.job?.company || data.parsedJd?.company,
+  };
+}
+
+async function getToken(): Promise<string | null> {
+  // Use dev mode bypass
+  const DEV_MODE = true;
+  const DEV_USER_ID = 'dev_user_001';
+  if (DEV_MODE) return DEV_USER_ID;
+
+  return new Promise((resolve) => {
+    chrome.storage.local.get(['token'], (res) => resolve(res['token'] ?? null));
+  });
 }

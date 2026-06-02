@@ -23,6 +23,7 @@ export class MineShiningPointTool {
   ) {}
 
   readonly name = MINE_SHINING_POINT_TOOL_NAME;
+  readonly scenes = ['ONBOARDING', 'GAP_MINING'] as const;
   readonly description =
     "Extract a 'shining point' achievement from the user's message and create a PROPOSED material item.";
   readonly parameters = Type.Object({

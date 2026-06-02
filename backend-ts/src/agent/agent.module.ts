@@ -4,6 +4,7 @@ import { BullModule } from '@nestjs/bullmq';
 import { MEMORY_QUEUE } from '../contexts/memory/memory.constants.js';
 import { AgentService } from './agent.service.js';
 import { ContextBuilderService } from './context-builder.service.js';
+import { SemanticMaterialLoaderService } from './semantic-material-loader.service.js';
 import { SearchCompanyTool } from './tools/search-company.tool.js';
 import { MineShiningPointTool } from './tools/mine-shining-point.tool.js';
 import { DraftMotivationTool } from './tools/draft-motivation.tool.js';
@@ -65,6 +66,7 @@ import { type AppConfig } from '../config/configuration.js';
     },
     AgentService,
     ContextBuilderService,
+    SemanticMaterialLoaderService,
     SearchCompanyTool,
     MineShiningPointTool,
     DraftMotivationTool,

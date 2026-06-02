@@ -1,5 +1,15 @@
 import { create } from 'zustand';
 
+/** Shape of a message as returned by the backend GET /conversations/:id endpoint. */
+interface BackendMessage {
+  role: 'USER' | 'ASSISTANT';
+  createdAt: string;
+  text?: string;
+  payload?: {
+    content?: Array<{ type: string; text?: string }>;
+  };
+}
+
 export interface ConversationMessage {
   role: 'user' | 'assistant';
   text: string;
@@ -176,9 +186,15 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
         return;
       }
       // Convert backend messages to store format
-      const messages: ConversationMessage[] = result.messages.map((m: any) => ({
+      const messages: ConversationMessage[] = (result.messages as BackendMessage[]).map((m) => ({
         role: m.role === 'USER' ? 'user' : 'assistant',
-        text: m.text || m.payload?.content?.filter((b: any) => b.type === 'text').map((b: any) => b.text).join('') || '',
+        text:
+          m.text ||
+          m.payload?.content
+            ?.filter((b) => b.type === 'text')
+            .map((b) => b.text ?? '')
+            .join('') ||
+          '',
         timestamp: new Date(m.createdAt).getTime(),
       }));
       set({

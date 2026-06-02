@@ -1,8 +1,6 @@
 import { randomBytes } from 'crypto';
-import { Body, Controller, Delete, Get, Patch, Post, BadRequestException, Inject, NotFoundException, Res, HttpCode } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Patch, Post, BadRequestException, Inject, Res, HttpCode } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { type Response } from 'express';
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
@@ -11,13 +9,8 @@ import { IamService } from './iam.service.js';
 import { AUTH_VERIFIER, type AuthVerifier } from '../../adapters/auth/auth.interface.js';
 import { NonceStore } from './services/nonce.store.js';
 import { AccountPurgeSagaService } from './services/account-purge-saga.service.js';
+import { AccountExportService } from './services/account-export.service.js';
 import { RedisService } from '../../redis/redis.module.js';
-import { BillingSubscription } from '../../database/entities/billing/subscription.entity.js';
-import { QuotaUsageCounter } from '../../database/entities/quota/quota-counter.entity.js';
-import { ProfileProfile } from '../../database/entities/profile/profile.entity.js';
-import { ProfileMaterial } from '../../database/entities/profile/material.entity.js';
-import { JobRadarItem } from '../../database/entities/jobs/radar-item.entity.js';
-import { ConvConversation } from '../../database/entities/conversation/conversation.entity.js';
 
 const SESSION_TTL_SECONDS = 86400; // 24 hours
 
@@ -71,19 +64,8 @@ export class IamController {
     @Inject(AUTH_VERIFIER) private readonly authVerifier: AuthVerifier,
     private readonly nonceStore: NonceStore,
     private readonly purgeSaga: AccountPurgeSagaService,
+    private readonly exportService: AccountExportService,
     private readonly redisService: RedisService,
-    @InjectRepository(BillingSubscription)
-    private readonly billingRepo: Repository<BillingSubscription>,
-    @InjectRepository(QuotaUsageCounter)
-    private readonly quotaRepo: Repository<QuotaUsageCounter>,
-    @InjectRepository(ProfileProfile)
-    private readonly profileRepo: Repository<ProfileProfile>,
-    @InjectRepository(ProfileMaterial)
-    private readonly materialRepo: Repository<ProfileMaterial>,
-    @InjectRepository(JobRadarItem)
-    private readonly radarRepo: Repository<JobRadarItem>,
-    @InjectRepository(ConvConversation)
-    private readonly convRepo: Repository<ConvConversation>,
   ) {}
 
   @Post('me')
@@ -102,25 +84,7 @@ export class IamController {
   @ApiOperation({ summary: 'Get current user entitlements and quota' })
   async entitlements(@CurrentUser() user: AuthenticatedUser) {
     const iamUser = await this.service.findByClerkId(user.userId);
-
-    const sub = await this.billingRepo.findOne({ where: { userId: iamUser.id } });
-    if (!sub) throw new NotFoundException('No subscription record found');
-
-    const quota = await this.quotaRepo.findOne({ where: { userId: iamUser.id } });
-
-    const tailoringLimit = quota?.tailoringLimit ?? 3;
-    const tailoringCompleted = quota?.tailoringCompleted ?? 0;
-    const remaining = Math.max(0, tailoringLimit - tailoringCompleted);
-
-    return {
-      tier: sub.tier,
-      state: sub.state,
-      quota: {
-        tailoringLimit,
-        tailoringCompleted,
-        remaining,
-      },
-    };
+    return this.service.getEntitlements(iamUser.id);
   }
 
   @Get('settings')
@@ -160,45 +124,10 @@ export class IamController {
   @ApiOperation({ summary: 'Export all user data as JSON (GDPR Article 20 data portability)' })
   async exportAccount(@CurrentUser() user: AuthenticatedUser, @Res() res: Response) {
     const iamUser = await this.service.findByClerkId(user.userId);
-    const uid = iamUser.id;
-
-    const [settings, profile, materials, radar, subscription, quota, conversations] =
-      await Promise.all([
-        this.service.getSettings(uid),
-        this.profileRepo.findOne({ where: { userId: uid } }),
-        this.materialRepo.find({ where: { userId: uid }, order: { createdAt: 'ASC' } }),
-        this.radarRepo.find({ where: { userId: uid }, order: { createdAt: 'ASC' } }),
-        this.billingRepo.findOne({ where: { userId: uid } }),
-        this.quotaRepo.findOne({ where: { userId: uid } }),
-        this.convRepo.find({ where: { userId: uid }, order: { createdAt: 'ASC' } }),
-      ]);
-
-    const payload = {
-      exportedAt: new Date().toISOString(),
-      schemaVersion: '1.0',
-      user: {
-        id: iamUser.id,
-        email: iamUser.email,
-        fullName: iamUser.fullName,
-        createdAt: iamUser.createdAt,
-      },
-      settings: settings ?? null,
-      profile: profile ?? null,
-      materials,
-      radar,
-      subscription: subscription
-        ? { tier: subscription.tier, state: subscription.state, periodEnd: subscription.periodEnd }
-        : null,
-      quota: quota ?? null,
-      conversationSummary: {
-        count: conversations.length,
-        ids: conversations.map((c) => c.id),
-      },
-    };
-
     // Note: raw message content is intentionally excluded from the export payload
     // to avoid returning encrypted bytea blobs. Users can request full message history
     // via support for a complete GDPR data package.
+    const payload = await this.exportService.export(iamUser);
     res.setHeader('Content-Type', 'application/json');
     res.setHeader(
       'Content-Disposition',

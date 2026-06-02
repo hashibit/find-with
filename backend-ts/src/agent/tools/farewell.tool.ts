@@ -20,6 +20,7 @@ export class FarewellTool {
   ) {}
 
   readonly name = FAREWELL_TOOL_NAME;
+  readonly scenes = ['FREE_CHAT', 'OFFER_ACCEPTED'] as const;
   readonly description =
     "Generate a farewell message and job search recap when the user accepts an offer. Call when status transitions to OFFER_ACCEPTED.";
   readonly parameters = Type.Object({

@@ -20,6 +20,7 @@ export class SetConversationDensityTool {
   ) {}
 
   readonly name = SET_CONVERSATION_DENSITY_TOOL_NAME;
+  readonly scenes = ['ALL'] as const;
   readonly description = 'Temporarily change conversation density when user expresses preference.';
   readonly parameters = Type.Object({
     density: DensityEnum,

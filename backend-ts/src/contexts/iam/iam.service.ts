@@ -73,6 +73,30 @@ export class IamService {
     return this.getSettings(userId);
   }
 
+  async getEntitlements(userId: string): Promise<{
+    tier: string;
+    state: string;
+    quota: { tailoringLimit: number; tailoringCompleted: number; remaining: number };
+  }> {
+    const [sub, quota] = await Promise.all([
+      this.billingRepo.findOne({ where: { userId } }),
+      this.quotaRepo.findOne({ where: { userId } }),
+    ]);
+    if (!sub) throw new NotFoundException('No subscription record found');
+
+    const tailoringLimit = quota?.tailoringLimit ?? 3;
+    const tailoringCompleted = quota?.tailoringCompleted ?? 0;
+    return {
+      tier: sub.tier,
+      state: sub.state,
+      quota: {
+        tailoringLimit,
+        tailoringCompleted,
+        remaining: Math.max(0, tailoringLimit - tailoringCompleted),
+      },
+    };
+  }
+
   async softDelete(userId: string): Promise<void> {
     await this.userRepo.update({ id: userId }, { deletedAt: new Date(), isActive: false });
   }

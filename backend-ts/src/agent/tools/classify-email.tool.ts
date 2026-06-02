@@ -18,6 +18,7 @@ export class ClassifyEmailTool {
   ) {}
 
   readonly name = CLASSIFY_EMAIL_TOOL_NAME;
+  readonly scenes = ['FOLLOWUP'] as const;
   readonly description = 'Classify a captured email and extract key information.';
   readonly parameters = Type.Object({
     email_capture_id: Type.String(),

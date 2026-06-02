@@ -49,20 +49,21 @@ function buildTool() {
     find: vi.fn().mockResolvedValue([]),
     save: vi.fn().mockImplementation((e) => Promise.resolve(e)),
   };
-  const materialRepo = {
-    findOne: vi.fn().mockResolvedValue(null),
-    find: vi.fn().mockResolvedValue([]),
-    save: vi.fn().mockImplementation((e) => Promise.resolve(e)),
+  // Mock for SemanticMaterialLoaderService
+  const materialLoader = {
+    rankByEmbedding: vi.fn().mockResolvedValue([]),
+    loadAll: vi.fn().mockResolvedValue([]),
+    loadForPromptContext: vi.fn().mockResolvedValue([]),
   };
 
   const tool = new RecomputeMatchTool(
     radarRepo as any,
     matchRepo as any,
     jdRepo as any,
-    materialRepo as any,
+    materialLoader as any,
   );
 
-  return { tool, radarRepo, matchRepo, jdRepo, materialRepo };
+  return { tool, radarRepo, matchRepo, jdRepo, materialLoader };
 }
 
 const ctx = { userId: 'u_01', conversationId: 'conv_01' };
@@ -112,11 +113,11 @@ describe('RecomputeMatchTool', () => {
 
   describe('execute — success (no embeddings)', () => {
     it('calls matchRepo.save with an updated deepScore', async () => {
-      const { tool, radarRepo, jdRepo, matchRepo, materialRepo } = buildTool();
+      const { tool, radarRepo, jdRepo, matchRepo, materialLoader } = buildTool();
       radarRepo.findOne.mockResolvedValue(makeRadar());
-      jdRepo.findOne.mockResolvedValue(makeJd());
+      jdRepo.findOne.mockResolvedValue(makeJd()); // no jdEmbedding → loadAll path
       matchRepo.findOne.mockResolvedValue(makeMatch());
-      materialRepo.find.mockResolvedValue([makeMaterial()]);
+      materialLoader.loadAll.mockResolvedValue([makeMaterial()]);
 
       await tool.execute('tc_01', params, ctx);
 
@@ -126,11 +127,11 @@ describe('RecomputeMatchTool', () => {
     });
 
     it('returns surfaceScore equal to existing matchResult.surfaceScore', async () => {
-      const { tool, radarRepo, jdRepo, matchRepo, materialRepo } = buildTool();
+      const { tool, radarRepo, jdRepo, matchRepo, materialLoader } = buildTool();
       radarRepo.findOne.mockResolvedValue(makeRadar());
       jdRepo.findOne.mockResolvedValue(makeJd());
       matchRepo.findOne.mockResolvedValue(makeMatch());
-      materialRepo.find.mockResolvedValue([makeMaterial()]);
+      materialLoader.loadAll.mockResolvedValue([makeMaterial()]);
 
       const result = await tool.execute('tc_01', params, ctx);
 
@@ -138,11 +139,11 @@ describe('RecomputeMatchTool', () => {
     });
 
     it('returns a gaps array (may be empty)', async () => {
-      const { tool, radarRepo, jdRepo, matchRepo, materialRepo } = buildTool();
+      const { tool, radarRepo, jdRepo, matchRepo, materialLoader } = buildTool();
       radarRepo.findOne.mockResolvedValue(makeRadar());
       jdRepo.findOne.mockResolvedValue(makeJd());
       matchRepo.findOne.mockResolvedValue(makeMatch());
-      materialRepo.find.mockResolvedValue([makeMaterial()]);
+      materialLoader.loadAll.mockResolvedValue([makeMaterial()]);
 
       const result = await tool.execute('tc_01', params, ctx);
 
@@ -151,11 +152,11 @@ describe('RecomputeMatchTool', () => {
     });
 
     it('result.content[0].text contains Surface and Deep labels', async () => {
-      const { tool, radarRepo, jdRepo, matchRepo, materialRepo } = buildTool();
+      const { tool, radarRepo, jdRepo, matchRepo, materialLoader } = buildTool();
       radarRepo.findOne.mockResolvedValue(makeRadar());
       jdRepo.findOne.mockResolvedValue(makeJd());
       matchRepo.findOne.mockResolvedValue(makeMatch());
-      materialRepo.find.mockResolvedValue([]);
+      materialLoader.loadAll.mockResolvedValue([]);
 
       const result = await tool.execute('tc_01', params, ctx);
 
@@ -166,12 +167,12 @@ describe('RecomputeMatchTool', () => {
 
   describe('execute — success (with embeddings)', () => {
     it('deepScore is 100 when material embedding is a perfect cosine match to jd embedding', async () => {
-      const { tool, radarRepo, jdRepo, matchRepo, materialRepo } = buildTool();
+      const { tool, radarRepo, jdRepo, matchRepo, materialLoader } = buildTool();
       radarRepo.findOne.mockResolvedValue(makeRadar());
       jdRepo.findOne.mockResolvedValue(makeJd([1, 0, 0]));
       matchRepo.findOne.mockResolvedValue(makeMatch());
-      // Perfect cosine similarity: same unit vector
-      materialRepo.find.mockResolvedValue([makeMaterial([1, 0, 0])]);
+      // rankByEmbedding returns pre-ranked results with cosine score
+      materialLoader.rankByEmbedding.mockResolvedValue([{ material: makeMaterial([1, 0, 0]), score: 1.0 }]);
 
       const result = await tool.execute('tc_01', params, ctx);
 
@@ -179,11 +180,11 @@ describe('RecomputeMatchTool', () => {
     });
 
     it('calls matchRepo.save with deepScore = 100 on perfect cosine match', async () => {
-      const { tool, radarRepo, jdRepo, matchRepo, materialRepo } = buildTool();
+      const { tool, radarRepo, jdRepo, matchRepo, materialLoader } = buildTool();
       radarRepo.findOne.mockResolvedValue(makeRadar());
       jdRepo.findOne.mockResolvedValue(makeJd([1, 0, 0]));
       matchRepo.findOne.mockResolvedValue(makeMatch());
-      materialRepo.find.mockResolvedValue([makeMaterial([1, 0, 0])]);
+      materialLoader.rankByEmbedding.mockResolvedValue([{ material: makeMaterial([1, 0, 0]), score: 1.0 }]);
 
       await tool.execute('tc_01', params, ctx);
 
@@ -192,12 +193,12 @@ describe('RecomputeMatchTool', () => {
     });
 
     it('deepScore is 0 when material embedding is orthogonal to jd embedding', async () => {
-      const { tool, radarRepo, jdRepo, matchRepo, materialRepo } = buildTool();
+      const { tool, radarRepo, jdRepo, matchRepo, materialLoader } = buildTool();
       radarRepo.findOne.mockResolvedValue(makeRadar());
       jdRepo.findOne.mockResolvedValue(makeJd([1, 0, 0]));
       matchRepo.findOne.mockResolvedValue(makeMatch());
       // Orthogonal vector → cosine similarity = 0
-      materialRepo.find.mockResolvedValue([makeMaterial([0, 1, 0])]);
+      materialLoader.rankByEmbedding.mockResolvedValue([{ material: makeMaterial([0, 1, 0]), score: 0.0 }]);
 
       const result = await tool.execute('tc_01', params, ctx);
 

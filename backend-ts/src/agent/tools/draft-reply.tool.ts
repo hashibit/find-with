@@ -31,6 +31,7 @@ export class DraftReplyTool {
   ) {}
 
   readonly name = DRAFT_REPLY_TOOL_NAME;
+  readonly scenes = ['FOLLOWUP'] as const;
   readonly description = "Draft an email reply based on the user's intent.";
   readonly parameters = Type.Object({
     email_capture_id: Type.String(),

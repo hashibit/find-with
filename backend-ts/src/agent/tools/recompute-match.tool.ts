@@ -5,12 +5,9 @@ import { Type } from '@sinclair/typebox';
 import { JobMatchResult } from '../../database/entities/jobs/match-result.entity.js';
 import { JobRadarItem } from '../../database/entities/jobs/radar-item.entity.js';
 import { JobParsedJd } from '../../database/entities/jobs/parsed-jd.entity.js';
-import { ProfileMaterial } from '../../database/entities/profile/material.entity.js';
+import { SemanticMaterialLoaderService } from '../semantic-material-loader.service.js';
 
 export const RECOMPUTE_MATCH_TOOL_NAME = 'recompute_match';
-
-// Number of top-scoring materials to use for deep match scoring (mirrors jobs.processor.ts).
-const TOP_K = 8;
 
 @Injectable()
 export class RecomputeMatchTool {
@@ -21,11 +18,11 @@ export class RecomputeMatchTool {
     private readonly matchRepo: Repository<JobMatchResult>,
     @InjectRepository(JobParsedJd)
     private readonly jdRepo: Repository<JobParsedJd>,
-    @InjectRepository(ProfileMaterial)
-    private readonly materialRepo: Repository<ProfileMaterial>,
+    private readonly materialLoader: SemanticMaterialLoaderService,
   ) {}
 
   readonly name = RECOMPUTE_MATCH_TOOL_NAME;
+  readonly scenes = ['JOB_ANALYSIS', 'TAILOR_EDIT'] as const;
   readonly description =
     'Recompute the three-layer match score for a radar item after materials have been updated.';
   readonly parameters = Type.Object({
@@ -71,64 +68,48 @@ export class RecomputeMatchTool {
       };
     }
 
-    // Load confirmed materials for the user
-    const materials = await this.materialRepo.find({
-      where: [
-        { userId, status: 'CONFIRMED' },
-        { userId, status: 'USER_EDITED' },
-      ],
-    });
-
     const hardSkills = (parsedJd.hardSkills as string[] | null) ?? [];
-
-    // Reconstruct the JD text for surface match from capture — we only have
-    // hardSkills here, so surface scoring uses the same keyword approach as the processor.
-    const surfaceHits = hardSkills.filter((s) =>
-      hardSkills.some((skill) => skill.toLowerCase() === s.toLowerCase()),
-    );
-
-    // Layer 1: surface score from JD hard skills matched against skills list
-    // (We re-use the same formula: hits / total * 100)
-    // Since we don't have the original capture text here, we measure how many
-    // hard skills appear in the parsedJd's own hardSkills list (all of them),
-    // which always equals 100% — instead, reuse existing surfaceScore and only
-    // recompute deep score where materials have changed.
-    //
-    // For a proper surface recompute we'd need the original capture text.
-    // We keep the existing surfaceScore and only update deepScore + gaps.
     const existingSurfaceScore = matchResult.surfaceScore ?? 0;
 
     let deepScore = 0;
     let deepHits: string[] = [];
     const jdEmbedding = parsedJd.jdEmbedding ?? null;
 
-    if (jdEmbedding && materials.some((m) => m.embedding && m.embedding.length > 0)) {
-      const materialScores = materials
-        .filter((m) => m.embedding && m.embedding.length > 0)
-        .map((m) => ({
-          material: m,
-          score: this.cosineSimilarity(jdEmbedding, m.embedding!),
-          text: (m.shiningText ?? '') + ' ' + (m.tags ?? []).join(' '),
-        }))
-        .sort((a, b) => b.score - a.score);
+    if (jdEmbedding) {
+      // Semantic path: rank CONFIRMED + USER_EDITED materials by cosine similarity to JD embedding.
+      // RecomputeMatchTool includes USER_EDITED (unlike ContextBuilder which uses CONFIRMED only)
+      // because edited materials reflect deliberate user refinement and should count toward the score.
+      const ranked = await this.materialLoader.rankByEmbedding(
+        userId,
+        jdEmbedding,
+        ['CONFIRMED', 'USER_EDITED'],
+        SemanticMaterialLoaderService.TOP_K,
+      );
 
-      const topK = materialScores.slice(0, TOP_K);
-      if (topK.length > 0) {
-        const avgSimilarity = topK.reduce((sum, m) => sum + m.score, 0) / topK.length;
+      if (ranked.length > 0) {
+        const avgSimilarity = ranked.reduce((sum, r) => sum + r.score, 0) / ranked.length;
         deepScore = Math.max(0, Math.round(avgSimilarity * 100));
       }
 
-      const topMaterialTexts = topK.map((m) => m.text.toLowerCase()).join(' ');
+      const topMaterialTexts = ranked
+        .map((r) => ((r.material.shiningText ?? '') + ' ' + (r.material.tags ?? []).join(' ')).toLowerCase())
+        .join(' ');
       deepHits = hardSkills.filter((s) => topMaterialTexts.includes(s.toLowerCase()));
     } else {
-      const materialTexts = materials
-        .map((m) => (m.shiningText ?? '') + ' ' + (m.tags ?? []).join(' '))
-        .join(' ')
-        .toLowerCase();
+      // No JD embedding — fall back to keyword match across all materials (including those without embeddings).
+      const all = await this.materialLoader.loadAll(userId, ['CONFIRMED', 'USER_EDITED']);
+      const materialTexts = all
+        .map((m) => ((m.shiningText ?? '') + ' ' + (m.tags ?? []).join(' ')).toLowerCase())
+        .join(' ');
       deepHits = hardSkills.filter((s) => materialTexts.includes(s.toLowerCase()));
       deepScore =
         hardSkills.length > 0
-          ? (Math.max(existingSurfaceScore / 100 * hardSkills.length, deepHits.length) / hardSkills.length) * 100
+          ? (Math.max(
+              (existingSurfaceScore / 100) * hardSkills.length,
+              deepHits.length,
+            ) /
+              hardSkills.length) *
+            100
           : 0;
       deepScore = Math.round(deepScore);
     }
@@ -140,15 +121,9 @@ export class RecomputeMatchTool {
     matchResult.deepScore = deepScore;
     matchResult.hitsDeep = deepHits;
     matchResult.gaps = gaps.slice(0, 10);
-    matchResult.adviceRationale = `Recomputed: surface=${existingSurfaceScore}%, deep=${deepScore}% (${materials.length} confirmed materials)`;
+    matchResult.adviceRationale = `Recomputed: surface=${existingSurfaceScore}%, deep=${deepScore}%`;
 
     await this.matchRepo.save(matchResult);
-
-    const result = {
-      surfaceScore: existingSurfaceScore,
-      deepScore,
-      gaps: gaps.slice(0, 10),
-    };
 
     return {
       content: [
@@ -157,20 +132,11 @@ export class RecomputeMatchTool {
           text: `Match recomputed for radar item ${radar_item_id}:\n- Surface: ${existingSurfaceScore}%\n- Deep: ${deepScore}%\n- Gaps: ${gaps.slice(0, 5).join(', ') || 'none'}`,
         },
       ],
-      details: result,
+      details: {
+        surfaceScore: existingSurfaceScore,
+        deepScore,
+        gaps: gaps.slice(0, 10),
+      },
     };
-  }
-
-  private cosineSimilarity(a: number[], b: number[]): number {
-    let dot = 0;
-    let normA = 0;
-    let normB = 0;
-    for (let i = 0; i < a.length; i++) {
-      dot += a[i]! * b[i]!;
-      normA += a[i]! * a[i]!;
-      normB += b[i]! * b[i]!;
-    }
-    if (normA === 0 || normB === 0) return 0;
-    return dot / (Math.sqrt(normA) * Math.sqrt(normB));
   }
 }

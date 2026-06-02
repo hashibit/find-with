@@ -37,8 +37,20 @@ export interface AgentSseEvent {
   type?: string;
 }
 
+type Scene =
+  | 'JOB_ANALYSIS'
+  | 'ONBOARDING'
+  | 'GAP_MINING'
+  | 'TAILOR_EDIT'
+  | 'FOLLOWUP'
+  | 'FREE_CHAT'
+  | 'OFFER_ACCEPTED'
+  | 'ALL';
+
 interface ToolExecutor {
   readonly name: string;
+  /** Conversation kinds this tool is available in. Use 'ALL' to allow in every kind. */
+  readonly scenes: readonly Scene[];
   readonly description: string;
   readonly parameters: unknown;
   execute(
@@ -52,18 +64,6 @@ interface ToolContext {
   userId: string;
   conversationId: string;
 }
-
-// Scene → allowed tools (mirrors Python ToolRegistry)
-const TOOL_SCENES: Record<string, string[]> = {
-  search_company: ['JOB_ANALYSIS'],
-  mine_shining_point: ['ONBOARDING', 'GAP_MINING'],
-  draft_motivation: ['TAILOR_EDIT'],
-  classify_email: ['FOLLOWUP'],
-  draft_reply: ['FOLLOWUP'],
-  set_conversation_density: ['ALL'],
-  farewell_recap: ['FREE_CHAT', 'OFFER_ACCEPTED'],
-  recompute_match: ['JOB_ANALYSIS', 'TAILOR_EDIT'],
-};
 
 const MAX_ITERATION = 10;
 const TOOL_TIMEOUT_MS = 90_000; // 90 seconds
@@ -439,6 +439,9 @@ export class AgentService {
     if (typeof t['name'] !== 'string' || !t['name']) {
       throw new Error(`Tool registration error: missing string 'name' field`);
     }
+    if (!Array.isArray(t['scenes']) || t['scenes'].length === 0) {
+      throw new Error(`Tool registration error: '${t['name']}' missing non-empty 'scenes' array`);
+    }
     if (typeof t['execute'] !== 'function') {
       throw new Error(`Tool registration error: '${t['name']}' missing 'execute' method`);
     }
@@ -458,10 +461,7 @@ export class AgentService {
 
   private getToolsForScene(conversationKind: string): Tool[] {
     return Array.from(this.toolMap.values())
-      .filter((tool) => {
-        const scenes = TOOL_SCENES[tool.name] ?? [];
-        return scenes.includes('ALL') || scenes.includes(conversationKind);
-      })
+      .filter((tool) => tool.scenes.includes('ALL') || tool.scenes.includes(conversationKind as Scene))
       .map((tool) => ({
         name: tool.name,
         description: tool.description,

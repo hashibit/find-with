@@ -19,6 +19,7 @@ import { ClerkAuthAdapter } from '../../adapters/auth/clerk-auth.adapter.js';
 import { DevAuthAdapter } from '../../adapters/auth/dev-auth.adapter.js';
 import { NonceStore } from './services/nonce.store.js';
 import { AccountPurgeSagaService } from './services/account-purge-saga.service.js';
+import { AccountExportService } from './services/account-export.service.js';
 import { AccountPurgeSaga } from '../../database/entities/iam/account-purge-saga.entity.js';
 import { ProfileProfile } from '../../database/entities/profile/profile.entity.js';
 import { ProfileMaterial } from '../../database/entities/profile/material.entity.js';
@@ -48,6 +49,7 @@ import { RedisModule } from '../../redis/redis.module.js';
     BillingService,
     NonceStore,
     AccountPurgeSagaService,
+    AccountExportService,
     {
       provide: AUTH_VERIFIER,
       inject: [ConfigService],

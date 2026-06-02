@@ -21,6 +21,7 @@ const makeIamService = () => ({
   findByClerkId: vi.fn().mockResolvedValue({ id: 'db_user_01' }),
   getSettings: vi.fn().mockResolvedValue({ density: 'BALANCED', locale: 'en', timezone: 'UTC' }),
   updateSettings: vi.fn().mockImplementation((_, dto) => Promise.resolve(dto)),
+  getEntitlements: vi.fn().mockResolvedValue({ tier: 'FREE', state: 'ACTIVE', quota: { tailoringLimit: 3, tailoringCompleted: 0, remaining: 3 } }),
 });
 
 const makeAuthVerifier = () => ({
@@ -37,7 +38,20 @@ const makeRedisService = () => ({
   },
 });
 
-const makeStubRepo = () => ({ findOne: vi.fn().mockResolvedValue(null), find: vi.fn().mockResolvedValue([]) });
+const makeExportService = () => ({
+  export: vi.fn().mockResolvedValue({
+    exportedAt: new Date().toISOString(),
+    schemaVersion: '1.0',
+    user: { id: 'db_user_01', email: 'user@example.com', fullName: 'Alice', createdAt: new Date() },
+    settings: { density: 'BALANCED' },
+    profile: { basicInfo: { fullName: 'Alice' } },
+    materials: [{ id: 'm_01', shiningText: 'Led team' }],
+    radar: [],
+    subscription: { tier: 'PRO', state: 'ACTIVE', periodEnd: null },
+    quota: { tailoringLimit: 10, tailoringCompleted: 2 },
+    conversationSummary: { count: 2, ids: ['conv_01', 'conv_02'] },
+  }),
+});
 
 function buildController(overrides: Partial<{
   iamService: ReturnType<typeof makeIamService>;
@@ -45,38 +59,28 @@ function buildController(overrides: Partial<{
   nonceStore: ReturnType<typeof makeNonceStore>;
   redisService: ReturnType<typeof makeRedisService>;
   purgeSaga: { initiate: ReturnType<typeof vi.fn>; cancelDeletion: ReturnType<typeof vi.fn> };
+  exportService: ReturnType<typeof makeExportService>;
 }> = {}) {
   const iamService = overrides.iamService ?? makeIamService();
   const authVerifier = overrides.authVerifier ?? makeAuthVerifier();
   const nonceStore = overrides.nonceStore ?? makeNonceStore();
   const redisService = overrides.redisService ?? makeRedisService();
+  const exportService = overrides.exportService ?? makeExportService();
   const purgeSaga = overrides.purgeSaga ?? {
     initiate: vi.fn().mockResolvedValue({ expiresAt: new Date() }),
     cancelDeletion: vi.fn().mockResolvedValue(undefined),
   };
-  const billingRepo = makeStubRepo();
-  const quotaRepo = makeStubRepo();
-  const profileRepo = makeStubRepo();
-  const materialRepo = makeStubRepo();
-  const radarRepo = makeStubRepo();
-  const convRepo = makeStubRepo();
 
   const controller = new IamController(
     iamService as any,
     authVerifier as any,
     nonceStore as any,
     purgeSaga as any,
+    exportService as any,
     redisService as any,
-    billingRepo as any,
-    quotaRepo as any,
-    profileRepo as any,
-    materialRepo as any,
-    radarRepo as any,
-    convRepo as any,
   );
 
-  return { controller, iamService, authVerifier, nonceStore, redisService, purgeSaga,
-    billingRepo, quotaRepo, profileRepo, materialRepo, radarRepo, convRepo };
+  return { controller, iamService, authVerifier, nonceStore, redisService, purgeSaga, exportService };
 }
 
 const MOCK_USER = { userId: 'clerk_u1' };
@@ -228,16 +232,7 @@ describe('IamController', () => {
 
   describe('exportAccount()', () => {
     it('returns a JSON response with user data sections', async () => {
-      const iamService = makeIamService();
-      const { controller, billingRepo, quotaRepo, profileRepo, materialRepo, radarRepo, convRepo } =
-        buildController({ iamService });
-
-      billingRepo.findOne.mockResolvedValue({ tier: 'PRO', state: 'ACTIVE', periodEnd: null });
-      quotaRepo.findOne.mockResolvedValue({ tailoringLimit: 10, tailoringCompleted: 2 });
-      profileRepo.findOne.mockResolvedValue({ basicInfo: { fullName: 'Alice' } });
-      materialRepo.find.mockResolvedValue([{ id: 'm_01', shiningText: 'Led team' }]);
-      radarRepo.find.mockResolvedValue([]);
-      convRepo.find.mockResolvedValue([{ id: 'conv_01' }, { id: 'conv_02' }]);
+      const { controller, exportService } = buildController();
 
       const setHeader = vi.fn();
       const json = vi.fn();
@@ -245,6 +240,7 @@ describe('IamController', () => {
 
       await controller.exportAccount(MOCK_USER as any, mockRes);
 
+      expect(exportService.export).toHaveBeenCalledWith(expect.objectContaining({ id: 'db_user_01' }));
       expect(setHeader).toHaveBeenCalledWith('Content-Type', 'application/json');
       const payload = json.mock.calls[0][0];
       expect(payload.user.id).toBe('db_user_01');

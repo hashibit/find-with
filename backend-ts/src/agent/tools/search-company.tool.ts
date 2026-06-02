@@ -17,6 +17,7 @@ export class SearchCompanyTool {
   ) {}
 
   readonly name = SEARCH_COMPANY_TOOL_NAME;
+  readonly scenes = ['JOB_ANALYSIS'] as const;
   readonly description =
     'Search for company information including size, stage, recent news, and risk signals.';
   readonly parameters = Type.Object({

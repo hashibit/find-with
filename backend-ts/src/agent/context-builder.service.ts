@@ -14,8 +14,8 @@ import { ConvConversation } from '../database/entities/conversation/conversation
 import { ConvRollingSummary } from '@/database/entities/conversation/rolling-summary.entity.js';
 
 import { ProfileProfile } from '../database/entities/profile/profile.entity.js';
-import { ProfileMaterial } from '../database/entities/profile/material.entity.js';
 import { JobParsedJd } from '../database/entities/jobs/parsed-jd.entity.js';
+import { SemanticMaterialLoaderService } from './semantic-material-loader.service.js';
 import { JobRadarItem } from '../database/entities/jobs/radar-item.entity.js';
 import { UserGoalMemory } from '../database/entities/memory/user-goal-memory.entity.js';
 import { resolveDensity, densityInstruction } from '../common/density-resolver.js';
@@ -107,7 +107,6 @@ const ROLLING_SUMMARY_PROMPT = `You are summarizing a segment of a job search co
 export const MOST_RECENT_MESSAGES = 30;
 export const MAX_ROLLING_SUMMARIES = 20;
 export const MAX_MATERIALS = 20;
-export const SEMANTIC_MATERIALS_TOP_K = 8;
 export const TOKEN_COMPRESS_THRESHOLD = 10000;
 export const ROLLING_MESSAGES_WINDOW = 20;
 
@@ -117,18 +116,7 @@ type CompressableMessages = {
   messages: string[];
 };
 
-function cosineSimilarity(a: number[], b: number[]): number {
-  let dot = 0;
-  let normA = 0;
-  let normB = 0;
-  for (let i = 0; i < a.length; i++) {
-    dot += a[i]! * b[i]!;
-    normA += a[i]! * a[i]!;
-    normB += b[i]! * b[i]!;
-  }
-  if (normA === 0 || normB === 0) return 0;
-  return dot / (Math.sqrt(normA) * Math.sqrt(normB));
-}
+// cosineSimilarity removed — now in SemanticMaterialLoaderService via common/math.ts
 
 @Injectable()
 export class ContextBuilderService {
@@ -141,8 +129,7 @@ export class ContextBuilderService {
     private readonly rollingSummayRepo: Repository<ConvRollingSummary>,
     @InjectRepository(ProfileProfile)
     private readonly profileRepo: Repository<ProfileProfile>,
-    @InjectRepository(ProfileMaterial)
-    private readonly materialRepo: Repository<ProfileMaterial>,
+    private readonly materialLoader: SemanticMaterialLoaderService,
     @InjectRepository(JobParsedJd)
     private readonly parsedJdRepo: Repository<JobParsedJd>,
     @InjectRepository(JobRadarItem)
@@ -170,7 +157,7 @@ export class ContextBuilderService {
     const [profile, materials, recentMessages, rollingSummaries, conversation, goalMemory] =
       await Promise.all([
         this.profileRepo.findOne({ where: { userId } }),
-        this.loadMaterials(userId, jdEmbedding),
+        this.materialLoader.loadForPromptContext(userId, jdEmbedding),
         this.messageRepo.find({
           where: { conversationId, archived: false },
           order: { createdAt: 'DESC' },
@@ -316,37 +303,6 @@ export class ContextBuilderService {
     if (!radarItem?.parsedJdId) return null;
     const jd = await this.parsedJdRepo.findOne({ where: { id: radarItem.parsedJdId } });
     return jd?.jdEmbedding ?? null;
-  }
-
-  private async loadMaterials(
-    userId: string,
-    jdEmbedding: number[] | null,
-  ): Promise<ProfileMaterial[]> {
-    if (jdEmbedding) {
-      // Layer 3: semantic search — load materials with embeddings and rank by cosine similarity
-      const withEmbeddings = await this.materialRepo.find({
-        where: { userId, status: 'CONFIRMED' },
-        order: { createdAt: 'DESC' },
-        take: 100,
-      });
-
-      const scored = withEmbeddings
-        .filter((m) => m.embedding && m.embedding.length > 0)
-        .map((m) => ({ m, score: cosineSimilarity(jdEmbedding, m.embedding!) }))
-        .sort((a, b) => b.score - a.score)
-        .slice(0, SEMANTIC_MATERIALS_TOP_K)
-        .map((x) => x.m);
-
-      // Fall back to time-ordered if too few semantic results
-      if (scored.length >= 3) return scored;
-    }
-
-    // Fallback: time-ordered top 20
-    return this.materialRepo.find({
-      where: { userId, status: 'CONFIRMED' },
-      order: { createdAt: 'DESC' },
-      take: MAX_MATERIALS,
-    });
   }
 
   private buildGoalMemorySection(goals: UserGoalMemory | null): string {

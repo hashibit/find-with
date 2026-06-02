@@ -16,6 +16,7 @@ export class DraftMotivationTool {
   ) {}
 
   readonly name = DRAFT_MOTIVATION_TOOL_NAME;
+  readonly scenes = ['TAILOR_EDIT'] as const;
   readonly description = "Draft a 'Why are you interested?' response for a job application form.";
   readonly parameters = Type.Object({
     parsed_jd_id: Type.String(),

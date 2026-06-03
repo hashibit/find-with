@@ -49,52 +49,52 @@ describe('initial state', () => {
 // ---------------------------------------------------------------------------
 
 describe('updateItemStatus', () => {
-  it('updates the status of the matching item', () => {
+  it('updates the status of the matching item', async () => {
     useRadarStore.setState({ radarItems: [makeItem({ id: 'job_001', status: 'saved' })] });
-    useRadarStore.getState().updateItemStatus('job_001', 'applied');
+    await useRadarStore.getState().updateItemStatus('job_001', 'applied');
     expect(useRadarStore.getState().radarItems[0].status).toBe('applied');
   });
 
-  it('updates lastActivity on the changed item', () => {
+  it('updates lastActivity on the changed item', async () => {
     const before = 1_000;
     useRadarStore.setState({
       radarItems: [makeItem({ id: 'job_001', lastActivity: before })],
     });
     const beforeUpdate = Date.now();
-    useRadarStore.getState().updateItemStatus('job_001', 'interview');
+    await useRadarStore.getState().updateItemStatus('job_001', 'interview');
     const after = useRadarStore.getState().radarItems[0].lastActivity!;
     expect(after).toBeGreaterThanOrEqual(beforeUpdate);
   });
 
-  it('does not mutate items that do not match the id', () => {
+  it('does not mutate items that do not match the id', async () => {
     useRadarStore.setState({
       radarItems: [
         makeItem({ id: 'job_001', status: 'saved' }),
         makeItem({ id: 'job_002', status: 'saved', company: 'Linear' }),
       ],
     });
-    useRadarStore.getState().updateItemStatus('job_001', 'applied');
+    await useRadarStore.getState().updateItemStatus('job_001', 'applied');
     expect(useRadarStore.getState().radarItems[1].status).toBe('saved');
   });
 
-  it('is a no-op when the id does not exist', () => {
+  it('is a no-op when the id does not exist', async () => {
     const item = makeItem({ id: 'job_001' });
     useRadarStore.setState({ radarItems: [item] });
-    useRadarStore.getState().updateItemStatus('no_such_id', 'offer');
+    await useRadarStore.getState().updateItemStatus('no_such_id', 'offer');
     // Status unchanged
     expect(useRadarStore.getState().radarItems[0].status).toBe('saved');
   });
 
-  it('supports all valid status transitions', () => {
+  it('supports all valid status transitions', async () => {
     const statuses: RadarItem['status'][] = ['saved', 'applied', 'interview', 'offer', 'rejected'];
     for (const status of statuses) {
       useRadarStore.setState({ radarItems: [makeItem({ id: 'j1', status: 'saved' })] });
-      useRadarStore.getState().updateItemStatus('j1', status);
+      await useRadarStore.getState().updateItemStatus('j1', status);
       expect(useRadarStore.getState().radarItems[0].status).toBe(status);
     }
   });
 
-  it('handles multiple items — updates only the target', () => {
+  it('handles multiple items — updates only the target', async () => {
     useRadarStore.setState({
       radarItems: [
         makeItem({ id: 'a', status: 'saved' }),
@@ -102,7 +102,7 @@ describe('updateItemStatus', () => {
         makeItem({ id: 'c', status: 'interview' }),
       ],
     });
-    useRadarStore.getState().updateItemStatus('b', 'offer');
+    await useRadarStore.getState().updateItemStatus('b', 'offer');
     const items = useRadarStore.getState().radarItems;
     expect(items[0].status).toBe('saved');
     expect(items[1].status).toBe('offer');

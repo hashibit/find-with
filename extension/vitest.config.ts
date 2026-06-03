@@ -8,5 +8,6 @@ export default defineConfig({
       ['tests/sanitize.test.ts', 'jsdom'],
       ['tests/easy-apply.test.ts', 'jsdom'],
     ],
+    setupFiles: ['tests/setup.ts'],
   },
 });

@@ -110,17 +110,10 @@ describe('startNewConversation', () => {
     expect(useConversationStore.getState().isStreaming).toBe(false);
   });
 
-  it('sets a new non-null conversation ID', () => {
+  it('clears the conversation ID (new conversation will be created on next message)', () => {
+    useConversationStore.setState({ currentConversationId: 'conv_123' });
     useConversationStore.getState().startNewConversation();
-    expect(useConversationStore.getState().currentConversationId).not.toBeNull();
-  });
-
-  it('generates a different conversation ID on each call', () => {
-    useConversationStore.getState().startNewConversation();
-    const id1 = useConversationStore.getState().currentConversationId;
-    useConversationStore.getState().startNewConversation();
-    const id2 = useConversationStore.getState().currentConversationId;
-    expect(id1).not.toBe(id2);
+    expect(useConversationStore.getState().currentConversationId).toBeNull();
   });
 });
 

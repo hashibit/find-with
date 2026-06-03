@@ -7,6 +7,9 @@ import { FollowupSchedulerService } from './followup-scheduler.service.js';
 import { FollowupEmail } from '../../database/entities/followup/followup-email.entity.js';
 import { FollowupDraft } from '../../database/entities/followup/followup-draft.entity.js';
 import { JobRadarItem } from '../../database/entities/jobs/radar-item.entity.js';
+import { JobParsedJd } from '../../database/entities/jobs/parsed-jd.entity.js';
+import { ConvConversation } from '../../database/entities/conversation/conversation.entity.js';
+import { ConvMessage } from '../../database/entities/conversation/message.entity.js';
 import { GdprPurgeLog } from '../../database/entities/iam/gdpr-purge-log.entity.js';
 import { IamUser } from '../../database/entities/iam/iam-user.entity.js';
 import { AccountPurgeSaga } from '../../database/entities/iam/account-purge-saga.entity.js';
@@ -22,6 +25,9 @@ import { IamModule } from '../iam/iam.module.js';
       FollowupEmail,
       FollowupDraft,
       JobRadarItem,
+      JobParsedJd,
+      ConvConversation,
+      ConvMessage,
       GdprPurgeLog,
       IamUser,
       AccountPurgeSaga,

@@ -1,0 +1,80 @@
+name: E2E
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    # Nightly at 02:00 UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    name: 'L4 E2E (Playwright + Extension)'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      DISPLAY: ':99'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # xvfb provides a virtual display so headful Chromium can run in CI.
+      # --headless=new does NOT expose chrome.sidePanel — do not switch to it.
+      - uses: coactions/setup-xvfb@v1
+        with:
+          run: echo "xvfb started"
+
+      - name: Install Playwright Chromium
+        run: pnpm --filter @findwith/e2e exec playwright install chromium --with-deps
+
+      - name: Start e2e service stack
+        run: docker compose -f docker-compose.e2e.yml up -d
+        timeout-minutes: 5
+
+      - name: Wait for services
+        run: bash e2e/scripts/wait-for-services.sh
+        timeout-minutes: 3
+
+      - name: Build backend
+        run: pnpm --filter @findwith/backend run build
+
+      - name: Run TypeORM migrations
+        run: cd backend-ts && dotenv -e .env.e2e -- pnpm run migration:run
+
+      - name: Build extension (e2e variant)
+        run: bash e2e/scripts/build-extension-e2e.sh
+
+      - name: Run e2e tests
+        run: pnpm e2e
+        env:
+          DISPLAY: ':99'
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ github.run_id }}
+          path: e2e/playwright-report/
+          retention-days: 14
+
+      - name: Stop e2e service stack
+        if: always()
+        run: docker compose -f docker-compose.e2e.yml down -v

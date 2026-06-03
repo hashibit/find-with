@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { getToken } from '../../lib/auth';
-
-const API_BASE = 'http://localhost:14667/v1'; // dev; prod: https://api.findwith.com/v1
+import { API_V1 } from '../../background/config';
 
 interface MatchResult {
   surfaceScore: number;
@@ -76,7 +75,7 @@ export function JobAnalysis() {
     (async () => {
       try {
         const token = await getToken();
-        const resp = await fetch(`${API_BASE}/jobs/${jobId}`, {
+        const resp = await fetch(`${API_V1}/jobs/${jobId}`, {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
         });
         if (!resp.ok) throw new Error(`${resp.status} ${resp.statusText}`);
@@ -99,7 +98,7 @@ export function JobAnalysis() {
 
   if (loading) {
     return (
-      <div style={{ padding: '24px 16px', color: '#6b7280', fontSize: 14 }}>
+      <div data-testid="job-analysis-loading" style={{ padding: '24px 16px', color: '#6b7280', fontSize: 14 }}>
         Analyzing job...
       </div>
     );
@@ -107,7 +106,7 @@ export function JobAnalysis() {
 
   if (error) {
     return (
-      <div style={{ padding: '24px 16px', color: '#dc2626', fontSize: 14 }}>
+      <div data-testid="job-analysis-error" style={{ padding: '24px 16px', color: '#dc2626', fontSize: 14 }}>
         Failed to load analysis: {error}
       </div>
     );
@@ -119,7 +118,7 @@ export function JobAnalysis() {
   const isPending = job.status === 'PENDING' || !parsedJd;
 
   return (
-    <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div data-testid="job-analysis-view" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* Header */}
       <div>
         <div style={{ fontSize: 15, fontWeight: 600 }}>{job.title}</div>
@@ -128,15 +127,16 @@ export function JobAnalysis() {
 
       {isPending ? (
         <div
+          data-testid="job-analysis-pending"
           style={{ fontSize: 13, color: '#6b7280', padding: '12px', background: '#f9fafb', borderRadius: 8 }}
         >
           Analysis in progress — check back in a moment.
         </div>
       ) : (
-        <>
+        <div data-testid="job-analysis-complete">
           {/* Match scores */}
           {matchResult && (
-            <div style={{ padding: 14, border: '1px solid #e5e7eb', borderRadius: 8 }}>
+            <div data-testid="match-scores" style={{ padding: 14, border: '1px solid #e5e7eb', borderRadius: 8, marginBottom: 16 }}>
               <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>Match Scores</div>
               <ScoreBar label="Surface match (keywords)" score={matchResult.surfaceScore} />
               <ScoreBar label="Deep match (your story)" score={matchResult.deepScore} />
@@ -146,6 +146,7 @@ export function JobAnalysis() {
           {/* Gaps */}
           {matchResult && matchResult.gaps.length > 0 && (
             <div
+              data-testid="gap-list"
               style={{
                 padding: 14,
                 border: '1px solid #fde68a',
@@ -168,7 +169,7 @@ export function JobAnalysis() {
 
           {/* Company brief */}
           {companyBrief && (
-            <div style={{ padding: 14, border: '1px solid #e5e7eb', borderRadius: 8 }}>
+            <div data-testid="company-summary" style={{ padding: 14, border: '1px solid #e5e7eb', borderRadius: 8 }}>
               <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Company</div>
               {companyBrief.summary && (
                 <p style={{ fontSize: 12, color: '#374151', margin: '0 0 8px' }}>
@@ -213,11 +214,11 @@ export function JobAnalysis() {
 
           {/* Rationale */}
           {matchResult?.adviceRationale && (
-            <div style={{ fontSize: 11, color: '#9ca3af', padding: '0 4px' }}>
+            <div data-testid="advice-rationale" style={{ fontSize: 11, color: '#9ca3af', padding: '0 4px' }}>
               {matchResult.adviceRationale}
             </div>
           )}
-        </>
+        </div>
       )}
     </div>
   );

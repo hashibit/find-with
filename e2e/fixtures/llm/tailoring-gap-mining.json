@@ -1,0 +1,26 @@
+{
+  "endpoint": "/v1/chat/completions",
+  "requestHash": "__recorded__",
+  "scenarioName": "tailoring-gap-mining",
+  "response": {
+    "id": "chatcmpl-mock-tailoring-gap-mining",
+    "object": "chat.completion",
+    "created": 1748000005,
+    "model": "gpt-4o",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "{\"newBullet\":{\"text\":\"Coordinated cross-functional auth v2 migration with 4 engineering teams, ensuring zero-downtime rollout and PCI DSS compliance sign-off\",\"status\":\"CONFIRMED\",\"sourceKind\":\"conversation\"},\"updatedMatchScore\":91,\"acknowledgement\":\"Good — that cross-team coordination on compliance-adjacent work (auth, PCI context) is directly relevant to payments domain. I've added it to your tailored resume. Match score moved from 86% to 91%.\"}"
+        },
+        "finish_reason": "stop"
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 500,
+      "completion_tokens": 120,
+      "total_tokens": 620
+    }
+  }
+}

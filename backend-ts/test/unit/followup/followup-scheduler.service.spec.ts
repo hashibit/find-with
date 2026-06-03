@@ -21,6 +21,21 @@ function buildService() {
     find: vi.fn().mockResolvedValue([]),
   };
 
+  const parsedJdRepo = {
+    findOne: vi.fn().mockResolvedValue(null),
+  };
+
+  const convRepo = {
+    findOne: vi.fn().mockResolvedValue(null),
+    create: vi.fn().mockImplementation((data) => data),
+    save: vi.fn().mockImplementation((data) => Promise.resolve(data)),
+  };
+
+  const messageRepo = {
+    create: vi.fn().mockImplementation((data) => data),
+    save: vi.fn().mockResolvedValue(undefined),
+  };
+
   const gdprLogRepo = {};
 
   const transactionFn = vi.fn().mockResolvedValue(undefined);
@@ -31,6 +46,11 @@ function buildService() {
     },
   };
 
+  const fieldCrypto = {
+    encrypt: vi.fn().mockResolvedValue(Buffer.from('encrypted')),
+    decrypt: vi.fn().mockResolvedValue('decrypted'),
+  };
+
   const purgeSagaService = {
     processPendingSagas: vi.fn().mockResolvedValue(undefined),
   };
@@ -38,12 +58,16 @@ function buildService() {
   const service = new FollowupSchedulerService(
     emailRepo as any,
     radarRepo as any,
+    parsedJdRepo as any,
+    convRepo as any,
+    messageRepo as any,
     gdprLogRepo as any,
     userRepo as any,
+    fieldCrypto as any,
     purgeSagaService as any,
   );
 
-  return { service, emailRepo, radarRepo, userRepo, purgeSagaService, qbChain };
+  return { service, emailRepo, radarRepo, parsedJdRepo, convRepo, messageRepo, fieldCrypto, userRepo, purgeSagaService, qbChain };
 }
 
 // ---------------------------------------------------------------------------
@@ -79,6 +103,75 @@ describe('FollowupSchedulerService', () => {
       radarRepo.find.mockResolvedValue([]);
 
       await expect(service.checkPendingFollowups()).resolves.not.toThrow();
+    });
+
+    it('creates a FOLLOWUP conversation and message for a due item', async () => {
+      const now = new Date();
+      const { service, radarRepo, convRepo, messageRepo, fieldCrypto } = buildService();
+
+      const dueItem = {
+        id: 'radar_01',
+        userId: 'user_01',
+        status: 'APPLIED',
+        parsedJdId: null,
+        lastStatusAt: new Date(now.getTime() - 3 * 86_400_000 - 1800_000), // 3d + 30min ago
+      };
+      radarRepo.find.mockResolvedValueOnce([dueItem]).mockResolvedValue([]);
+
+      await service.checkPendingFollowups();
+
+      expect(convRepo.save).toHaveBeenCalledOnce();
+      expect(messageRepo.save).toHaveBeenCalledOnce();
+      expect(fieldCrypto.encrypt).toHaveBeenCalledOnce();
+
+      const savedConv = convRepo.save.mock.calls[0][0];
+      expect(savedConv.kind).toBe('FOLLOWUP');
+      expect(savedConv.anchorId).toBe('radar_01');
+      expect(savedConv.userId).toBe('user_01');
+    });
+
+    it('skips nudge when a FOLLOWUP conversation already exists for the radar item', async () => {
+      const now = new Date();
+      const { service, radarRepo, convRepo, messageRepo } = buildService();
+
+      const dueItem = {
+        id: 'radar_02',
+        userId: 'user_01',
+        status: 'APPLIED',
+        parsedJdId: null,
+        lastStatusAt: new Date(now.getTime() - 3 * 86_400_000 - 1800_000),
+      };
+      radarRepo.find.mockResolvedValueOnce([dueItem]).mockResolvedValue([]);
+      convRepo.findOne.mockResolvedValue({ id: 'existing_conv' }); // already nudged
+
+      await service.checkPendingFollowups();
+
+      expect(convRepo.save).not.toHaveBeenCalled();
+      expect(messageRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('includes job title and company in the nudge text when parsedJd is available', async () => {
+      const now = new Date();
+      const { service, radarRepo, parsedJdRepo, messageRepo, fieldCrypto } = buildService();
+
+      const dueItem = {
+        id: 'radar_03',
+        userId: 'user_01',
+        status: 'APPLIED',
+        parsedJdId: 'jd_01',
+        lastStatusAt: new Date(now.getTime() - 3 * 86_400_000 - 1800_000),
+      };
+      radarRepo.find.mockResolvedValueOnce([dueItem]).mockResolvedValue([]);
+      parsedJdRepo.findOne.mockResolvedValue({ title: 'Senior PM', company: 'Acme' });
+
+      await service.checkPendingFollowups();
+
+      const encryptedWith = fieldCrypto.encrypt.mock.calls[0][0] as string;
+      expect(encryptedWith).toContain('Senior PM at Acme');
+
+      const savedMsg = messageRepo.save.mock.calls[0][0];
+      expect(savedMsg.role).toBe('ASSISTANT');
+      expect((savedMsg.payload as any).content[0].text).toContain('Senior PM at Acme');
     });
   });
 

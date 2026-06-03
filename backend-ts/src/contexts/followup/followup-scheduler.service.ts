@@ -1,13 +1,17 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, LessThan, MoreThan, IsNull, Not } from 'typeorm';
+import { Repository, LessThan, MoreThan } from 'typeorm';
 import { FollowupEmail } from '../../database/entities/followup/followup-email.entity.js';
 import { JobRadarItem } from '../../database/entities/jobs/radar-item.entity.js';
+import { JobParsedJd } from '../../database/entities/jobs/parsed-jd.entity.js';
+import { ConvConversation } from '../../database/entities/conversation/conversation.entity.js';
+import { ConvMessage } from '../../database/entities/conversation/message.entity.js';
 import { AccountPurgeSaga } from '../../database/entities/iam/account-purge-saga.entity.js';
 import { GdprPurgeLog } from '../../database/entities/iam/gdpr-purge-log.entity.js';
 import { IamUser } from '../../database/entities/iam/iam-user.entity.js';
 import { AccountPurgeSagaService } from '../iam/services/account-purge-saga.service.js';
+import { FIELD_CRYPTO, type FieldCrypto } from '../../common/crypto/crypto.interface.js';
 import { ulid } from 'ulid';
 
 @Injectable()
@@ -19,10 +23,18 @@ export class FollowupSchedulerService {
     private readonly emailRepo: Repository<FollowupEmail>,
     @InjectRepository(JobRadarItem)
     private readonly radarRepo: Repository<JobRadarItem>,
+    @InjectRepository(JobParsedJd)
+    private readonly parsedJdRepo: Repository<JobParsedJd>,
+    @InjectRepository(ConvConversation)
+    private readonly convRepo: Repository<ConvConversation>,
+    @InjectRepository(ConvMessage)
+    private readonly messageRepo: Repository<ConvMessage>,
     @InjectRepository(GdprPurgeLog)
     private readonly gdprLogRepo: Repository<GdprPurgeLog>,
     @InjectRepository(IamUser)
     private readonly userRepo: Repository<IamUser>,
+    @Inject(FIELD_CRYPTO)
+    private readonly fieldCrypto: FieldCrypto,
     private readonly purgeSagaService: AccountPurgeSagaService,
   ) {}
 
@@ -50,11 +62,78 @@ export class FollowupSchedulerService {
       });
 
       const due = items.filter((i) => i.lastStatusAt <= windowEnd);
-      if (due.length > 0) {
-        this.logger.log(`${due.length} items due for ${days}-day followup`);
-        // TODO v0.2: push SSE nudge via conversation service
+      if (due.length === 0) continue;
+
+      this.logger.log(`${due.length} items due for ${days}-day followup`);
+
+      for (const item of due) {
+        await this.createNudgeIfAbsent(item, days);
       }
     }
+  }
+
+  /**
+   * Create a FOLLOWUP conversation with a Quinn nudge message for the given radar item,
+   * unless one already exists (idempotent — safe to call multiple times).
+   * The conversation appears in the user's panel on next open without requiring SSE.
+   */
+  private async createNudgeIfAbsent(item: JobRadarItem, days: number): Promise<void> {
+    const existing = await this.convRepo.findOne({
+      where: { userId: item.userId, kind: 'FOLLOWUP', anchorId: item.id },
+    });
+    if (existing) return;
+
+    let title: string | null = null;
+    let company: string | null = null;
+    if (item.parsedJdId) {
+      const jd = await this.parsedJdRepo.findOne({ where: { id: item.parsedJdId } });
+      title = jd?.title ?? null;
+      company = jd?.company ?? null;
+    }
+
+    const nudgeText = this.buildNudgeText(days, title, company);
+
+    const conv = this.convRepo.create({
+      id: ulid(),
+      userId: item.userId,
+      kind: 'FOLLOWUP',
+      anchorId: item.id,
+      effectiveDensity: 'BALANCED',
+      lastActivity: new Date(),
+    });
+    await this.convRepo.save(conv);
+
+    const encrypted = await this.fieldCrypto.encrypt(nudgeText);
+    await this.messageRepo.save(
+      this.messageRepo.create({
+        id: ulid(),
+        conversationId: conv.id,
+        role: 'ASSISTANT',
+        text: null,
+        encryptedText: encrypted,
+        payload: {
+          role: 'assistant',
+          content: [{ type: 'text', text: nudgeText }],
+          timestamp: Date.now(),
+        },
+      }),
+    );
+
+    this.logger.log(`Followup nudge created: radarItem=${item.id} day=${days}`);
+  }
+
+  private buildNudgeText(days: number, title: string | null, company: string | null): string {
+    const label =
+      title && company ? `${title} at ${company}` :
+      title ?? company ?? 'a role you applied to';
+
+    if (days <= 3) {
+      return `${days} days ago you applied to ${label}. Any reply yet?`;
+    }
+    if (days <= 8) {
+      return `It's been ${days} days since you applied to ${label} — still no reply. Worth sending a follow-up, or ready to move on?`;
+    }
+    return `${days} days since you applied to ${label}. If there's still no response, it may be time to move on. What do you want to do?`;
   }
 
   /**

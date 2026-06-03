@@ -1,0 +1,76 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg15
+    environment:
+      POSTGRES_USER: e2e
+      POSTGRES_PASSWORD: e2e
+      POSTGRES_DB: findwith_e2e
+    ports:
+      - "5434:5432"
+    volumes:
+      - ./infra/init-test-db.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U e2e -d findwith_e2e"]
+      interval: 3s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6381:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: e2ekey
+      MINIO_ROOT_PASSWORD: e2esecret
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  mailpit:
+    image: axllent/mailpit
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
+  dom-fixtures:
+    image: nginx:alpine
+    volumes:
+      - ./e2e/fixtures/dom:/usr/share/nginx/html:ro
+    ports:
+      - "8081:80"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:80/"]
+      interval: 3s
+      timeout: 3s
+      retries: 5
+
+  llm-mock:
+    build:
+      context: ./e2e/llm-mock
+    environment:
+      LLM_RECORD: "${LLM_RECORD:-false}"
+      OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
+      PORT: "11435"
+    ports:
+      - "11435:11435"
+    volumes:
+      - ./e2e/fixtures/llm:/app/fixtures
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:11435/health"]
+      interval: 3s
+      timeout: 3s
+      retries: 10

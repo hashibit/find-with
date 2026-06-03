@@ -1,0 +1,26 @@
+{
+  "endpoint": "/v1/chat/completions",
+  "requestHash": "__recorded__",
+  "scenarioName": "followup-email-classify",
+  "response": {
+    "id": "chatcmpl-mock-email-classify",
+    "object": "chat.completion",
+    "created": 1748000007,
+    "model": "gpt-4o",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "{\"kind\":\"INTERVIEW_INVITE\",\"summary\":\"Acme Corp is inviting you to a first-round interview for the Senior Product Manager role. Interview is scheduled for Thursday June 12 at 2:00 PM PT via video call with Sarah Chen (Head of Product). You need to confirm availability.\",\"keyInfo\":{\"interviewer\":\"Sarah Chen, Head of Product\",\"date\":\"Thursday, June 12, 2026\",\"time\":\"2:00 PM – 3:00 PM PT\",\"format\":\"Video call (Zoom)\"},\"nextSteps\":[\"Reply to confirm the proposed time or suggest 2-3 alternatives\",\"Prepare for a product strategy conversation with the Head of Product\",\"Research Acme Corp's recent platform launch and European expansion\"],\"draftReply\":\"Hi Sarah,\\n\\nThank you for the invitation — I'm happy to confirm Thursday June 12 at 2:00 PM PT works well for me.\\n\\nLooking forward to our conversation.\\n\\nBest,\\nAlex\"}"
+        },
+        "finish_reason": "stop"
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 450,
+      "completion_tokens": 200,
+      "total_tokens": 650
+    }
+  }
+}

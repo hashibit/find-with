@@ -1,0 +1,26 @@
+{
+  "endpoint": "/v1/chat/completions",
+  "requestHash": "__recorded__",
+  "scenarioName": "onboarding-resume-parse",
+  "response": {
+    "id": "chatcmpl-mock-onboarding-resume-parse",
+    "object": "chat.completion",
+    "created": 1748000000,
+    "model": "gpt-4o",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "{\"basicInfo\":{\"fullName\":\"Alex Johnson\",\"email\":\"alex.johnson@email.com\",\"phone\":\"+1-415-555-0101\",\"location\":\"San Francisco, CA\",\"linkedinUrl\":\"https://linkedin.com/in/alexjohnson\"},\"education\":[{\"school\":\"UC Berkeley\",\"degree\":\"Bachelor of Science\",\"field\":\"Business Administration\",\"startYear\":2014,\"endYear\":2018,\"gpa\":\"3.7\"}],\"workExperience\":[{\"company\":\"Linear\",\"title\":\"Product Manager\",\"startDate\":\"2022-03\",\"endDate\":null,\"location\":\"San Francisco, CA\",\"bullets\":[\"Owned roadmap for developer tools product used by 50,000+ teams\",\"Increased feature adoption by 32% through redesigned onboarding\",\"Led cross-functional team of 8 engineers and 2 designers\"]},{\"company\":\"Stripe\",\"title\":\"Associate Product Manager\",\"startDate\":\"2019-06\",\"endDate\":\"2022-02\",\"location\":\"San Francisco, CA\",\"bullets\":[\"Launched Stripe Dashboard mobile app reaching 100k MAU in 6 months\",\"Defined KPI framework adopted across 4 product teams\",\"Collaborated with legal and compliance on PCI DSS requirements\"]}],\"skills\":{\"hard\":[\"Product roadmap\",\"SQL\",\"A/B testing\",\"Figma\",\"Amplitude\",\"JIRA\"],\"soft\":[\"Cross-functional leadership\",\"Stakeholder management\",\"Executive communication\"]},\"projects\":[],\"certifications\":[]}"
+        },
+        "finish_reason": "stop"
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 800,
+      "completion_tokens": 350,
+      "total_tokens": 1150
+    }
+  }
+}

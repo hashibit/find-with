@@ -1,0 +1,26 @@
+{
+  "endpoint": "/v1/chat/completions",
+  "requestHash": "__recorded__",
+  "scenarioName": "job-analysis-jd-parse",
+  "response": {
+    "id": "chatcmpl-mock-jd-parse",
+    "object": "chat.completion",
+    "created": 1748000001,
+    "model": "gpt-4o",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "{\"title\":\"Senior Product Manager\",\"company\":\"Acme Corp\",\"location\":\"San Francisco, CA (Hybrid)\",\"salaryRange\":{\"min\":160000,\"max\":200000,\"currency\":\"USD\"},\"hardSkills\":[\"SQL\",\"A/B testing\",\"Product roadmap\",\"Stakeholder management\",\"B2B SaaS\",\"Executive communication\"],\"softSkills\":[\"Cross-functional leadership\",\"Communication\",\"Analytical thinking\",\"Ownership\"],\"experienceYears\":5,\"educationRequired\":true,\"hiddenSignals\":[\"Works with 3-5 engineering squads suggests large org\",\"Payments domain knowledge preferred\"],\"niceToHave\":[\"Payments or fintech experience\",\"Amplitude / Mixpanel / Looker\",\"Startup experience\",\"MBA\"],\"buzzwordTranslation\":\"'Drive cross-functional alignment' = manage competing priorities across teams without direct authority\"}"
+        },
+        "finish_reason": "stop"
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 600,
+      "completion_tokens": 220,
+      "total_tokens": 820
+    }
+  }
+}

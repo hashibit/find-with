@@ -1,0 +1,26 @@
+{
+  "endpoint": "/v1/chat/completions",
+  "requestHash": "__recorded__",
+  "scenarioName": "tailoring-bullet-edit",
+  "response": {
+    "id": "chatcmpl-mock-tailoring-bullet-edit",
+    "object": "chat.completion",
+    "created": 1748000006,
+    "model": "gpt-4o",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "{\"revisedText\":\"Drove 32% feature adoption increase via data-informed onboarding redesign across 50,000+ teams\",\"status\":\"USER_EDITED\"}"
+        },
+        "finish_reason": "stop"
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 200,
+      "completion_tokens": 45,
+      "total_tokens": 245
+    }
+  }
+}

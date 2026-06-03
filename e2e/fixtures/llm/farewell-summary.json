@@ -1,0 +1,26 @@
+{
+  "endpoint": "/v1/chat/completions",
+  "requestHash": "__recorded__",
+  "scenarioName": "farewell-summary",
+  "response": {
+    "id": "chatcmpl-mock-farewell-summary",
+    "object": "chat.completion",
+    "created": 1748000008,
+    "model": "gpt-4o",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "Congratulations. This one was worth the effort.\n\nHere's a quick recap of this search: you analyzed several roles, refined your story around cross-functional leadership and data-driven product work, and landed the offer at Stripe.\n\nI've saved all your materials — the shining points, the tailored bullets, the gap-mining conversations. When you're ready to move again, everything is here.\n\nYour subscription is paused. Come back whenever you need to.\n\nGood luck at Stripe."
+        },
+        "finish_reason": "stop"
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 600,
+      "completion_tokens": 110,
+      "total_tokens": 710
+    }
+  }
+}

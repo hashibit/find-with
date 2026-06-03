@@ -37,7 +37,7 @@ export function Radar() {
   };
 
   return (
-    <div style={{ padding: '24px 16px' }}>
+    <div data-testid="radar-view" style={{ padding: '24px 16px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <h2 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>My Radar</h2>
         <button
@@ -106,7 +106,7 @@ export function Radar() {
           radarItems.map((item) => {
             const statusInfo = getStatusLabel(item.status);
             return (
-              <div key={item.id}>
+              <div key={item.id} data-testid="radar-item" data-item-id={item.id} data-item-status={item.status}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   <div
                     style={{
@@ -129,6 +129,7 @@ export function Radar() {
                     <div style={{ fontSize: 13, color: '#6b7280' }}>{item.company}</div>
                   </div>
                   <span
+                    data-testid="radar-status-badge"
                     style={{
                       background: statusInfo.color,
                       color: 'white',

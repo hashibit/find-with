@@ -1,0 +1,17 @@
+{
+  "name": "@findwith/e2e",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "test": "playwright test",
+    "test:record": "LLM_RECORD=true playwright test",
+    "report": "playwright show-report e2e/playwright-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.44.0",
+    "tsx": "^4.15.7",
+    "typeorm": "^0.3.20",
+    "pg": "^8.12.0",
+    "dotenv": "^16.4.5"
+  }
+}

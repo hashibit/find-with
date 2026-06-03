@@ -2,3 +2,4 @@ packages:
   - 'backend-ts'
   - 'extension'
   - 'web'
+  - 'e2e'

@@ -1,8 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getToken } from '../../lib/auth';
-
-const API_BASE = 'http://localhost:14667/v1'; // dev; prod: https://api.findwith.com/v1
+import { API_V1 } from '../../background/config';
 
 interface BasicInfo {
   fullName?: string;
@@ -17,7 +16,7 @@ interface ProfileData {
 }
 
 async function fetchProfile(token: string): Promise<ProfileData | null> {
-  const resp = await fetch(`${API_BASE}/profile`, {
+  const resp = await fetch(`${API_V1}/profile`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (resp.status === 404) return null;
@@ -28,7 +27,7 @@ async function fetchProfile(token: string): Promise<ProfileData | null> {
 async function uploadResume(token: string, file: File): Promise<void> {
   const form = new FormData();
   form.append('file', file);
-  const resp = await fetch(`${API_BASE}/profile/resume`, {
+  const resp = await fetch(`${API_V1}/profile/resume`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
     body: form,
@@ -89,14 +88,14 @@ export function Onboarding() {
 
   if (loading) {
     return (
-      <div style={{ padding: '24px 16px', color: '#6b7280', fontSize: 14 }}>
+      <div data-testid="onboarding-loading" style={{ padding: '24px 16px', color: '#6b7280', fontSize: 14 }}>
         Loading profile...
       </div>
     );
   }
 
   return (
-    <div style={{ padding: '24px 16px' }}>
+    <div data-testid="onboarding-view" style={{ padding: '24px 16px' }}>
       <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>Get started</h2>
       <p style={{ fontSize: 13, color: '#6b7280', marginBottom: 20 }}>
         Upload your resume so Quinn can understand your background.
@@ -105,6 +104,7 @@ export function Onboarding() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {profile?.basicInfo && (
           <div
+            data-testid="profile-summary"
             style={{
               padding: 14,
               borderRadius: 8,
@@ -140,10 +140,12 @@ export function Onboarding() {
           ref={fileInputRef}
           type="file"
           accept=".pdf,.docx"
+          data-testid="resume-file-input"
           style={{ display: 'none' }}
           onChange={handleFileChange}
         />
         <button
+          data-testid="upload-resume-btn"
           onClick={() => fileInputRef.current?.click()}
           disabled={uploading}
           style={{
@@ -177,12 +179,13 @@ export function Onboarding() {
         )}
 
         {uploadDone && !uploadError && (
-          <div style={{ fontSize: 12, color: '#16a34a', padding: '0 4px' }}>
+          <div data-testid="upload-success" style={{ fontSize: 12, color: '#16a34a', padding: '0 4px' }}>
             Resume uploaded — Quinn is parsing it now.
           </div>
         )}
 
         <button
+          data-testid="lets-start-btn"
           disabled={!hasResume}
           onClick={() => navigate('/')}
           style={{

@@ -1,4 +1,4 @@
-.PHONY: dev ci test lint proto clean
+.PHONY: dev ci test lint proto clean e2e-up e2e-down e2e-migrate e2e-seed e2e e2e-record
 
 # Dev
 dev: up
@@ -99,6 +99,33 @@ migrate:
 
 migration:
 	cd backend-ts && pnpm run migration:generate -- src/database/migrations/$(msg)
+
+# E2E tests (L4 — Playwright + Chrome extension + full service stack)
+# Requires: Docker, pnpm, Chromium browser.
+# In CI: coactions/setup-xvfb provides DISPLAY=:99 for headful Chrome.
+e2e-up:
+	docker compose -f docker-compose.e2e.yml up -d
+
+e2e-down:
+	docker compose -f docker-compose.e2e.yml down -v
+
+e2e-migrate:
+	cd backend-ts && dotenv -e .env.e2e -- pnpm run migration:run
+
+e2e-seed:
+	cd backend-ts && dotenv -e .env.e2e -- tsx ../e2e/fixtures/seed.ts
+
+# Run full e2e suite (builds backend + extension first, then runs Playwright)
+e2e: build-backend build-extension-e2e
+	pnpm e2e
+
+# Record mode: proxy LLM calls to real OpenAI and save fixture files.
+# Requires OPENAI_API_KEY in environment.
+e2e-record: build-backend build-extension-e2e
+	pnpm e2e:record
+
+build-extension-e2e:
+	bash e2e/scripts/build-extension-e2e.sh
 
 # DR
 dr-dry-run:

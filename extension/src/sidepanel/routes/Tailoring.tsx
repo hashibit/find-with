@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-
-const API_BASE = 'http://localhost:14667/api/v1';
+import { getToken as getAuthToken } from '../../lib/auth';
+import { API_V1 } from '../../background/config';
 
 interface BulletState {
   id: string;
@@ -45,7 +45,7 @@ export function Tailoring() {
     (async () => {
       try {
         const token = await getToken();
-        const resp = await fetch(`${API_BASE}/tailoring/${tailoringId}`, {
+        const resp = await fetch(`${API_V1}/tailoring/${tailoringId}`, {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
         });
         if (!resp.ok) throw new Error(`${resp.status} ${resp.statusText}`);
@@ -69,7 +69,7 @@ export function Tailoring() {
 
   if (loading) {
     return (
-      <div style={{ padding: '24px 16px', color: '#6b7280', fontSize: 14 }}>
+      <div data-testid="tailoring-loading" style={{ padding: '24px 16px', color: '#6b7280', fontSize: 14 }}>
         Loading tailored resume...
       </div>
     );
@@ -101,7 +101,7 @@ export function Tailoring() {
   const handleEditBullet = async (bulletId: string, newText: string) => {
     try {
       const token = await getToken();
-      const resp = await fetch(`${API_BASE}/tailoring/${tailoringId}/bullets/${bulletId}`, {
+      const resp = await fetch(`${API_V1}/tailoring/${tailoringId}/bullets/${bulletId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -133,7 +133,7 @@ export function Tailoring() {
   const handleExport = async (fmt: string = 'pdf') => {
     try {
       const token = await getToken();
-      const resp = await fetch(`${API_BASE}/tailoring/${tailoringId}/export`, {
+      const resp = await fetch(`${API_V1}/tailoring/${tailoringId}/export`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       if (!resp.ok) throw new Error('Failed to export');
@@ -147,7 +147,7 @@ export function Tailoring() {
   };
 
   return (
-    <div style={{ padding: '24px 16px' }}>
+    <div data-testid="tailoring-view" style={{ padding: '24px 16px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <h2 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>Tailoring</h2>
         <span style={{ fontSize: 12, color: '#4f46e5', fontWeight: 500 }}>
@@ -161,10 +161,10 @@ export function Tailoring() {
         </p>
       )}
 
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16, padding: 12, background: '#f9fafb', borderRadius: 8 }}>
+      <div data-testid="match-scores" style={{ display: 'flex', gap: 8, marginBottom: 16, padding: 12, background: '#f9fafb', borderRadius: 8 }}>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 12, color: '#6b7280' }}>Before</div>
-          <div style={{ fontSize: 13, fontWeight: 500 }}>
+          <div data-testid="match-score-before" style={{ fontSize: 13, fontWeight: 500 }}>
             <span style={{ color: '#dc2626' }}>{tailoring.matchScoreBefore}%</span> match
           </div>
         </div>
@@ -278,6 +278,7 @@ export function Tailoring() {
 
       <div style={{ marginTop: 24, display: 'flex', gap: 8 }}>
         <button
+          data-testid="export-btn"
           onClick={() => handleExport('pdf')}
           style={{
             padding: '10px 20px',
@@ -322,13 +323,5 @@ function transformTailoringData(data: any): TailoringData {
   };
 }
 
-async function getToken(): Promise<string | null> {
-  // Use dev mode bypass
-  const DEV_MODE = true;
-  const DEV_USER_ID = 'dev_user_001';
-  if (DEV_MODE) return DEV_USER_ID;
-
-  return new Promise((resolve) => {
-    chrome.storage.local.get(['token'], (res) => resolve(res['token'] ?? null));
-  });
-}
+// getToken is imported as getAuthToken from '../../lib/auth'
+const getToken = getAuthToken;

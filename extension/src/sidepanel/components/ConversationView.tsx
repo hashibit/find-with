@@ -18,6 +18,7 @@ export function ConversationView() {
 
   return (
     <div
+      data-testid="conversation-view"
       style={{
         borderTop: '1px solid #e5e7eb',
         maxHeight: '50vh',
@@ -29,6 +30,7 @@ export function ConversationView() {
         {messages.map((msg, i) => (
           <div
             key={i}
+            data-testid={msg.role === 'assistant' ? 'agent-message' : 'user-message'}
             style={{
               margin: '8px 0',
               padding: '8px 12px',
@@ -41,13 +43,16 @@ export function ConversationView() {
           </div>
         ))}
         {isStreaming && (
-          <div style={{ color: '#6b7280', fontSize: 12, padding: 8 }}>Quinn is typing...</div>
+          <div data-testid="streaming-indicator" style={{ color: '#6b7280', fontSize: 12, padding: 8 }}>
+            Quinn is typing...
+          </div>
         )}
         <div ref={messagesEnd} />
       </div>
 
       <div style={{ display: 'flex', padding: '8px 16px', gap: 8 }}>
         <input
+          data-testid="message-input"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleSend()}
@@ -62,6 +67,7 @@ export function ConversationView() {
           }}
         />
         <button
+          data-testid="send-btn"
           onClick={handleSend}
           disabled={isStreaming}
           style={{

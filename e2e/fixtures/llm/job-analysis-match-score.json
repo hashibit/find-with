@@ -1,0 +1,26 @@
+{
+  "endpoint": "/v1/chat/completions",
+  "requestHash": "__recorded__",
+  "scenarioName": "job-analysis-match-score",
+  "response": {
+    "id": "chatcmpl-mock-match-score",
+    "object": "chat.completion",
+    "created": 1748000003,
+    "model": "gpt-4o",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "{\"surfaceScore\":72,\"deepScore\":85,\"hitsSurface\":[\"SQL\",\"A/B testing\",\"Product roadmap\",\"Stakeholder management\",\"B2B SaaS\"],\"hitsDeep\":[\"Cross-functional leadership\",\"Executive communication\",\"Ownership of 0-to-1 features\"],\"gaps\":[\"Payments or fintech domain experience\",\"Managing 3+ engineering squads simultaneously\",\"Explicit experience with Amplitude or Mixpanel\"],\"adviceRationale\":\"Strong match on core PM skills. The payments gap is real but not disqualifying — you have relevant B2B SaaS depth. Worth applying.\"}"
+        },
+        "finish_reason": "stop"
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 700,
+      "completion_tokens": 160,
+      "total_tokens": 860
+    }
+  }
+}

@@ -1,5 +1,4 @@
 import { defineConfig } from '@playwright/test';
-import path from 'path';
 
 export default defineConfig({
   testDir: 'e2e/tests',
@@ -12,20 +11,11 @@ export default defineConfig({
     ['html', { outputFolder: 'e2e/playwright-report', open: 'never' }],
   ],
   use: {
-    // Side Panel API requires headful Chrome.
-    // In CI: xvfb-action provides a virtual display (DISPLAY=:99).
-    // '--headless=new' does NOT expose chrome.sidePanel — do not use it.
-    headless: false,
-    channel: 'chromium',
-    launchOptions: {
-      args: [
-        `--load-extension=${path.resolve('extension/dist-e2e')}`,
-        `--disable-extensions-except=${path.resolve('extension/dist-e2e')}`,
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-      ],
-    },
+    // The extension context is provided by e2e/fixtures/extension.ts which uses
+    // chromium.launchPersistentContext — the Playwright-recommended approach for
+    // Chrome extension testing. launchOptions are defined there, not here.
     baseURL: 'http://localhost:14667',
+    screenshot: 'only-on-failure',
   },
   globalSetup: './e2e/global-setup.ts',
   globalTeardown: './e2e/global-teardown.ts',

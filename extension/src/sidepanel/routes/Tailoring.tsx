@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { getToken as getAuthToken } from '../../lib/auth';
 import { API_V1 } from '../../background/config';
+import { useConversationStore } from '../stores/conversation';
 
 interface BulletState {
   id: string;
@@ -36,27 +37,65 @@ export function Tailoring() {
   const [error, setError] = useState<string | null>(null);
   const [editingBullet, setEditingBullet] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
+  const gapMiningTriggered = useRef(false);
+  const { sendMessage } = useConversationStore();
+
+  // Auto-start gap mining conversation once the tailoring data is loaded
+  useEffect(() => {
+    if (!tailoring || gapMiningTriggered.current) return;
+    gapMiningTriggered.current = true;
+    const jobLabel = tailoring.jobTitle
+      ? `${tailoring.jobTitle}${tailoring.company ? ` at ${tailoring.company}` : ''}`
+      : 'this position';
+    sendMessage(
+      `I've loaded my tailored resume for ${jobLabel}. What are the key gaps I should address to improve my match?`,
+    );
+  }, [tailoring?.id]);
 
   useEffect(() => {
     if (!tailoringId) return;
     setLoading(true);
     setError(null);
 
+    let cancelled = false;
+
+    const fetchTailoring = async () => {
+      const token = await getToken();
+      const resp = await fetch(`${API_V1}/tailoring/${tailoringId}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!resp.ok) throw new Error(`${resp.status} ${resp.statusText}`);
+      return transformTailoringData(await resp.json());
+    };
+
     (async () => {
       try {
-        const token = await getToken();
-        const resp = await fetch(`${API_V1}/tailoring/${tailoringId}`, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        });
-        if (!resp.ok) throw new Error(`${resp.status} ${resp.statusText}`);
-        const data = await resp.json();
-        setTailoring(transformTailoringData(data));
-      } catch (e) {
-        setError(String(e));
-      } finally {
+        const data = await fetchTailoring();
+        if (cancelled) return;
+        setTailoring(data);
         setLoading(false);
+
+        // Poll until sections are populated (async BullMQ job may still be running)
+        if (data.sections.length === 0) {
+          const interval = setInterval(async () => {
+            if (cancelled) { clearInterval(interval); return; }
+            try {
+              const updated = await fetchTailoring();
+              if (cancelled) { clearInterval(interval); return; }
+              setTailoring(updated);
+              if (updated.sections.length > 0) clearInterval(interval);
+            } catch { /* keep polling */ }
+          }, 2000);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setError(String(e));
+          setLoading(false);
+        }
       }
     })();
+
+    return () => { cancelled = true; };
   }, [tailoringId]);
 
   if (!tailoringId) {
@@ -234,6 +273,7 @@ export function Tailoring() {
                       </div>
                     ) : (
                       <div
+                        data-testid="bullet-item"
                         style={{
                           padding: '12px 16px',
                           borderRadius: 8,

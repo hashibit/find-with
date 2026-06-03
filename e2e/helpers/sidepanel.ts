@@ -13,6 +13,11 @@ export const E2E_USER_FREE = 'e2e-user-free';
 export const BACKEND_URL = 'http://localhost:14667';
 export const FIXTURES_URL = 'http://localhost:8081';
 
+// Stable extension ID derived from e2e/extension-key.pem via e2e/manifest.e2e.json key field.
+// If the PEM key changes, recompute: python3 -c "import json,hashlib,base64; ..."
+const EXTENSION_ID = 'fljfnjaepjaejcnplikaaejcbjhpofon';
+export const SIDEPANEL_URL = `chrome-extension://${EXTENSION_ID}/src/sidepanel/index.html`;
+
 /**
  * Wait for an element matching `selector` to become visible.
  * Uses Playwright's built-in `.waitFor` — no polling needed.
@@ -22,7 +27,8 @@ export async function waitForElement(
   selector: string,
   timeout = 30_000,
 ): Promise<void> {
-  await page.locator(selector).waitFor({ state: 'visible', timeout });
+  // Use .first() to avoid strict-mode violation when multiple elements match
+  await page.locator(selector).first().waitFor({ state: 'visible', timeout });
 }
 
 /**
@@ -30,33 +36,30 @@ export async function waitForElement(
  * Must be called on the extension side panel page (not the content page).
  */
 export async function injectAuthToken(page: Page, userId: string): Promise<void> {
-  await page.evaluate((uid) => {
-    chrome.storage.local.set({
-      auth_token: uid,
-      auth_expires_at: Math.floor(Date.now() / 1000) + 3600,
-      user_id: uid,
-    });
+  // Key must match what extension/src/lib/auth.ts reads: chrome.storage.local.get(['token'])
+  // Await the Promise so storage is committed before any page reload.
+  await page.evaluate(async (uid) => {
+    await chrome.storage.local.set({ token: uid });
   }, userId);
 }
 
 /**
- * Find the extension side panel page in the context.
- * Side panel URL pattern: `chrome-extension://<id>/src/sidepanel/index.html`
+ * Open the extension side panel page and return it.
+ *
+ * Chrome opens the side panel only on icon click (openPanelOnActionClick: true),
+ * which Playwright cannot trigger from the toolbar.
+ * Solution: navigate directly to the side panel URL using the stable extension ID
+ * derived from e2e/extension-key.pem (predictable, no service-worker discovery needed).
  */
 export async function getSidePanelPage(context: BrowserContext): Promise<Page> {
-  // Give the extension a moment to register
-  await new Promise((r) => setTimeout(r, 500));
+  // Re-use existing side panel page if already open
+  const existing = context.pages().find((p) => p.url().includes('sidepanel/index.html'));
+  if (existing) return existing;
 
-  const pages = context.pages();
-  const sidepanel = pages.find((p) => p.url().includes('sidepanel/index.html'));
-  if (sidepanel) return sidepanel;
-
-  // Wait for it to open
-  return new Promise((resolve) => {
-    context.on('page', (page) => {
-      if (page.url().includes('sidepanel/index.html')) resolve(page);
-    });
-  });
+  const page = await context.newPage();
+  await page.goto(SIDEPANEL_URL);
+  await page.waitForLoadState('domcontentloaded');
+  return page;
 }
 
 /**

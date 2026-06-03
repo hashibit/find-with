@@ -57,7 +57,7 @@ jobs:
         run: pnpm --filter @findwith/backend run build
 
       - name: Run TypeORM migrations
-        run: cd backend-ts && dotenv -e .env.e2e -- pnpm run migration:run
+        run: cd backend-ts && set -a && . .env.e2e && set +a && pnpm run migration:run
 
       - name: Build extension (e2e variant)
         run: bash e2e/scripts/build-extension-e2e.sh

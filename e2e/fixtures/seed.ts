@@ -169,6 +169,20 @@ export async function seed() {
       ON CONFLICT (id) DO NOTHING
     `, [NOW]);
 
+    // ── Quota counter — PRO users get unlimited tailoring ─────────────────────
+    // Reset on every seed run so previous test runs don't exhaust the quota.
+    await client.query(`
+      INSERT INTO quota_usage_counters ("userId", "tailoringCompleted", "tailoringLimit", "windowStart")
+      VALUES ('e2e-user-1', 0, 999999, $1)
+      ON CONFLICT ("userId") DO UPDATE
+        SET "tailoringCompleted" = 0,
+            "tailoringLimit"     = 999999,
+            "windowStart"        = $1
+    `, [NOW]);
+
+    // Clear any consume-log entries from previous runs (UNIQUE on tailoredResumeId)
+    await client.query(`DELETE FROM quota_consume_log WHERE "userId" = 'e2e-user-1'`);
+
     console.log('[seed] E2E fixture data seeded successfully');
   } finally {
     await client.end();

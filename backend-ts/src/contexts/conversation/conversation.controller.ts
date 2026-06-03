@@ -1,4 +1,4 @@
-import { Body, Controller, Get, type MessageEvent, Param, Post, Sse, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, type MessageEvent, Param, Post, Query, Sse, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Observable, map } from 'rxjs';
 import { createZodDto } from 'nestjs-zod';
@@ -58,10 +58,10 @@ export class ConversationController {
   prompt(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
-    @Body() dto: SendPromptDto,
+    @Query('message') message: string,
   ): Observable<MessageEvent> {
     return this.agent
-      .respond(id, user.userId, dto.message)
+      .respond(id, user.userId, message)
       .pipe(map((evt) => ({ data: evt.data }) as MessageEvent));
   }
 }

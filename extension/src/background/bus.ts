@@ -79,6 +79,10 @@ export async function handleMessage(
       if (sender.tab?.windowId) {
         await chrome.sidePanel.open({ windowId: sender.tab.windowId });
       }
+      // Notify all connected sidepanel ports (e.g. the NavBus 'nav' port) to navigate.
+      connectedPorts.forEach((port) => {
+        port.postMessage({ type: 'NAVIGATE', route: msg.payload.route ?? '/onboarding' });
+      });
       return { opened: true };
 
     // Conversation

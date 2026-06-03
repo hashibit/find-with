@@ -37,7 +37,7 @@ export const useRadarStore = create<RadarState>((set) => ({
   error: null,
 
   fetchRadar: async () => {
-    set({ isLoading: true, error: null });
+    set({ isLoading: true, radarItems: [], error: null });
     try {
       const result = await chrome.runtime.sendMessage({ type: 'RADAR_FETCH' });
       if (result.error) {

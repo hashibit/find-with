@@ -77,3 +77,4 @@ docker-compose.override.yml
 backend/.claude/
 .claude
 .understand-anything
+.e2e-backend.pid

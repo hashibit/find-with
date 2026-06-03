@@ -110,10 +110,10 @@ e2e-down:
 	docker compose -f docker-compose.e2e.yml down -v
 
 e2e-migrate:
-	cd backend-ts && dotenv -e .env.e2e -- pnpm run migration:run
+	cd backend-ts && set -a && . .env.e2e && set +a && pnpm run migration:run
 
 e2e-seed:
-	cd backend-ts && dotenv -e .env.e2e -- tsx ../e2e/fixtures/seed.ts
+	cd backend-ts && set -a && . .env.e2e && set +a && tsx ../e2e/fixtures/seed.ts
 
 # Run full e2e suite (builds backend + extension first, then runs Playwright)
 e2e: build-backend build-extension-e2e

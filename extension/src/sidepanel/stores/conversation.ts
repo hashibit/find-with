@@ -20,7 +20,7 @@ interface ConversationState {
   messages: ConversationMessage[];
   isStreaming: boolean;
   currentConversationId: string | null;
-  sendMessage: (text: string) => Promise<void>;
+  sendMessage: (text: string, conversationKind?: string) => Promise<void>;
   setStreaming: (streaming: boolean) => void;
   appendAssistantChunk: (chunk: string) => void;
   startNewConversation: () => void;
@@ -32,7 +32,7 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
   isStreaming: false,
   currentConversationId: null,
 
-  sendMessage: async (text: string) => {
+  sendMessage: async (text: string, conversationKind = 'FREE_CHAT') => {
     const userMsg: ConversationMessage = { role: 'user', text, timestamp: Date.now() };
     set((state) => ({
       messages: [...state.messages, userMsg],
@@ -45,7 +45,7 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
       if (!conversationId) {
         const createResult = await chrome.runtime.sendMessage({
           type: 'CONVERSATION_CREATE',
-          payload: { kind: 'FREE_CHAT' },
+          payload: { kind: conversationKind },
         });
         if (createResult.error) {
           set({ isStreaming: false });

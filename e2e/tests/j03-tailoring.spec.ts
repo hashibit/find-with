@@ -4,7 +4,7 @@
  * Using a pre-seeded ANALYZED radar item, start tailoring, edit a bullet,
  * and export the plain text. Verifies match score, provenance tags, and quota counter.
  */
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures/extension.js';
 import {
   waitForElement,
   injectAuthToken,
@@ -89,8 +89,11 @@ test.describe('J-03: Resume Tailoring + Export', () => {
     await sidepanel.locator('[data-testid="message-input"]').fill('I coordinated with 4 engineering teams to ship auth v2');
     await sidepanel.locator('[data-testid="send-btn"]').click();
 
-    // Step 10: New bullet appears (agent responds)
-    await waitForElement(sidepanel, '[data-testid="agent-message"]:last-child', 20_000);
+    // Step 10: Quinn responds to gap input (wait for second agent message)
+    await sidepanel.locator('[data-testid="agent-message"]').nth(1).waitFor({ state: 'visible', timeout: 20_000 });
+
+    // Wait for bullet items to render (confirms BullMQ processed and sections populated)
+    await waitForElement(sidepanel, '[data-testid="bullet-item"]', 30_000);
 
     // Step 12: Patch a bullet via API
     const tailoringDetail = await (await apiCall('GET', `/tailoring/${tailoringId}`)).json();

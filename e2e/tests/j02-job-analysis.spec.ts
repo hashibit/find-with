@@ -4,7 +4,7 @@
  * Navigate to a LinkedIn fixture page, click "Ask Quinn",
  * verify the three-layer match analysis renders correctly.
  */
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures/extension.js';
 import {
   waitForElement,
   injectAuthToken,

@@ -1,0 +1,26 @@
+{
+  "endpoint": "/v1/chat/completions",
+  "requestHash": "__recorded__",
+  "scenarioName": "job-analysis-quinn-skip",
+  "response": {
+    "id": "chatcmpl-mock-job-analysis-skip",
+    "object": "chat.completion",
+    "created": 1748000011,
+    "model": "gpt-4o",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "I don't recommend applying to this one. The role requires deep ML engineering expertise — PyTorch, CUDA, LLM training at scale. Your background is in product management, not ML research. The gap is too wide to bridge with tailoring. This would be a waste of your time and theirs."
+        },
+        "finish_reason": "stop"
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 500,
+      "completion_tokens": 60,
+      "total_tokens": 560
+    }
+  }
+}

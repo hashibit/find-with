@@ -1,5 +1,5 @@
-import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { Onboarding } from './routes/Onboarding';
 import { JobAnalysis } from './routes/JobAnalysis';
 import { Tailoring } from './routes/Tailoring';
@@ -8,9 +8,29 @@ import { Library } from './routes/Library';
 import { EasyApply } from './routes/EasyApply';
 import { ConversationView } from './components/ConversationView';
 
+/**
+ * Opens a persistent port so the background service worker can push NAVIGATE
+ * messages when a content script triggers OPEN_SIDEPANEL.
+ * Must live inside <BrowserRouter> to access useNavigate.
+ */
+function NavBus() {
+  const navigate = useNavigate();
+  useEffect(() => {
+    const port = chrome.runtime.connect({ name: 'nav' });
+    port.onMessage.addListener((msg: { type: string; route?: string }) => {
+      if (msg.type === 'NAVIGATE' && msg.route) {
+        navigate(msg.route);
+      }
+    });
+    return () => { try { port.disconnect(); } catch {} };
+  }, [navigate]);
+  return null;
+}
+
 export function App() {
   return (
     <BrowserRouter>
+      <NavBus />
       <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
         <header
           style={{
@@ -36,6 +56,7 @@ export function App() {
             <Route path="/radar" element={<Radar />} />
             <Route path="/library" element={<Library />} />
             <Route path="/easy-apply" element={<EasyApply />} />
+            <Route path="*" element={<Navigate to="/onboarding" />} />
           </Routes>
         </main>
 

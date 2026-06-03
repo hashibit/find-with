@@ -21,12 +21,12 @@
     "test:int": "pnpm test:infra:up && pnpm --filter backend-ts run test:int:migrate && pnpm --filter backend-ts run test:int",
     "e2e:up": "docker compose -f docker-compose.e2e.yml up -d",
     "e2e:down": "docker compose -f docker-compose.e2e.yml down -v",
-    "e2e:migrate": "cd backend-ts && dotenv -e .env.e2e -- pnpm run migration:run",
-    "e2e:seed": "cd backend-ts && dotenv -e .env.e2e -- tsx ../e2e/fixtures/seed.ts",
+    "e2e:migrate": "cd backend-ts && set -a && . .env.e2e && set +a && pnpm run migration:run",
+    "e2e:seed": "cd backend-ts && set -a && . .env.e2e && set +a && tsx ../e2e/fixtures/seed.ts",
     "build:backend": "pnpm --filter @findwith/backend run build",
     "build:extension:e2e": "bash e2e/scripts/build-extension-e2e.sh",
-    "e2e": "playwright test",
-    "e2e:record": "LLM_RECORD=true playwright test"
+    "e2e": "NODE_OPTIONS=--no-strip-types playwright test",
+    "e2e:record": "LLM_RECORD=true NODE_OPTIONS=--no-strip-types playwright test"
   },
   "devDependencies": {
     "@playwright/test": "^1.44.0",

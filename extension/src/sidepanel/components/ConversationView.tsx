@@ -2,13 +2,29 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useConversationStore } from '../stores/conversation';
 
 export function ConversationView() {
-  const { messages, isStreaming, sendMessage } = useConversationStore();
+  const { messages, isStreaming, sendMessage, loadConversation } = useConversationStore();
   const [input, setInput] = useState('');
   const messagesEnd = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     messagesEnd.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Expose test hooks for Playwright e2e tests
+  useEffect(() => {
+    (window as any).findwithLoadConversation = (id: string) => loadConversation(id);
+    // Direct store injection — bypasses chrome.runtime for reliability in e2e
+    (window as any).findwithSetConversationMessages = (
+      msgs: Array<{ role: 'user' | 'assistant'; text: string; timestamp: number }>,
+      id: string,
+    ) => {
+      useConversationStore.setState({ messages: msgs, currentConversationId: id, isStreaming: false });
+    };
+    return () => {
+      delete (window as any).findwithLoadConversation;
+      delete (window as any).findwithSetConversationMessages;
+    };
+  }, [loadConversation]);
 
   const handleSend = () => {
     if (!input.trim() || isStreaming) return;

@@ -12,15 +12,15 @@
         "index": 0,
         "message": {
           "role": "assistant",
-          "content": "{\"name\":\"Acme Corp\",\"summary\":\"Acme Corp is a B2B SaaS company specializing in enterprise workflow automation with ~800 employees. Series C ($120M raised). Growing steadily with strong NPS scores and a reputation for engineering quality.\",\"stage\":\"Series C\",\"employeeCount\":800,\"recentDevelopments\":[\"Launched v3.0 of core platform in Q1 2026\",\"Expanded to European market in 2025\",\"No recent layoffs\"],\"riskSignals\":[],\"glassdoorRating\":4.2,\"interviewDifficulty\":\"Moderate — structured process with 4 rounds\"}"
+          "content": "{\"whatTheyDo\":\"Acme Corp is a B2B SaaS company specializing in enterprise workflow automation with ~800 employees at Series C.\",\"sizeStage\":\"Series C, ~800 employees\",\"recentNews\":[\"Launched v3.0 of core platform in Q1 2026\",\"Expanded to European market in 2025\"],\"risks\":{\"layoffs\":false,\"regulatory\":false},\"glassdoorRating\":4.2}"
         },
         "finish_reason": "stop"
       }
     ],
     "usage": {
       "prompt_tokens": 400,
-      "completion_tokens": 180,
-      "total_tokens": 580
+      "completion_tokens": 120,
+      "total_tokens": 520
     }
   }
 }

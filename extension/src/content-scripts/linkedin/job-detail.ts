@@ -8,26 +8,24 @@ import { sanitizeText } from '../shared/sanitize';
  */
 
 function scrapeJobDetail(): Record<string, string> {
+  const title = sanitizeText(
+    queryText(['.job-details-jobs-unified-top-card__job-title', 'h1.t-24', 'h1']),
+  );
+  const company = sanitizeText(
+    queryText([
+      '.job-details-jobs-unified-top-card__company-name',
+      '.jobs-unified-top-card__company-name',
+    ]),
+  );
+  const description = sanitizeText(
+    queryText(['.jobs-description__content', '.jobs-box__html-content', '#job-details']),
+  );
+  // Backend CaptureJobDto expects camelCase: source, sourceUrl, capturedText
+  const header = [title, company].filter(Boolean).join(' — ');
   return {
-    title: sanitizeText(
-      queryText(['.job-details-jobs-unified-top-card__job-title', 'h1.t-24', 'h1']),
-    ),
-    company: sanitizeText(
-      queryText([
-        '.job-details-jobs-unified-top-card__company-name',
-        '.jobs-unified-top-card__company-name',
-      ]),
-    ),
-    location: sanitizeText(
-      queryText([
-        '.job-details-jobs-unified-top-card__bullet',
-        '.jobs-unified-top-card__workplace-type',
-      ]),
-    ),
-    description: sanitizeText(
-      queryText(['.jobs-description__content', '.jobs-box__html-content', '#job-details']),
-    ),
-    source_url: window.location.href,
+    source: 'linkedin',
+    sourceUrl: window.location.href,
+    capturedText: [header, description].filter(Boolean).join('\n\n'),
   };
 }
 
@@ -72,9 +70,11 @@ function injectAskQuinnButton() {
         btn.textContent = 'Error — retry';
       } else {
         btn.textContent = 'Sent to Quinn';
+        // Pass the capture ID so the sidepanel can navigate to /job-analysis?id=...
+        const jobId: string | undefined = result?.capture?.id ?? result?.radarItem?.id;
         await chrome.runtime.sendMessage({
           type: 'OPEN_SIDEPANEL',
-          payload: { route: '/job-analysis' },
+          payload: { route: jobId ? `/job-analysis?id=${jobId}` : '/job-analysis' },
         });
       }
     } catch (e) {

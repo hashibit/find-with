@@ -5,6 +5,7 @@ import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { JobCapture } from '../../database/entities/jobs/job-capture.entity.js';
 import { JobParsedJd } from '../../database/entities/jobs/parsed-jd.entity.js';
+import { JobCompanyBrief } from '../../database/entities/jobs/company-brief.entity.js';
 import { JobMatchResult } from '../../database/entities/jobs/match-result.entity.js';
 import { JobRadarItem } from '../../database/entities/jobs/radar-item.entity.js';
 import { ulid } from 'ulid';
@@ -27,6 +28,8 @@ export class JobsService {
     private readonly captureRepo: Repository<JobCapture>,
     @InjectRepository(JobParsedJd)
     private readonly jdRepo: Repository<JobParsedJd>,
+    @InjectRepository(JobCompanyBrief)
+    private readonly companyRepo: Repository<JobCompanyBrief>,
     @InjectRepository(JobMatchResult)
     private readonly matchRepo: Repository<JobMatchResult>,
     @InjectRepository(JobRadarItem)
@@ -72,8 +75,41 @@ export class JobsService {
     const matchResult = parsedJd
       ? await this.matchRepo.findOne({ where: { parsedJdId: parsedJd.id, userId } })
       : null;
+    const companyBrief = parsedJd?.company
+      ? await this.companyRepo.findOne({ where: { company: parsedJd.company } })
+      : null;
 
-    return { capture, parsedJd, matchResult, radarItem };
+    const risks = companyBrief?.risks as Record<string, boolean> | null | undefined;
+    const riskSignals = risks
+      ? Object.entries(risks).filter(([, v]) => v).map(([k]) => k)
+      : [];
+
+    return {
+      id: capture.id,
+      title: parsedJd?.title ?? null,
+      company: parsedJd?.company ?? null,
+      status: radarItem?.status ?? 'BROWSED',
+      companyBrief: companyBrief ? {
+        name: companyBrief.company,
+        summary: companyBrief.whatTheyDo ?? null,
+        riskSignals,
+      } : null,
+      parsedJd: parsedJd ? {
+        hardSkills: (parsedJd.hardSkills as string[]) ?? [],
+        softSkills: (parsedJd.softSkills as string[]) ?? [],
+        experienceYears: (parsedJd.experience as Record<string, unknown> | null)?.['yearsMin'] as number ?? null,
+        niceToHave: (parsedJd.niceToHave as string[]) ?? [],
+        hiddenSignals: (parsedJd.hiddenSignals as string[]) ?? [],
+      } : null,
+      matchResult: matchResult ? {
+        surfaceScore: matchResult.surfaceScore ?? 0,
+        deepScore: matchResult.deepScore ?? 0,
+        gaps: (matchResult.gaps as string[]) ?? [],
+        hitsSurface: (matchResult.hitsSurface as string[]) ?? [],
+        hitsDeep: (matchResult.hitsDeep as string[]) ?? [],
+        adviceRationale: matchResult.adviceRationale ?? null,
+      } : null,
+    };
   }
 
   async listRadar(userId: string): Promise<JobRadarItem[]> {

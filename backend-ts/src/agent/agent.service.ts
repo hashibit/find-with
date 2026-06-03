@@ -193,7 +193,7 @@ export class AgentService {
     conversationId: string,
     userId: string,
     userMessage: string,
-    conversationKind = 'FREE_CHAT',
+    conversationKind?: string | null,
     anchorId?: string | null,
   ): Observable<AgentSseEvent> {
     if (userMessage.length > AgentService.MAX_USER_MESSAGE) {
@@ -204,7 +204,7 @@ export class AgentService {
       conversationId,
       userId,
       userMessage,
-      conversationKind,
+      conversationKind: conversationKind ?? null,
       anchorId,
     });
     return subject.asObservable();
@@ -216,11 +216,16 @@ export class AgentService {
       conversationId: string;
       userId: string;
       userMessage: string;
-      conversationKind: string;
+      conversationKind: string | null;
       anchorId?: string | null;
     },
   ): Promise<void> {
-    const { conversationId, userId, userMessage, conversationKind } = opts;
+    const { conversationId, userId, userMessage } = opts;
+    // Look up conversation kind from DB if not provided — keeps controller synchronous
+    const conversationKind =
+      opts.conversationKind ??
+      (await this.convRepo.findOne({ where: { id: conversationId }, select: ['kind'] }))?.kind ??
+      'FREE_CHAT';
     const toolCtx: ToolContext = { userId, conversationId };
 
     try {

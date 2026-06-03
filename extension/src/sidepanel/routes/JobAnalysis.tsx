@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { getToken } from '../../lib/auth';
 import { API_V1 } from '../../background/config';
+import { useConversationStore } from '../stores/conversation';
 
 interface MatchResult {
   surfaceScore: number;
@@ -66,27 +67,77 @@ export function JobAnalysis() {
   const [job, setJob] = useState<JobDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const conversationStartedRef = useRef(false);
+  const { sendMessage, startNewConversation } = useConversationStore();
 
   useEffect(() => {
     if (!jobId) return;
     setLoading(true);
     setError(null);
 
-    (async () => {
+    let cancelled = false;
+
+    const fetchJob = async () => {
       try {
         const token = await getToken();
         const resp = await fetch(`${API_V1}/jobs/${jobId}`, {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
         });
         if (!resp.ok) throw new Error(`${resp.status} ${resp.statusText}`);
-        setJob(await resp.json());
+        return await resp.json() as JobDetail;
       } catch (e) {
-        setError(String(e));
-      } finally {
+        throw e;
+      }
+    };
+
+    (async () => {
+      try {
+        const data = await fetchJob();
+        if (cancelled) return;
+        setJob(data);
         setLoading(false);
+
+        // Poll every 2s until both parsedJd and matchResult are present
+        // (status is never 'PENDING'; BROWSED → ANALYZED after processor completes)
+        if (!data.parsedJd || !data.matchResult) {
+          const interval = setInterval(async () => {
+            if (cancelled) { clearInterval(interval); return; }
+            try {
+              const updated = await fetchJob();
+              if (cancelled) { clearInterval(interval); return; }
+              setJob(updated);
+              if (updated.parsedJd && updated.matchResult) {
+                clearInterval(interval);
+              }
+            } catch { /* keep polling */ }
+          }, 2000);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setError(String(e));
+          setLoading(false);
+        }
       }
     })();
+
+    return () => { cancelled = true; };
   }, [jobId]);
+
+  // Once analysis is complete (both parsedJd and matchResult present), start a JOB_ANALYSIS conversation
+  useEffect(() => {
+    if (!job || !job.parsedJd || !job.matchResult || conversationStartedRef.current) return;
+    const isComplete = job.parsedJd && job.matchResult;
+    if (!isComplete) return;
+    conversationStartedRef.current = true;
+    startNewConversation();
+    const surface = job.matchResult?.surfaceScore ?? 0;
+    const deep = job.matchResult?.deepScore ?? 0;
+    const isBadMatch = surface < 30;
+    const trigger = isBadMatch
+      ? `Job analysis complete for ${job.title ?? 'this role'} at ${job.company ?? 'the company'}. This looks like a mismatch — surface match is only ${surface}%. Should I still help you apply?`
+      : `Job analysis complete for ${job.title ?? 'this role'} at ${job.company ?? 'the company'}. Surface match: ${surface}%, deep match: ${deep}%. Want to apply?`;
+    void sendMessage(trigger, 'JOB_ANALYSIS');
+  }, [job, sendMessage, startNewConversation]);
 
   if (!jobId) {
     return (
@@ -115,7 +166,7 @@ export function JobAnalysis() {
   if (!job) return null;
 
   const { matchResult, parsedJd, companyBrief } = job;
-  const isPending = job.status === 'PENDING' || !parsedJd;
+  const isPending = !parsedJd || !matchResult;
 
   return (
     <div data-testid="job-analysis-view" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: 16 }}>

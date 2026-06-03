@@ -8,17 +8,42 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-E2E_DIR="$REPO_ROOT/e2e"
-EXT_DIR="$REPO_ROOT/extension"
-DIST_E2E="$EXT_DIR/dist-e2e"
+export E2E_DIR="$REPO_ROOT/e2e"
+export EXT_DIR="$REPO_ROOT/extension"
+export DIST_E2E="$EXT_DIR/dist-e2e"
 
 echo "[build-extension-e2e] Building extension..."
 
 cd "$EXT_DIR"
 
-# Build with e2e API base
+# Build with e2e API base and dev-mode disabled so the extension reads
+# auth tokens from chrome.storage.local (injected by Playwright helpers)
+# instead of the hardcoded DEV_USER_ID.
 VITE_API_BASE=http://localhost:14667 \
+VITE_DEV_MODE=false \
   pnpm exec vite build --outDir dist-e2e --emptyOutDir
+
+# Rebuild content scripts as self-contained IIFE bundles.
+# Vite/Rollup extracts shared utilities into a separate chunk, which Chrome
+# content scripts cannot load without "type": "module" + complex CSP handling.
+# esbuild bundles everything inline, producing a standalone IIFE per script.
+echo "[build-extension-e2e] Rebuilding content scripts as IIFE bundles..."
+for cs_entry in \
+  "src/content-scripts/linkedin/job-detail.ts:dist-e2e/cs-linkedin-job.js" \
+  "src/content-scripts/linkedin/easy-apply.ts:dist-e2e/cs-linkedin-apply.js" \
+  "src/content-scripts/gmail/email-reader.ts:dist-e2e/cs-gmail.js"
+do
+  input="${cs_entry%%:*}"
+  output="${cs_entry##*:}"
+  pnpm exec esbuild "$input" \
+    --bundle \
+    --format=iife \
+    --platform=browser \
+    --target=chrome120 \
+    --outfile="$output" \
+    --define:VITE_API_BASE='"http://localhost:14667"'
+done
+echo "[build-extension-e2e] Content scripts rebuilt"
 
 # Patch manifest
 node - <<'EOF'

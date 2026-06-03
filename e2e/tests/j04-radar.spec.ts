@@ -4,7 +4,7 @@
  * Uses the seeded radar item (job-1, status=APPLIED).
  * Verifies cards render, status badges update, and DB reflects changes.
  */
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures/extension.js';
 import {
   waitForElement,
   injectAuthToken,
@@ -71,10 +71,8 @@ test.describe('J-04: Radar Status Progression', () => {
 
     // Step 12: Refresh UI and verify rejected state
     await sidepanel.locator('button:has-text("Refresh")').click();
-    await waitForElement(sidepanel, '[data-testid="radar-item"]', 10_000);
-    const rejectedItem = sidepanel.locator('[data-testid="radar-item"][data-item-id="job-1"]');
-    const rejectedBadge = rejectedItem.locator('[data-testid="radar-status-badge"]');
-    const rejectedText = await rejectedBadge.textContent();
-    expect(rejectedText?.toLowerCase()).toContain('rejected');
+    // Wait for the badge text to update to "rejected" (not just for the element to be visible)
+    const rejectedBadge2 = sidepanel.locator('[data-testid="radar-item"][data-item-id="job-1"] [data-testid="radar-status-badge"]');
+    await expect(rejectedBadge2).toContainText(/rejected/i, { timeout: 15_000 });
   });
 });

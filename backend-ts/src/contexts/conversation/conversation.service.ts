@@ -50,6 +50,12 @@ export class ConversationService {
     });
   }
 
+  /** Returns the conversation kind for a given id, or 'FREE_CHAT' if not found. */
+  async getKind(id: string): Promise<string> {
+    const conv = await this.convRepo.findOne({ where: { id }, select: ['kind'] });
+    return conv?.kind ?? 'FREE_CHAT';
+  }
+
   /** Returns the conversation if it belongs to userId, throws otherwise. */
   async close(userId: string, id: string): Promise<ConvConversation> {
     const conv = await this.convRepo.findOne({ where: { id } });

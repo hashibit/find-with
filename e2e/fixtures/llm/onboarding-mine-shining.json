@@ -1,0 +1,36 @@
+{
+  "endpoint": "/v1/chat/completions",
+  "requestHash": "__recorded__",
+  "scenarioName": "onboarding-mine-shining",
+  "response": {
+    "id": "chatcmpl-mock-onboarding-mine-shining",
+    "object": "chat.completion",
+    "created": 1748000005,
+    "model": "gpt-4o",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": null,
+          "tool_calls": [
+            {
+              "id": "call_mine_e2e_1",
+              "type": "function",
+              "function": {
+                "name": "mine_shining_point",
+                "arguments": "{\"raw_text\":\"I led the redesign of checkout flow\"}"
+              }
+            }
+          ]
+        },
+        "finish_reason": "tool_calls"
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 450,
+      "completion_tokens": 40,
+      "total_tokens": 490
+    }
+  }
+}

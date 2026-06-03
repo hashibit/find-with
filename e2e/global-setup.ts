@@ -9,11 +9,14 @@
  *   5. Start the NestJS backend on port 14667
  */
 import { execSync, spawn } from 'child_process';
-import { readFileSync } from 'fs';
+import { readFileSync, writeFileSync } from 'fs';
+import { createRequire } from 'module';
 import path from 'path';
-import { fileURLToPath } from 'url';
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const PID_FILE = path.join(process.cwd(), '.e2e-backend.pid');
+
+// process.cwd() is the repo root when Playwright is invoked from there
+const ROOT = process.cwd();
 const BACKEND_DIR = path.join(ROOT, 'backend-ts');
 const ENV_FILE = '.env.e2e';
 
@@ -29,37 +32,56 @@ export default async function globalSetup() {
     process.exit(1);
   }
 
-  // ── 2. MinIO bucket (non-fatal if mc not installed) ────────────────────────
+  // ── 2. MinIO bucket ────────────────────────────────────────────────────────
+  console.log('[setup] Creating MinIO bucket...');
   try {
+    // Try mc client first (fast path)
     execSync(
-      'mc alias set e2e http://localhost:9000 e2ekey e2esecret 2>/dev/null; mc mb --ignore-existing e2e/findwith-test 2>/dev/null || true',
+      'mc alias set e2e http://localhost:9000 e2ekey e2esecret 2>/dev/null && mc mb --ignore-existing e2e/findwith-test 2>/dev/null',
       { stdio: 'pipe', shell: true },
     );
+    console.log('[setup] MinIO bucket ready (mc)');
   } catch {
-    console.warn('[setup] MinIO bucket creation skipped (mc not installed — bucket may need manual creation)');
+    // Fallback: use AWS SDK from backend's node_modules (CJS require)
+    try {
+      // createRequire relative to BACKEND_DIR resolves @aws-sdk/client-s3 from there
+      const req = createRequire(path.join(BACKEND_DIR, '__e2e_setup__.js'));
+      const { S3Client, CreateBucketCommand, HeadBucketCommand } = req('@aws-sdk/client-s3');
+      const s3 = new S3Client({
+        region: 'us-east-1',
+        credentials: { accessKeyId: 'e2ekey', secretAccessKey: 'e2esecret' },
+        endpoint: 'http://localhost:9000',
+        forcePathStyle: true,
+      });
+      try {
+        await s3.send(new HeadBucketCommand({ Bucket: 'findwith-test' }));
+        console.log('[setup] MinIO bucket already exists');
+      } catch {
+        await s3.send(new CreateBucketCommand({ Bucket: 'findwith-test' }));
+        console.log('[setup] MinIO bucket created (SDK)');
+      }
+    } catch (sdkErr) {
+      console.warn('[setup] MinIO bucket setup failed — upload tests may fail:', sdkErr);
+    }
   }
 
   // ── 3. Migrations ─────────────────────────────────────────────────────────
   console.log('[setup] Running migrations...');
+  const envVars = parseEnvFile(path.join(BACKEND_DIR, ENV_FILE));
   execSync(
-    `dotenv -e ${ENV_FILE} -- pnpm run typeorm migration:run -d src/database/data-source.ts`,
-    { cwd: BACKEND_DIR, stdio: 'inherit' },
+    'pnpm run typeorm migration:run -d src/database/data-source.ts',
+    { cwd: BACKEND_DIR, stdio: 'inherit', env: { ...process.env, ...envVars } },
   );
 
   // ── 4. Seed fixture data ───────────────────────────────────────────────────
   console.log('[setup] Seeding fixture data...');
   execSync(
-    `dotenv -e ${ENV_FILE} -- tsx ../e2e/fixtures/seed.ts`,
-    {
-      cwd: BACKEND_DIR,
-      stdio: 'inherit',
-      env: { ...process.env, DATABASE_URL: 'postgresql://e2e:e2e@localhost:5434/findwith_e2e' },
-    },
+    'pnpm exec tsx ../e2e/fixtures/seed.ts',
+    { cwd: BACKEND_DIR, stdio: 'inherit', env: { ...process.env, ...envVars } },
   );
 
   // ── 5. Start backend ───────────────────────────────────────────────────────
   console.log('[setup] Starting backend...');
-  const envVars = parseEnvFile(path.join(BACKEND_DIR, ENV_FILE));
   const backend = spawn('node', ['dist/main.js'], {
     cwd: BACKEND_DIR,
     env: { ...process.env, ...envVars },
@@ -76,7 +98,11 @@ export default async function globalSetup() {
     if (line) process.stderr.write(`[backend] ${line}\n`);
   });
 
-  (global as Record<string, unknown>).__E2E_BACKEND_PID__ = backend.pid;
+  // Write PID to file — global teardown runs in a separate Node process
+  // so globals don't persist; a file is the reliable cross-process channel.
+  if (backend.pid) {
+    writeFileSync(PID_FILE, String(backend.pid), 'utf8');
+  }
 
   await waitForBackend('http://localhost:14667/ready', 30_000);
   console.log('[setup] Backend ready');

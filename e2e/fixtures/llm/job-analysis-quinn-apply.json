@@ -1,0 +1,26 @@
+{
+  "endpoint": "/v1/chat/completions",
+  "requestHash": "__recorded__",
+  "scenarioName": "job-analysis-quinn-apply",
+  "response": {
+    "id": "chatcmpl-mock-job-analysis-apply",
+    "object": "chat.completion",
+    "created": 1748000010,
+    "model": "gpt-4o",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "Solid match. The surface score is decent and your B2B SaaS background covers most of what they want. The payments experience gap is real but not disqualifying — your product depth makes up for it. I'd recommend you apply. Want me to start on a tailored resume?"
+        },
+        "finish_reason": "stop"
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 500,
+      "completion_tokens": 60,
+      "total_tokens": 560
+    }
+  }
+}

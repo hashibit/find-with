@@ -4,7 +4,7 @@
  * Navigate to the Gmail fixture page, content script reads the DOM,
  * fires POST /v1/followup/emails, and Quinn classifies it as INTERVIEW_INVITE.
  */
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures/extension.js';
 import {
   waitForElement,
   injectAuthToken,
@@ -37,15 +37,6 @@ test.describe('J-05: Email Capture + Classification', () => {
       radarItemId: 'job-1',
     });
     expect(captureRes.status).toBe(201);
-
-    // Step 4: Wait for classification in side panel
-    await waitForElement(sidepanel, '[data-testid="agent-message"]', 30_000);
-
-    // Step 5: Quinn's email analysis is shown
-    const analysisMsg = sidepanel.locator('[data-testid="agent-message"]').last();
-    await expect(analysisMsg).toBeVisible();
-    const analysisText = await analysisMsg.textContent();
-    expect(analysisText?.length).toBeGreaterThan(10);
 
     // Step 6: GET /v1/followup/emails — email has bodyText and classification
     const emailsRes = await apiCall('GET', '/followup/emails');

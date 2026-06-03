@@ -1,0 +1,26 @@
+{
+  "endpoint": "/v1/chat/completions",
+  "requestHash": "__recorded__",
+  "scenarioName": "onboarding-post-mine",
+  "response": {
+    "id": "chatcmpl-mock-onboarding-post-mine",
+    "object": "chat.completion",
+    "created": 1748000007,
+    "model": "gpt-4o",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "That's a strong one — leading a full checkout redesign shows real ownership. I've saved it to your profile. What was the biggest challenge you ran into mid-project?"
+        },
+        "finish_reason": "stop"
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 500,
+      "completion_tokens": 45,
+      "total_tokens": 545
+    }
+  }
+}

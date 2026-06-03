@@ -53,7 +53,7 @@ services:
     ports:
       - "8081:80"
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:80/"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:80/linkedin-job-senior-pm.html"]
       interval: 3s
       timeout: 3s
       retries: 5

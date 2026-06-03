@@ -1,0 +1,26 @@
+{
+  "endpoint": "/v1/chat/completions",
+  "requestHash": "__recorded__",
+  "scenarioName": "mine-shining-point-extract",
+  "response": {
+    "id": "chatcmpl-mock-mine-shining-extract",
+    "object": "chat.completion",
+    "created": 1748000006,
+    "model": "gpt-4o",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "{\"shiningText\":\"Led end-to-end redesign of checkout flow, improving conversion rate by 18% and reducing cart abandonment across mobile and web\",\"rationale\":\"Demonstrates ownership, cross-functional execution, and measurable business impact on a revenue-critical surface\",\"tags\":[\"ownership\",\"process_improvement\",\"quantified_impact\",\"initiative\"]}"
+        },
+        "finish_reason": "stop"
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 120,
+      "completion_tokens": 80,
+      "total_tokens": 200
+    }
+  }
+}

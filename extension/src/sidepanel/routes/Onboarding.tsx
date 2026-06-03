@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getToken } from '../../lib/auth';
 import { API_V1 } from '../../background/config';
+import { useConversationStore } from '../stores/conversation';
 
 interface BasicInfo {
   fullName?: string;
@@ -21,7 +22,13 @@ async function fetchProfile(token: string): Promise<ProfileData | null> {
   });
   if (resp.status === 404) return null;
   if (!resp.ok) throw new Error(`${resp.status} ${resp.statusText}`);
-  return resp.json();
+  const text = await resp.text();
+  if (!text) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
 }
 
 async function uploadResume(token: string, file: File): Promise<void> {
@@ -41,6 +48,7 @@ async function uploadResume(token: string, file: File): Promise<void> {
 export function Onboarding() {
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { sendMessage } = useConversationStore();
 
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -74,8 +82,19 @@ export function Onboarding() {
       if (!token) throw new Error('Not authenticated');
       await uploadResume(token, file);
       setUploadDone(true);
-      const updated = await fetchProfile(token);
-      setProfile(updated);
+      // fetchProfile is best-effort — its failure must not hide the success banner
+      try {
+        const updated = await fetchProfile(token);
+        setProfile(updated);
+        if (updated?.basicInfo) {
+          void sendMessage(
+            "My resume has been uploaded. Please ask me a few questions to understand my background and identify my key strengths.",
+            'ONBOARDING',
+          );
+        }
+      } catch {
+        // profile fetch failed but upload succeeded — success banner still shows
+      }
     } catch (err) {
       setUploadError(String(err));
     } finally {

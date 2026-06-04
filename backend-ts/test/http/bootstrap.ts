@@ -137,14 +137,8 @@ export async function getApp(): Promise<INestApplication> {
     exclude: ['health', 'ready', 'webhooks/:path*', 'ingest/:path*', 'admin/:path*'],
   });
 
-  // @adminjs/nestjs v7 calls app.router in reorderRoutes(). Express 5 removed
-  // the `.router` getter, so we silently shim it to prevent a crash on startup.
-  const expressApp = _app.getHttpAdapter().getInstance() as { router?: unknown };
-  if (!('router' in expressApp)) {
-    Object.defineProperty(expressApp, 'router', { get: () => undefined, configurable: true });
-  }
-
   await _app.init();
+
 
   // Seed: ensure the test user exists in DB + Redis
   const iam = _app.get(IamService);

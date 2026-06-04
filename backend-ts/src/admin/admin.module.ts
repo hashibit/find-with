@@ -1,14 +1,10 @@
 import { Module } from '@nestjs/common';
-import AdminJS from 'adminjs';
-import { AdminModule as AdminJSNestModule } from '@adminjs/nestjs';
-import { Database, Resource } from '@adminjs/typeorm';
 import { BullBoardModule } from '@bull-board/nestjs';
 import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
 import { ExpressAdapter } from '@bull-board/express';
 import { BullModule } from '@nestjs/bullmq';
-import { TypeOrmModule, getRepositoryToken } from '@nestjs/typeorm';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
-import type { Repository } from 'typeorm';
 import { timingSafeEqual } from 'crypto';
 import type { Request, Response, NextFunction } from 'express';
 
@@ -29,20 +25,19 @@ import { TelemetryEvent } from '../database/entities/telemetry/telemetry-event.e
 import { QuotaConsumeLog } from '../database/entities/quota/quota-log.entity.js';
 import { AuditLog } from '../database/entities/admin/audit-log.entity.js';
 
-import { buildUserResource } from './resources/user.resource.js';
-import { buildSubscriptionResource } from './resources/subscription.resource.js';
-import { buildQuotaResource } from './resources/quota.resource.js';
-import { buildOutboxEventResource } from './resources/outbox-event.resource.js';
-import { buildWebhookEventResource } from './resources/webhook-event.resource.js';
-import { buildPurgeSagaResource } from './resources/purge-saga.resource.js';
-
 import { MEMORY_QUEUE } from '../contexts/memory/memory.constants.js';
 import { RESUME_PARSE_QUEUE } from '../contexts/profile/profile.service.js';
 import { JOB_ANALYZE_QUEUE } from '../contexts/jobs/jobs.service.js';
 import { TAILORING_QUEUE } from '../contexts/tailoring/tailoring.service.js';
 import { AgentModule } from '../agent/agent.module.js';
 
-AdminJS.registerAdapter({ Database, Resource });
+import { UsersAdminController } from './ops/users.controller.js';
+import { SubscriptionsAdminController } from './ops/subscriptions.controller.js';
+import { QuotaAdminController } from './ops/quota.controller.js';
+import { PurgeSagasAdminController } from './ops/purge-sagas.controller.js';
+import { OutboxAdminController } from './ops/outbox.controller.js';
+import { WebhooksAdminController } from './ops/webhooks.controller.js';
+import { AuditLogsAdminController } from './ops/audit-logs.controller.js';
 
 @Module({
   imports: [
@@ -63,87 +58,36 @@ AdminJS.registerAdapter({ Database, Resource });
       { name: JOB_ANALYZE_QUEUE },
       { name: TAILORING_QUEUE },
     ),
-    AdminJSNestModule.createAdminAsync({
-      imports: [TypeOrmModule.forFeature([
-        IamUser, BillingSubscription, QuotaUsageCounter, OutboxEvent, IamWebhookEvent,
-        AccountPurgeSaga, AuditLog,
-      ])],
-      inject: [
-        ConfigService,
-        getRepositoryToken(IamUser),
-        getRepositoryToken(BillingSubscription),
-        getRepositoryToken(QuotaUsageCounter),
-        getRepositoryToken(OutboxEvent),
-        getRepositoryToken(IamWebhookEvent),
-        getRepositoryToken(AccountPurgeSaga),
-        getRepositoryToken(AuditLog),
-      ],
-      useFactory: (
-        configService: ConfigService<AppConfig>,
-        userRepo: Repository<IamUser>,
-        subscriptionRepo: Repository<BillingSubscription>,
-        quotaRepo: Repository<QuotaUsageCounter>,
-        outboxRepo: Repository<OutboxEvent>,
-        webhookRepo: Repository<IamWebhookEvent>,
-        sagaRepo: Repository<AccountPurgeSaga>,
-        auditLogRepo: Repository<AuditLog>,
-      ) => {
+    BullBoardModule.forRootAsync({
+      imports: [],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService<AppConfig>) => {
         const secret = configService.get('admin', { infer: true })!.secret;
         return {
-          adminJsOptions: {
-            rootPath: '/admin',
-            resources: [
-              buildUserResource(userRepo),
-              buildSubscriptionResource(subscriptionRepo),
-              buildQuotaResource(quotaRepo),
-              buildOutboxEventResource(outboxRepo),
-              buildWebhookEventResource(webhookRepo),
-              buildPurgeSagaResource(sagaRepo, auditLogRepo),
-            ],
-          },
-          auth: {
-            authenticate: async (email: string, password: string) => {
-              if (password === secret) {
-                return Promise.resolve({ email: 'admin@findwith.com' });
-              }
-              return Promise.resolve(null);
-            },
-            cookieName: 'adminjs',
-            cookiePassword: secret,
-          },
-          sessionOptions: {
-            resave: false,
-            saveUninitialized: true,
-            secret,
+          route: '/admin/queues',
+          adapter: ExpressAdapter,
+          middleware: (req: Request, res: Response, next: NextFunction) => {
+            const provided = (req.headers['x-admin-secret'] as string) ?? '';
+            let isValid = false;
+            try {
+              const a = Buffer.from(provided, 'utf8');
+              const b = Buffer.from(secret, 'utf8');
+              const len = Math.max(a.length, b.length);
+              const pa = Buffer.alloc(len);
+              const pb = Buffer.alloc(len);
+              a.copy(pa);
+              b.copy(pb);
+              isValid = timingSafeEqual(pa, pb) && a.length === b.length;
+            } catch {
+              isValid = false;
+            }
+            if (!isValid) {
+              res.status(401).json({ error: 'Unauthorized' });
+              return;
+            }
+            next();
           },
         };
-      },
-    }),
-    BullBoardModule.forRoot({
-      route: '/admin/queues',
-      adapter: ExpressAdapter,
-      middleware: (req: Request, res: Response, next: NextFunction) => {
-        const configService = (req as unknown as { app: { get: (token: unknown) => unknown } }).app.get(ConfigService);
-        const secret = (configService as ConfigService<AppConfig>).get('admin', { infer: true })!.secret;
-        const provided = (req.headers['x-admin-secret'] as string) ?? '';
-        let isValid = false;
-        try {
-          const a = Buffer.from(provided, 'utf8');
-          const b = Buffer.from(secret, 'utf8');
-          const len = Math.max(a.length, b.length);
-          const pa = Buffer.alloc(len);
-          const pb = Buffer.alloc(len);
-          a.copy(pa);
-          b.copy(pb);
-          isValid = timingSafeEqual(pa, pb) && a.length === b.length;
-        } catch {
-          isValid = false;
-        }
-        if (!isValid) {
-          res.status(401).json({ error: 'Unauthorized' });
-          return;
-        }
-        next();
       },
     }),
     BullBoardModule.forFeature({ name: MEMORY_QUEUE, adapter: BullMQAdapter }),
@@ -157,7 +101,17 @@ AdminJS.registerAdapter({ Database, Resource });
     MetricsService,
     HealthService,
   ],
-  controllers: [MetricsController, HealthController],
+  controllers: [
+    MetricsController,
+    HealthController,
+    UsersAdminController,
+    SubscriptionsAdminController,
+    QuotaAdminController,
+    PurgeSagasAdminController,
+    OutboxAdminController,
+    WebhooksAdminController,
+    AuditLogsAdminController,
+  ],
   exports: [AdminGuard, MetricsService, HealthService],
 })
 export class AdminModule {}

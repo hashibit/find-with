@@ -1,16 +1,16 @@
 /**
- * Integration test: retry-purge action on AccountPurgeSaga.
+ * Integration test: retry action on PurgeSagasAdminController.
  *
  * Verifies the DEAD_LETTER → INITIATED reset path writes to the real DB
  * and that the AuditLog entry is persisted alongside it.
  */
 import { DataSource, Repository } from 'typeorm';
 import { beforeAll, afterAll, afterEach, describe, it, expect } from 'vitest';
+import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { ALL_ENTITIES } from '../../src/database/database.module.js';
-import { AccountPurgeSaga } from '../../src/database/entities/iam/account-purge-saga.entity.js';
+import { AccountPurgeSaga, PurgeSagaStep } from '../../src/database/entities/iam/account-purge-saga.entity.js';
 import { AuditLog } from '../../src/database/entities/admin/audit-log.entity.js';
-import { buildPurgeSagaResource } from '../../src/admin/resources/purge-saga.resource.js';
-import type { ActionContext } from 'adminjs';
+import { PurgeSagasAdminController } from '../../src/admin/ops/purge-sagas.controller.js';
 import { ulid } from 'ulid';
 
 let ds: DataSource;
@@ -18,7 +18,6 @@ let sagaRepo: Repository<AccountPurgeSaga>;
 let auditLogRepo: Repository<AuditLog>;
 
 // Track created saga IDs for cleanup.
-// userId is varchar(26) (a plain ULID), so prefix-based LIKE cleanup won't work.
 const createdSagaIds: string[] = [];
 
 beforeAll(async () => {
@@ -40,14 +39,13 @@ afterAll(async () => {
 
 afterEach(async () => {
   if (createdSagaIds.length > 0) {
-    // AuditLog.targetId = saga.userId; clean up by saga IDs resolved to their userIds
     const sagas = await sagaRepo.find({ where: createdSagaIds.map((id) => ({ id })) });
-    const userIds = sagas.map((s) => s.userId);
-    if (userIds.length > 0) {
+    const sagaIdList = sagas.map((s) => s.id);
+    if (sagaIdList.length > 0) {
       await auditLogRepo
         .createQueryBuilder()
         .delete()
-        .where('"targetId" IN (:...userIds)', { userIds })
+        .where('"targetId" IN (:...sagaIdList)', { sagaIdList })
         .execute();
     }
     await sagaRepo.delete(createdSagaIds);
@@ -56,12 +54,11 @@ afterEach(async () => {
 });
 
 async function seedDeadLetterSaga(userId?: string): Promise<AccountPurgeSaga> {
-  // userId must fit varchar(26) — use a plain ULID (exactly 26 chars)
   const resolvedUserId = userId ?? ulid();
   const saga = sagaRepo.create({
     id: ulid(),
     userId: resolvedUserId,
-    step: 'DEAD_LETTER',
+    step: PurgeSagaStep.DEAD_LETTER,
     expiresAt: new Date(Date.now() + 3600_000),
     cancelled: false,
     stepResults: null,
@@ -73,31 +70,27 @@ async function seedDeadLetterSaga(userId?: string): Promise<AccountPurgeSaga> {
   return saved;
 }
 
-function makeContext(sagaId: string): ActionContext {
-  return {
-    record: { id: () => sagaId },
-  } as unknown as ActionContext;
+function buildController(): PurgeSagasAdminController {
+  return new PurgeSagasAdminController(sagaRepo, auditLogRepo);
 }
 
-describe('retry-purge action — integration', () => {
+describe('PurgeSagasAdminController.retry — integration', () => {
   it('resets DEAD_LETTER saga to INITIATED in DB', async () => {
     const saga = await seedDeadLetterSaga();
+    const ctrl = buildController();
 
-    const resource = buildPurgeSagaResource(sagaRepo, auditLogRepo);
-    const handler = resource.options!.actions!['retry-purge']!.handler!;
-    await handler({} as any, {} as any, makeContext(saga.id));
+    await ctrl.retry(saga.id);
 
     const updated = await sagaRepo.findOneOrFail({ where: { id: saga.id } });
-    expect(updated.step).toBe('INITIATED');
+    expect(updated.step).toBe(PurgeSagaStep.INITIATED);
   });
 
   it('sets expiresAt to a date in the past', async () => {
     const saga = await seedDeadLetterSaga();
+    const ctrl = buildController();
 
-    const resource = buildPurgeSagaResource(sagaRepo, auditLogRepo);
-    const handler = resource.options!.actions!['retry-purge']!.handler!;
     const before = new Date();
-    await handler({} as any, {} as any, makeContext(saga.id));
+    await ctrl.retry(saga.id);
 
     const updated = await sagaRepo.findOneOrFail({ where: { id: saga.id } });
     expect(updated.expiresAt!.getTime()).toBeLessThan(before.getTime());
@@ -105,34 +98,31 @@ describe('retry-purge action — integration', () => {
 
   it('clears errorMessage and deadLetterRunbookUrl in DB', async () => {
     const saga = await seedDeadLetterSaga();
+    const ctrl = buildController();
 
-    const resource = buildPurgeSagaResource(sagaRepo, auditLogRepo);
-    const handler = resource.options!.actions!['retry-purge']!.handler!;
-    await handler({} as any, {} as any, makeContext(saga.id));
+    await ctrl.retry(saga.id);
 
     const updated = await sagaRepo.findOneOrFail({ where: { id: saga.id } });
     expect(updated.errorMessage).toBeNull();
     expect(updated.deadLetterRunbookUrl).toBeNull();
   });
 
-  it('writes an AuditLog entry with action = retry-purge', async () => {
+  it('writes an AuditLog entry with action = purge_saga.retry', async () => {
     const saga = await seedDeadLetterSaga();
+    const ctrl = buildController();
 
-    const resource = buildPurgeSagaResource(sagaRepo, auditLogRepo);
-    const handler = resource.options!.actions!['retry-purge']!.handler!;
-    await handler({} as any, {} as any, makeContext(saga.id));
+    await ctrl.retry(saga.id);
 
-    const log = await auditLogRepo.findOne({ where: { action: 'retry-purge', targetId: saga.userId } });
+    const log = await auditLogRepo.findOne({ where: { action: 'purge_saga.retry', targetId: saga.id } });
     expect(log).not.toBeNull();
-    expect(log!.note).toContain(saga.id);
+    expect(log!.note).toContain('DEAD_LETTER');
   });
 
-  it('does not reset non-DEAD_LETTER saga', async () => {
-    const sagaId = ulid();
+  it('throws BadRequestException for non-DEAD_LETTER saga', async () => {
     const saga = sagaRepo.create({
-      id: sagaId,
-      userId: ulid(),  // plain ULID fits varchar(26)
-      step: 'STRIPE_DELETED',
+      id: ulid(),
+      userId: ulid(),
+      step: PurgeSagaStep.STRIPE_DELETED,
       expiresAt: new Date(Date.now() + 3600_000),
       cancelled: false,
       stepResults: null,
@@ -140,14 +130,17 @@ describe('retry-purge action — integration', () => {
       errorMessage: null,
     });
     await sagaRepo.save(saga);
-    createdSagaIds.push(sagaId);
+    createdSagaIds.push(saga.id);
 
-    const resource = buildPurgeSagaResource(sagaRepo, auditLogRepo);
-    const handler = resource.options!.actions!['retry-purge']!.handler!;
-    const result = await handler({} as any, {} as any, makeContext(saga.id));
+    const ctrl = buildController();
 
-    expect((result as any).notice.type).toBe('error');
+    await expect(ctrl.retry(saga.id)).rejects.toThrow(BadRequestException);
     const unchanged = await sagaRepo.findOneOrFail({ where: { id: saga.id } });
-    expect(unchanged.step).toBe('STRIPE_DELETED');
+    expect(unchanged.step).toBe(PurgeSagaStep.STRIPE_DELETED);
+  });
+
+  it('throws NotFoundException for unknown saga id', async () => {
+    const ctrl = buildController();
+    await expect(ctrl.retry(ulid())).rejects.toThrow(NotFoundException);
   });
 });

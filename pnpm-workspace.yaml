@@ -3,3 +3,4 @@ packages:
   - 'extension'
   - 'web'
   - 'e2e'
+  - 'admin'

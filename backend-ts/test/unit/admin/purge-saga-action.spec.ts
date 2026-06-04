@@ -1,102 +1,90 @@
-import { vi, describe, it, expect } from 'vitest';
-import { buildPurgeSagaResource } from '../../../src/admin/resources/purge-saga.resource.js';
-import type { ActionContext } from 'adminjs';
+import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { NotFoundException, BadRequestException } from '@nestjs/common';
+import { PurgeSagasAdminController } from '../../../src/admin/ops/purge-sagas.controller.js';
+import { PurgeSagaStep } from '../../../src/database/entities/iam/account-purge-saga.entity.js';
 
 function buildRepos(saga?: object) {
   const sagaRepo = {
-    findOneOrFail: vi.fn().mockResolvedValue(
-      saga ?? { id: 'saga_01', userId: 'user_01', step: 'DEAD_LETTER' },
+    findOneBy: vi.fn().mockResolvedValue(
+      saga ?? { id: 'saga_01', userId: 'user_01', step: PurgeSagaStep.DEAD_LETTER },
     ),
-    update: vi.fn().mockResolvedValue(undefined),
+    save: vi.fn().mockImplementation(async (entity) => entity),
+    findAndCount: vi.fn().mockResolvedValue([[], 0]),
   };
-  const auditLogRepo = {
+  const auditRepo = {
     create: vi.fn().mockImplementation((data) => data),
     save: vi.fn().mockResolvedValue(undefined),
   };
-  return { sagaRepo, auditLogRepo };
+  return { sagaRepo, auditRepo };
 }
 
-function makeContext(recordId = 'saga_01'): ActionContext {
-  return {
-    record: { id: () => recordId },
-  } as unknown as ActionContext;
-}
-
-describe('buildPurgeSagaResource — retry-purge handler', () => {
+describe('PurgeSagasAdminController — retry', () => {
   it('resets DEAD_LETTER saga to INITIATED', async () => {
-    const { sagaRepo, auditLogRepo } = buildRepos();
-    const resource = buildPurgeSagaResource(sagaRepo as any, auditLogRepo as any);
-    const handler = resource.options!.actions!['retry-purge']!.handler!;
+    const { sagaRepo, auditRepo } = buildRepos();
+    const ctrl = new PurgeSagasAdminController(sagaRepo as any, auditRepo as any);
 
-    const result = await handler({} as any, {} as any, makeContext());
+    const result = await ctrl.retry('saga_01');
 
-    expect(sagaRepo.update).toHaveBeenCalledWith(
-      'saga_01',
-      expect.objectContaining({ step: 'INITIATED' }),
+    expect(sagaRepo.save).toHaveBeenCalledWith(
+      expect.objectContaining({ step: PurgeSagaStep.INITIATED }),
     );
-    expect(result).toMatchObject({ notice: { message: 'Saga reset to INITIATED', type: 'success' } });
+    expect(result.step).toBe(PurgeSagaStep.INITIATED);
   });
 
-  it('sets expiresAt in the past (< now)', async () => {
-    const { sagaRepo, auditLogRepo } = buildRepos();
-    const resource = buildPurgeSagaResource(sagaRepo as any, auditLogRepo as any);
-    const handler = resource.options!.actions!['retry-purge']!.handler!;
+  it('sets expiresAt in the past', async () => {
+    const { sagaRepo, auditRepo } = buildRepos();
+    const ctrl = new PurgeSagasAdminController(sagaRepo as any, auditRepo as any);
 
     const before = Date.now();
-    await handler({} as any, {} as any, makeContext());
+    await ctrl.retry('saga_01');
 
-    const updateArg = (sagaRepo.update as ReturnType<typeof vi.fn>).mock.calls[0][1];
-    expect(updateArg.expiresAt.getTime()).toBeLessThan(before);
+    const saved = (sagaRepo.save as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(saved.expiresAt.getTime()).toBeLessThan(before);
   });
 
   it('clears errorMessage and deadLetterRunbookUrl', async () => {
-    const { sagaRepo, auditLogRepo } = buildRepos({
+    const { sagaRepo, auditRepo } = buildRepos({
       id: 'saga_01',
       userId: 'user_01',
-      step: 'DEAD_LETTER',
+      step: PurgeSagaStep.DEAD_LETTER,
     });
-    const resource = buildPurgeSagaResource(sagaRepo as any, auditLogRepo as any);
-    const handler = resource.options!.actions!['retry-purge']!.handler!;
+    const ctrl = new PurgeSagasAdminController(sagaRepo as any, auditRepo as any);
 
-    await handler({} as any, {} as any, makeContext());
+    await ctrl.retry('saga_01');
 
-    expect(sagaRepo.update).toHaveBeenCalledWith(
-      'saga_01',
+    expect(sagaRepo.save).toHaveBeenCalledWith(
       expect.objectContaining({ errorMessage: null, deadLetterRunbookUrl: null }),
     );
   });
 
-  it('writes an AuditLog entry with action = retry-purge', async () => {
-    const { sagaRepo, auditLogRepo } = buildRepos();
-    const resource = buildPurgeSagaResource(sagaRepo as any, auditLogRepo as any);
-    const handler = resource.options!.actions!['retry-purge']!.handler!;
+  it('writes an AuditLog entry with action = purge_saga.retry', async () => {
+    const { sagaRepo, auditRepo } = buildRepos();
+    const ctrl = new PurgeSagasAdminController(sagaRepo as any, auditRepo as any);
 
-    await handler({} as any, {} as any, makeContext());
+    await ctrl.retry('saga_01');
 
-    expect(auditLogRepo.save).toHaveBeenCalledWith(
-      expect.objectContaining({ action: 'retry-purge', targetId: 'user_01' }),
+    expect(auditRepo.save).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'purge_saga.retry', targetId: 'saga_01' }),
     );
   });
 
-  it('rejects non-DEAD_LETTER saga with error notice', async () => {
-    const { sagaRepo, auditLogRepo } = buildRepos({ id: 'saga_01', userId: 'user_01', step: 'STRIPE' });
-    const resource = buildPurgeSagaResource(sagaRepo as any, auditLogRepo as any);
-    const handler = resource.options!.actions!['retry-purge']!.handler!;
+  it('throws BadRequestException for non-DEAD_LETTER saga', async () => {
+    const { sagaRepo, auditRepo } = buildRepos({
+      id: 'saga_01',
+      userId: 'user_01',
+      step: PurgeSagaStep.STRIPE_DELETED,
+    });
+    const ctrl = new PurgeSagasAdminController(sagaRepo as any, auditRepo as any);
 
-    const result = await handler({} as any, {} as any, makeContext());
-
-    expect(sagaRepo.update).not.toHaveBeenCalled();
-    expect(result).toMatchObject({ notice: { type: 'error' } });
+    await expect(ctrl.retry('saga_01')).rejects.toThrow(BadRequestException);
+    expect(sagaRepo.save).not.toHaveBeenCalled();
   });
 
-  it('returns error notice when context.record is null', async () => {
-    const { sagaRepo, auditLogRepo } = buildRepos();
-    const resource = buildPurgeSagaResource(sagaRepo as any, auditLogRepo as any);
-    const handler = resource.options!.actions!['retry-purge']!.handler!;
+  it('throws NotFoundException when saga does not exist', async () => {
+    const { sagaRepo, auditRepo } = buildRepos();
+    sagaRepo.findOneBy.mockResolvedValue(null);
+    const ctrl = new PurgeSagasAdminController(sagaRepo as any, auditRepo as any);
 
-    const context = { record: null } as unknown as ActionContext;
-    const result = await handler({} as any, {} as any, context);
-
-    expect(result).toMatchObject({ notice: { message: 'No record found', type: 'error' } });
+    await expect(ctrl.retry('nonexistent')).rejects.toThrow(NotFoundException);
   });
 });

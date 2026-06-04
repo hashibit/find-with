@@ -31,14 +31,14 @@ afterAll(async () => { await closeApp(); });
 // ─── AdminGuard — auth pipeline ─────────────────────────────────────────────
 
 describe('AdminGuard auth pipeline', () => {
-  it('GET /admin/api/health without header → 401', async () => {
-    const res = await request(app.getHttpServer()).get('/admin/api/health');
+  it('GET /admin/ops/health without header → 401', async () => {
+    const res = await request(app.getHttpServer()).get('/admin/ops/health');
     expect(res.status).toBe(401);
   });
 
-  it('GET /admin/api/health with wrong secret → 401', async () => {
+  it('GET /admin/ops/health with wrong secret → 401', async () => {
     const res = await request(app.getHttpServer())
-      .get('/admin/api/health')
+      .get('/admin/ops/health')
       .set(WRONG);
     expect(res.status).toBe(401);
   });
@@ -48,7 +48,7 @@ describe('AdminGuard auth pipeline', () => {
     await ds.getRepository(TelemetryEvent).delete({ eventType: 'admin.auth.failure' });
 
     await request(app.getHttpServer())
-      .get('/admin/api/health')
+      .get('/admin/ops/health')
       .set({ 'x-admin-secret': 'incorrect-value' });
 
     const count = await ds.getRepository(TelemetryEvent).count({ where: { eventType: 'admin.auth.failure' } });
@@ -56,19 +56,19 @@ describe('AdminGuard auth pipeline', () => {
   });
 });
 
-// ─── GET /admin/api/health ──────────────────────────────────────────────────
+// ─── GET /admin/ops/health ──────────────────────────────────────────────────
 
-describe('GET /admin/api/health', () => {
+describe('GET /admin/ops/health', () => {
   it('returns 200 with correct secret', async () => {
     const res = await request(app.getHttpServer())
-      .get('/admin/api/health')
+      .get('/admin/ops/health')
       .set(ADMIN);
     expect(res.status).toBe(200);
   });
 
   it('response body has status, timestamp, services shape', async () => {
     const res = await request(app.getHttpServer())
-      .get('/admin/api/health')
+      .get('/admin/ops/health')
       .set(ADMIN);
     expect(res.body).toMatchObject({
       status: expect.stringMatching(/^(ok|degraded|down)$/),
@@ -85,37 +85,37 @@ describe('GET /admin/api/health', () => {
 
   it('postgres service is ok (test DB is running)', async () => {
     const res = await request(app.getHttpServer())
-      .get('/admin/api/health')
+      .get('/admin/ops/health')
       .set(ADMIN);
     expect(res.body.services.postgres.status).toBe('ok');
   });
 
   it('redis service is ok (test Redis is running)', async () => {
     const res = await request(app.getHttpServer())
-      .get('/admin/api/health')
+      .get('/admin/ops/health')
       .set(ADMIN);
     expect(res.body.services.redis.status).toBe('ok');
   });
 });
 
-// ─── GET /admin/api/metrics/overview ────────────────────────────────────────
+// ─── GET /admin/ops/metrics/overview ────────────────────────────────────────
 
-describe('GET /admin/api/metrics/overview', () => {
+describe('GET /admin/ops/metrics/overview', () => {
   it('returns 401 without header', async () => {
-    const res = await request(app.getHttpServer()).get('/admin/api/metrics/overview');
+    const res = await request(app.getHttpServer()).get('/admin/ops/metrics/overview');
     expect(res.status).toBe(401);
   });
 
   it('returns 200 with correct secret', async () => {
     const res = await request(app.getHttpServer())
-      .get('/admin/api/metrics/overview')
+      .get('/admin/ops/metrics/overview')
       .set(ADMIN);
     expect(res.status).toBe(200);
   });
 
   it('response body has expected shape', async () => {
     const res = await request(app.getHttpServer())
-      .get('/admin/api/metrics/overview')
+      .get('/admin/ops/metrics/overview')
       .set(ADMIN);
     expect(res.body).toMatchObject({
       users: expect.objectContaining({
@@ -143,7 +143,7 @@ describe('Rate limiting on admin endpoints', () => {
     const server = app.getHttpServer();
     const statuses: number[] = [];
     for (let i = 0; i < 10; i++) {
-      const r = await request(server).get('/admin/api/metrics/overview').set(ADMIN);
+      const r = await request(server).get('/admin/ops/metrics/overview').set(ADMIN);
       statuses.push(r.status);
     }
     expect(statuses).toContain(429);

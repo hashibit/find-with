@@ -10,7 +10,7 @@
 import { Client } from 'pg';
 
 const DB_URL =
-  process.env.DATABASE_URL || 'postgresql://e2e:e2e@localhost:5434/findwith_e2e';
+  process.env.DATABASE_URL || 'postgresql://e2e:e2e@localhost:14600/findwith_e2e';
 
 const NOW = new Date().toISOString();
 const FUTURE = new Date(Date.now() + 30 * 86_400_000).toISOString();
@@ -109,7 +109,7 @@ export async function seed() {
         'capture-e2e-1',
         'e2e-user-1',
         'linkedin',
-        'http://localhost:8081/linkedin-job-senior-pm.html',
+        'http://localhost:14800/linkedin-job-senior-pm.html',
         'Senior Product Manager at Acme Corp — 5+ years PM experience, B2B SaaS...',
         $1, $1, $1
       )

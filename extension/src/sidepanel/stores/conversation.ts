@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { runtimeCall, runtimeStream } from '../../lib/runtime';
 
 /** Shape of a message as returned by the backend GET /conversations/:id endpoint. */
 interface BackendMessage {
@@ -43,7 +44,7 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
       // 1. Create conversation if none exists
       let conversationId = get().currentConversationId;
       if (!conversationId) {
-        const createResult = await chrome.runtime.sendMessage({
+        const createResult = await runtimeCall({
           type: 'CONVERSATION_CREATE',
           payload: { kind: conversationKind },
         });
@@ -61,85 +62,70 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
         set({ currentConversationId: conversationId });
       }
 
-      // 2. Connect port for SSE streaming
-      const port = chrome.runtime.connect({ name: 'conversation' });
-
-      // 3. Clear previous assistant message buffer
+      // 2. Stream response via runtime seam
       let assistantText = '';
 
-      // 4. Send prompt and stream response
-      port.postMessage({
-        type: 'CONVERSATION_PROMPT',
-        payload: { conversationId, message: text },
-      });
-
-      // 5. Listen for SSE events
-      port.onMessage.addListener((msg) => {
-        if (msg.type === 'SSE_EVENT') {
-          try {
-            const parsed = JSON.parse(msg.data) as unknown;
-            if (typeof parsed !== 'object' || !parsed || !('kind' in parsed)) {
-              console.warn('[Conversation] Unexpected SSE event format', msg.data);
-              return;
+      runtimeStream(
+        conversationId!,
+        text,
+        (msg) => {
+          if (msg.type === 'SSE_EVENT') {
+            try {
+              const parsed = JSON.parse(msg.data) as unknown;
+              if (typeof parsed !== 'object' || !parsed || !('kind' in parsed)) {
+                console.warn('[Conversation] Unexpected SSE event format', msg.data);
+                return;
+              }
+              const event = parsed as { kind: string; delta?: string; message?: string };
+              if (event.kind === 'text_delta') {
+                assistantText += event.delta ?? '';
+                set((state) => {
+                  const messages = [...state.messages];
+                  const last = messages[messages.length - 1];
+                  if (last?.role === 'assistant' && last.timestamp === 0) {
+                    messages[messages.length - 1] = { ...last, text: assistantText };
+                  } else {
+                    messages.push({ role: 'assistant', text: assistantText, timestamp: 0 });
+                  }
+                  return { messages };
+                });
+              } else if (event.kind === 'done') {
+                set((state) => {
+                  const messages = [...state.messages];
+                  const last = messages[messages.length - 1];
+                  if (last?.role === 'assistant') {
+                    messages[messages.length - 1] = { ...last, timestamp: Date.now() };
+                  }
+                  return { messages, isStreaming: false };
+                });
+              } else if (event.kind === 'error') {
+                set((state) => ({
+                  messages: [
+                    ...state.messages,
+                    { role: 'assistant', text: `Error: ${event.message ?? 'unknown'}`, timestamp: Date.now() },
+                  ],
+                  isStreaming: false,
+                }));
+              }
+            } catch (e) {
+              console.error('[Conversation] Failed to parse SSE event', e);
             }
-            const event = parsed as { kind: string; delta?: string; message?: string };
-            if (event.kind === 'text_delta') {
-              assistantText += event.delta ?? '';
-              // Update the last assistant message or add a new one
-              set((state) => {
-                const messages = [...state.messages];
-                const last = messages[messages.length - 1];
-                if (last?.role === 'assistant' && last.timestamp === 0) {
-                  // Updating in-progress message
-                  messages[messages.length - 1] = { ...last, text: assistantText };
-                } else {
-                  // Add new in-progress message with timestamp 0 (will be updated)
-                  messages.push({ role: 'assistant', text: assistantText, timestamp: 0 });
-                }
-                return { messages };
-              });
-            } else if (event.kind === 'done') {
-              // Finalize the assistant message with real timestamp
-              set((state) => {
-                const messages = [...state.messages];
-                const last = messages[messages.length - 1];
-                if (last?.role === 'assistant') {
-                  messages[messages.length - 1] = { ...last, timestamp: Date.now() };
-                }
-                return { messages, isStreaming: false };
-              });
-              port.disconnect();
-            } else if (event.kind === 'error') {
-              set((state) => ({
-                messages: [
-                  ...state.messages,
-                  { role: 'assistant', text: `Error: ${event.message ?? 'unknown'}`, timestamp: Date.now() },
-                ],
-                isStreaming: false,
-              }));
-              port.disconnect();
-            }
-          } catch (e) {
-            console.error('[Conversation] Failed to parse SSE event', e);
           }
-        }
 
-        if (msg.type === 'SSE_ERROR') {
-          set((state) => ({
-            messages: [
-              ...state.messages,
-              { role: 'assistant', text: `Error: ${msg.error}`, timestamp: Date.now() },
-            ],
-            isStreaming: false,
-          }));
-          port.disconnect();
-        }
-      });
-
-      // Handle port disconnect (cleanup)
-      port.onDisconnect.addListener(() => {
-        set({ isStreaming: false });
-      });
+          if (msg.type === 'SSE_ERROR') {
+            set((state) => ({
+              messages: [
+                ...state.messages,
+                { role: 'assistant', text: `Error: ${msg.error}`, timestamp: Date.now() },
+              ],
+              isStreaming: false,
+            }));
+          }
+        },
+        () => {
+          set({ isStreaming: false });
+        },
+      );
     } catch (e) {
       set((state) => ({
         messages: [
@@ -177,7 +163,7 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
   loadConversation: async (id: string) => {
     set({ isStreaming: true });
     try {
-      const result = await chrome.runtime.sendMessage({
+      const result = await runtimeCall({
         type: 'CONVERSATION_GET',
         payload: { conversationId: id },
       });
@@ -185,7 +171,6 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
         set({ isStreaming: false });
         return;
       }
-      // Convert backend messages to store format
       const messages: ConversationMessage[] = (result.messages as BackendMessage[]).map((m) => ({
         role: m.role === 'USER' ? 'user' : 'assistant',
         text:

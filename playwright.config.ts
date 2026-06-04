@@ -14,7 +14,7 @@ export default defineConfig({
     // The extension context is provided by e2e/fixtures/extension.ts which uses
     // chromium.launchPersistentContext — the Playwright-recommended approach for
     // Chrome extension testing. launchOptions are defined there, not here.
-    baseURL: 'http://localhost:14667',
+    baseURL: 'http://localhost:14607',
     screenshot: 'only-on-failure',
   },
   globalSetup: './e2e/global-setup.ts',

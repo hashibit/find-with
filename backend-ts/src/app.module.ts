@@ -22,6 +22,7 @@ import { RecommendationModule } from './contexts/recommendation/recommendation.m
 import { InfraModule } from './contexts/infra/infra.module.js';
 import { MemoryModule } from './contexts/memory/memory.module.js';
 import { OutboxModule } from './contexts/outbox/outbox.module.js';
+import { AdminModule } from './admin/admin.module.js';
 import { type AppConfig } from './config/configuration.js';
 
 @Module({
@@ -59,6 +60,7 @@ import { type AppConfig } from './config/configuration.js';
     InfraModule,
     MemoryModule,
     OutboxModule,
+    AdminModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: UserAuthGuard }],
 })

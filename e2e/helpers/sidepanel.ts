@@ -10,8 +10,8 @@ import { expect } from '@playwright/test';
 export const E2E_USER_ID = 'e2e-user-1';
 export const E2E_USER_ONBOARD = 'e2e-user-onboard';
 export const E2E_USER_FREE = 'e2e-user-free';
-export const BACKEND_URL = 'http://localhost:14667';
-export const FIXTURES_URL = 'http://localhost:8081';
+export const BACKEND_URL = 'http://localhost:14607';
+export const FIXTURES_URL = 'http://localhost:14800';
 
 // Stable extension ID derived from e2e/extension-key.pem via e2e/manifest.e2e.json key field.
 // If the PEM key changes, recompute: python3 -c "import json,hashlib,base64; ..."

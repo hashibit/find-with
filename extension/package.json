@@ -4,8 +4,9 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite build --watch",
-    "build": "tsc && vite build && cp manifest.json dist/",
+    "dev": "vite build --mode development --watch",
+    "dev:web": "vite --mode development --open /dev.html",
+    "build": "tsc && vite build",
     "format": "prettier --write \"src/**/*.{ts,tsx}\"",
     "lint": "eslint src --fix",
     "test": "vitest run",

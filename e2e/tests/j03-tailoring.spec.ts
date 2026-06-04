@@ -18,7 +18,7 @@ async function getOrCreateAnalyzedItem(userId: string) {
   // Capture + parse a job to have an ANALYZED item ready
   const captureRes = await apiCall('POST', '/jobs/capture', {
     source: 'linkedin',
-    sourceUrl: 'http://localhost:8081/linkedin-job-senior-pm.html',
+    sourceUrl: 'http://localhost:14800/linkedin-job-senior-pm.html',
     capturedText: 'Senior Product Manager at Acme Corp — 5+ years PM experience',
   }, userId);
   const capture = await captureRes.json();

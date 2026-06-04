@@ -6,7 +6,7 @@ services:
       POSTGRES_PASSWORD: e2e
       POSTGRES_DB: findwith_e2e
     ports:
-      - "5434:5432"
+      - "14600:5432"
     volumes:
       - ./infra/init-test-db.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
@@ -18,7 +18,7 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "6381:6379"
+      - "14601:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 3s
@@ -32,41 +32,53 @@ services:
       MINIO_ROOT_USER: e2ekey
       MINIO_ROOT_PASSWORD: e2esecret
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "14602:9000"
+      - "14603:9001"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
       interval: 5s
       timeout: 5s
       retries: 10
 
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+        mc alias set local http://minio:9000 e2ekey e2esecret &&
+        mc mb --ignore-existing local/findwith-test
+      "
+
   mailpit:
     image: axllent/mailpit
     ports:
-      - "1025:1025"
-      - "8025:8025"
+      - "14604:1025"
+      - "14605:8025"
 
-  dom-fixtures:
-    image: nginx:alpine
+  mock-dom:
+    build:
+      context: ./e2e/mock-dom
     volumes:
-      - ./e2e/fixtures/dom:/usr/share/nginx/html:ro
+      - ./e2e/fixtures/dom:/app/fixtures:ro
     ports:
-      - "8081:80"
+      - "14800:14800"
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:80/linkedin-job-senior-pm.html"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:14800/health"]
       interval: 3s
       timeout: 3s
       retries: 5
 
-  llm-mock:
+  mock-llm:
     build:
-      context: ./e2e/llm-mock
+      context: ./e2e/mock-llm
     environment:
       LLM_RECORD: "${LLM_RECORD:-false}"
       OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
       PORT: "11435"
     ports:
-      - "11435:11435"
+      - "14801:11435"
     volumes:
       - ./e2e/fixtures/llm:/app/fixtures
     healthcheck:

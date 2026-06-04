@@ -44,7 +44,7 @@ describe('apiClient — success', () => {
     fetchMock.mockReturnValue(makeFetchResponse(true, 200, {}));
     await apiClient('/v1/jobs');
     expect(fetchMock).toHaveBeenCalledWith(
-      'http://localhost:14667/v1/jobs',
+      'http://localhost:14607/v1/jobs',
       expect.any(Object),
     );
   });

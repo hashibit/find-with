@@ -26,6 +26,7 @@ import { JobParsedJd } from '../database/entities/jobs/parsed-jd.entity.js';
 import { FollowupEmail } from '../database/entities/followup/followup-email.entity.js';
 import { FollowupDraft } from '../database/entities/followup/followup-draft.entity.js';
 import { PendingToolResult } from '../database/entities/agent/pending-tool-result.entity.js';
+import { TelemetryEvent } from '../database/entities/telemetry/telemetry-event.entity.js';
 import { FIELD_CRYPTO } from '../common/crypto/crypto.interface.js';
 import { EnvelopeCryptoService } from '../common/crypto/envelope-crypto.service.js';
 import { EphemeralCryptoService } from '../common/crypto/ephemeral-crypto.service.js';
@@ -49,6 +50,7 @@ import { type AppConfig } from '../config/configuration.js';
       FollowupDraft,
       UserGoalMemory,
       PendingToolResult,
+      TelemetryEvent,
     ]),
   ],
   providers: [

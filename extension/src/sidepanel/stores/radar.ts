@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { runtimeCall } from '../../lib/runtime';
 
 export interface RadarItem {
   id: string;
@@ -39,12 +40,11 @@ export const useRadarStore = create<RadarState>((set) => ({
   fetchRadar: async () => {
     set({ isLoading: true, radarItems: [], error: null });
     try {
-      const result = await chrome.runtime.sendMessage({ type: 'RADAR_FETCH' });
+      const result = await runtimeCall({ type: 'RADAR_FETCH' });
       if (result.error) {
         set({ error: result.error, isLoading: false });
         return;
       }
-      // Transform backend items to store format
       const items: RadarItem[] = (result.items || result || []).map((item: any) => ({
         id: item.id,
         jobTitle: item.jobTitle || item.title || 'Unknown',
@@ -61,7 +61,6 @@ export const useRadarStore = create<RadarState>((set) => ({
   },
 
   updateItemStatus: async (id: string, status: RadarItem['status']) => {
-    // Map back to backend status
     const backendStatusMap: Record<RadarItem['status'], string> = {
       saved: 'ANALYZED',
       applied: 'APPLIED',
@@ -70,11 +69,10 @@ export const useRadarStore = create<RadarState>((set) => ({
       rejected: 'REJECTED',
     };
     try {
-      await chrome.runtime.sendMessage({
+      await runtimeCall({
         type: 'RADAR_UPDATE',
         payload: { id, status: backendStatusMap[status] },
       });
-      // Update local state
       set((state) => ({
         radarItems: state.radarItems.map((item) =>
           item.id === id ? { ...item, status, lastActivity: Date.now() } : item,

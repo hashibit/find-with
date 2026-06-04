@@ -6,6 +6,7 @@
   "permissions": ["storage", "sidePanel", "alarms", "activeTab", "tabs"],
   "host_permissions": [
     "https://api.findwith.com/*",
+    "http://localhost:14607/*",
     "https://*.linkedin.com/*",
     "https://mail.google.com/*"
   ],
@@ -34,7 +35,7 @@
     }
   ],
   "externally_connectable": {
-    "matches": ["https://findwith.com/*", "http://localhost:14666/*"]
+    "matches": ["https://findwith.com/*", "http://localhost:14606/*"]
   },
   "action": {
     "default_title": "FindWith"

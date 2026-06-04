@@ -30,7 +30,7 @@ export default function ExtensionCallbackPage() {
         }
 
         // Call backend to verify Clerk JWT and get extension session token
-        const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:14667';
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:14607';
 
         const resp = await fetch(`${baseUrl}/v1/iam/auth/verify`, {
           method: 'POST',

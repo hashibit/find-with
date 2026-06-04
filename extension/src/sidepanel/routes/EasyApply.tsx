@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-
-const API_BASE = 'http://localhost:14667/api/v1';
+import { getToken } from '../../lib/auth';
+import { API_V1 as API_BASE } from '../../background/config';
 
 interface FillPlan {
   id: string;
@@ -330,13 +330,3 @@ function transformFillPlan(data: any): FillPlan {
   };
 }
 
-async function getToken(): Promise<string | null> {
-  // Use dev mode bypass
-  const DEV_MODE = true;
-  const DEV_USER_ID = 'dev_user_001';
-  if (DEV_MODE) return DEV_USER_ID;
-
-  return new Promise((resolve) => {
-    chrome.storage.local.get(['token'], (res) => resolve(res['token'] ?? null));
-  });
-}

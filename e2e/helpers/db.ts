@@ -3,7 +3,7 @@
  */
 import { Client } from 'pg';
 
-const DB_URL = process.env.DATABASE_URL || 'postgresql://e2e:e2e@localhost:5434/findwith_e2e';
+const DB_URL = process.env.DATABASE_URL || 'postgresql://e2e:e2e@localhost:14600/findwith_e2e';
 
 export async function withDb<T>(fn: (client: Client) => Promise<T>): Promise<T> {
   const client = new Client({ connectionString: DB_URL });

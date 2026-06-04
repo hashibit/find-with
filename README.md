@@ -116,11 +116,24 @@ Auth, payment, crypto, and storage are abstracted behind interfaces with dev stu
 ```bash
 make up
 # Starts: PostgreSQL 15, Redis 7, MinIO, Mailpit
-# Postgres: localhost:5432
-# Redis: localhost:6379
-# MinIO console: localhost:9001
-# Mailpit UI: localhost:8025
 ```
+
+All services use the `1466x` port range:
+
+| Port  | Service            | Notes                        |
+|-------|--------------------|------------------------------|
+| 14600 | PostgreSQL         | dev database                 |
+| 14601 | Redis              | BullMQ + cache               |
+| 14602 | MinIO API          | S3-compatible object storage |
+| 14603 | MinIO Console      | Web UI                       |
+| 14604 | Mailpit SMTP       | Email testing                |
+| 14605 | Mailpit Web UI     | Email viewer                 |
+| 14606 | Website (Next.js)  | Marketing + account pages    |
+| 14607 | Backend API        | NestJS — `GET /health`       |
+| 14800 | mock-dom            | e2e HTML fixtures (nginx)    |
+| 14801 | mock-llm               | e2e LLM mock server          |
+| 14700 | PostgreSQL (test)  | unit/integration test DB     |
+| 14701 | Redis (test)       | unit/integration test Redis  |
 
 ### 2. Configure environment
 
@@ -155,8 +168,8 @@ make migrate
 
 ```bash
 make dev
-# NestJS starts on :3000, watches for changes
-# Swagger UI: http://localhost:3000/api/v1/docs
+# NestJS starts on :14607, watches for changes
+# Swagger UI: http://localhost:14607/api/v1/docs
 ```
 
 ### Extension (Side Panel)

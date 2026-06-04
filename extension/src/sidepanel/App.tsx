@@ -7,22 +7,19 @@ import { Radar } from './routes/Radar';
 import { Library } from './routes/Library';
 import { EasyApply } from './routes/EasyApply';
 import { ConversationView } from './components/ConversationView';
+import { runtimeNavBus } from '../lib/runtime';
 
 /**
- * Opens a persistent port so the background service worker can push NAVIGATE
- * messages when a content script triggers OPEN_SIDEPANEL.
+ * Listens for NAVIGATE messages pushed by the background service worker
+ * (triggered when a content script calls OPEN_SIDEPANEL).
  * Must live inside <BrowserRouter> to access useNavigate.
+ * In dev mode (plain Vite server) this is a no-op.
  */
 function NavBus() {
   const navigate = useNavigate();
   useEffect(() => {
-    const port = chrome.runtime.connect({ name: 'nav' });
-    port.onMessage.addListener((msg: { type: string; route?: string }) => {
-      if (msg.type === 'NAVIGATE' && msg.route) {
-        navigate(msg.route);
-      }
-    });
-    return () => { try { port.disconnect(); } catch {} };
+    const cleanup = runtimeNavBus((route) => navigate(route));
+    return cleanup;
   }, [navigate]);
   return null;
 }

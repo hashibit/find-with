@@ -3,17 +3,22 @@ import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
 import hotReloadExtension from 'hot-reload-extension-vite';
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [
     react(),
-    hotReloadExtension({
-      log: true,
-      backgroundPath: 'src/background/index.ts',
-      sidePanel: {
-        path: 'src/sidepanel/index.tsx',
-        htmlPath: 'src/sidepanel/index.html',
-      },
-    }),
+    // hot-reload-extension-vite assumes Chrome extension context — skip in web dev mode
+    ...(mode !== 'development'
+      ? [
+          hotReloadExtension({
+            log: true,
+            backgroundPath: 'src/background/index.ts',
+            sidePanel: {
+              path: 'src/sidepanel/index.tsx',
+              htmlPath: 'src/sidepanel/index.html',
+            },
+          }),
+        ]
+      : []),
   ],
   resolve: {
     alias: { '@': resolve(__dirname, 'src') },
@@ -35,4 +40,4 @@ export default defineConfig({
       },
     },
   },
-});
+}));

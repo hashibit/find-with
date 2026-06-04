@@ -30,6 +30,7 @@ import { RecomputeMatchTool } from './tools/recompute-match.tool.js';
 import { ulid } from 'ulid';
 import { MEMORY_QUEUE, type MemoryJobData } from '../contexts/memory/memory.constants.js';
 import { PendingToolResult } from '../database/entities/agent/pending-tool-result.entity.js';
+import { TelemetryEvent } from '../database/entities/telemetry/telemetry-event.entity.js';
 import { type AppConfig } from '../config/configuration.js';
 
 export interface AgentSseEvent {
@@ -97,6 +98,7 @@ export class AgentService {
     @InjectRepository(ConvMessage) private readonly messageRepo: Repository<ConvMessage>,
     @InjectRepository(ConvConversation) private readonly convRepo: Repository<ConvConversation>,
     @InjectRepository(PendingToolResult) private readonly pendingToolRepo: Repository<PendingToolResult>,
+    @InjectRepository(TelemetryEvent) private readonly telemetryRepo: Repository<TelemetryEvent>,
     @Inject(LLM_PROVIDER) private readonly llm: LlmProvider,
     @Inject(FIELD_CRYPTO) private readonly fieldCrypto: FieldCrypto,
     @InjectQueue(MEMORY_QUEUE) private readonly memoryQueue: Queue<MemoryJobData>,
@@ -366,6 +368,18 @@ export class AgentService {
         }
       }
 
+      // Emit telemetry if the loop exhausted its iteration budget
+      if (iteration > MAX_ITERATION) {
+        void this.telemetryRepo.save(
+          this.telemetryRepo.create({
+            id: ulid(),
+            eventType: 'agent.iteration_exhausted',
+            userId,
+            payload: { conversationId },
+          }),
+        );
+      }
+
       // Enqueue async memory jobs — non-blocking, retried by BullMQ on failure
       await Promise.all([
         this.memoryQueue.add('compress', { type: 'COMPRESS_CONVERSATION', conversationId }),
@@ -478,5 +492,22 @@ export class AgentService {
     const now = Date.now();
     if (now - this.errorLastAt > 60000) this.errorCount = 0;
     return this.errorCount >= 5;
+  }
+
+  getProviderState(): {
+    activeProvider: string;
+    fallbackProvider: string;
+    errorCount: number;
+    inFailover: boolean;
+  } {
+    const llmConfig = this.configService.get('llm', { infer: true })!;
+    return {
+      activeProvider: this.shouldFailover()
+        ? llmConfig.fallbackProvider
+        : llmConfig.provider,
+      fallbackProvider: llmConfig.fallbackProvider,
+      errorCount: this.errorCount,
+      inFailover: this.shouldFailover(),
+    };
   }
 }

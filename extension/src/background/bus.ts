@@ -1,5 +1,6 @@
 import { getToken } from './auth.js';
 import { API_V1 as API_BASE } from './config.js';
+import { bgMsgToRequest } from '../lib/api-routes';
 
 export type BgMsg =
   | { type: 'JOB_CAPTURE'; payload: JobCapturePayload }
@@ -85,58 +86,11 @@ export async function handleMessage(
       });
       return { opened: true };
 
-    // Conversation
-    case 'CONVERSATION_CREATE':
-      return handleApiCall('conversations', 'POST', msg.payload);
-    case 'CONVERSATION_GET':
-      return handleApiCall(`conversations/${msg.payload.conversationId}`, 'GET');
-    case 'CONVERSATION_CLOSE':
-      return handleApiCall(`conversations/${msg.payload.conversationId}/close`, 'POST');
-
-    // Radar
-    case 'RADAR_FETCH':
-      return handleApiCall('jobs/radar', 'GET');
-    case 'RADAR_UPDATE':
-      return handleApiCall(`jobs/${msg.payload.id}/radar`, 'PATCH', { status: msg.payload.status, note: msg.payload.note });
-
-    // Profile
-    case 'PROFILE_FETCH':
-      return handleApiCall('profile', 'GET');
-    case 'MATERIALS_FETCH':
-      return handleApiCall('profile/materials', 'GET');
-    case 'MATERIALS_CREATE':
-      return handleApiCall('profile/materials', 'POST', msg.payload);
-    case 'MATERIALS_UPDATE':
-      return handleApiCall(`profile/materials/${msg.payload.id}`, 'PATCH', msg.payload);
-    case 'MATERIALS_DELETE':
-      return handleApiCall(`profile/materials/${msg.payload.id}`, 'DELETE');
-    case 'BASE_RESUMES_FETCH':
-      return handleApiCall('profile/base-resumes', 'GET');
-    case 'BASE_RESUMES_CREATE':
-      return handleApiCall('profile/base-resumes', 'POST', msg.payload);
-
-    // Tailoring
-    case 'TAILORING_START':
-      return handleApiCall('tailoring', 'POST', msg.payload);
-    case 'TAILORING_GET':
-      return handleApiCall(`tailoring/${msg.payload.id}`, 'GET');
-    case 'TAILORING_EDIT_BULLET':
-      return handleApiCall(`tailoring/${msg.payload.id}/bullets/${msg.payload.bulletId}`, 'PATCH', { text: msg.payload.text, kind: msg.payload.kind });
-    case 'TAILORING_REAPPLY_MATERIAL':
-      return handleApiCall(`tailoring/${msg.payload.id}/bullets/${msg.payload.bulletId}/source`, 'POST', { materialId: msg.payload.materialId });
-    case 'TAILORING_EXPORT':
-      return handleApiCall(`tailoring/${msg.payload.id}/export`, 'GET');
-
-    // Apply
-    case 'APPLY_PLAN':
-      return handleApiCall('apply/plan', 'POST', msg.payload);
-    case 'APPLY_APPROVE':
-      return handleApiCall(`apply/plan/${msg.payload.planId}/approve`, 'PATCH');
-    case 'APPLY_RECORD':
-      return handleApiCall('apply/submit', 'POST', msg.payload);
-
-    default:
+    default: {
+      const route = bgMsgToRequest(msg);
+      if (route) return handleApiCall(route.path, route.method, route.body);
       return { error: 'unknown message type' };
+    }
   }
 }
 

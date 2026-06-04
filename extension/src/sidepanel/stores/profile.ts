@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { runtimeCall } from '../../lib/runtime';
 
 export interface UserProfile {
   userId: string;
@@ -63,7 +64,7 @@ export const useProfileStore = create<ProfileState>((set) => ({
   fetchProfile: async () => {
     set({ isLoading: true, error: null });
     try {
-      const result = await chrome.runtime.sendMessage({ type: 'PROFILE_FETCH' });
+      const result = await runtimeCall({ type: 'PROFILE_FETCH' });
       if (result.error) {
         set({ error: result.error, isLoading: false });
         return;
@@ -84,10 +85,8 @@ export const useProfileStore = create<ProfileState>((set) => ({
 
   fetchMaterials: async () => {
     try {
-      const result = await chrome.runtime.sendMessage({ type: 'MATERIALS_FETCH' });
-      if (result.error) {
-        return;
-      }
+      const result = await runtimeCall({ type: 'MATERIALS_FETCH' });
+      if (result.error) return;
       const materials: Material[] = (result.items || result || []).map((m: any) => ({
         id: m.id,
         type: m.provenanceKind || 'shining_point',
@@ -107,10 +106,8 @@ export const useProfileStore = create<ProfileState>((set) => ({
 
   fetchBaseResumes: async () => {
     try {
-      const result = await chrome.runtime.sendMessage({ type: 'BASE_RESUMES_FETCH' });
-      if (result.error) {
-        return;
-      }
+      const result = await runtimeCall({ type: 'BASE_RESUMES_FETCH' });
+      if (result.error) return;
       const baseResumes: BaseResume[] = (result.items || result || []).map((r: any) => ({
         id: r.id,
         name: r.name,
@@ -126,12 +123,8 @@ export const useProfileStore = create<ProfileState>((set) => ({
 
   createMaterial: async (payload: CreateMaterialPayload) => {
     try {
-      const result = await chrome.runtime.sendMessage({
-        type: 'MATERIALS_CREATE',
-        payload,
-      });
+      const result = await runtimeCall({ type: 'MATERIALS_CREATE', payload });
       if (!result.error) {
-        // Refresh materials
         set((state) => ({
           materials: [
             ...state.materials,
@@ -155,10 +148,7 @@ export const useProfileStore = create<ProfileState>((set) => ({
 
   updateMaterial: async (id: string, patch: Partial<Material>) => {
     try {
-      await chrome.runtime.sendMessage({
-        type: 'MATERIALS_UPDATE',
-        payload: { id, ...patch },
-      });
+      await runtimeCall({ type: 'MATERIALS_UPDATE', payload: { id, ...patch } });
       set((state) => ({
         materials: state.materials.map((m) =>
           m.id === id ? { ...m, ...patch, updatedAt: Date.now() } : m,
@@ -171,10 +161,7 @@ export const useProfileStore = create<ProfileState>((set) => ({
 
   deleteMaterial: async (id: string) => {
     try {
-      await chrome.runtime.sendMessage({
-        type: 'MATERIALS_DELETE',
-        payload: { id },
-      });
+      await runtimeCall({ type: 'MATERIALS_DELETE', payload: { id } });
       set((state) => ({
         materials: state.materials.filter((m) => m.id !== id),
       }));
@@ -185,10 +172,7 @@ export const useProfileStore = create<ProfileState>((set) => ({
 
   createBaseResume: async (name: string, selectedMaterialIds?: string[]) => {
     try {
-      const result = await chrome.runtime.sendMessage({
-        type: 'BASE_RESUMES_CREATE',
-        payload: { name, selectedMaterialIds },
-      });
+      const result = await runtimeCall({ type: 'BASE_RESUMES_CREATE', payload: { name, selectedMaterialIds } });
       if (!result.error) {
         set((state) => ({
           baseResumes: [

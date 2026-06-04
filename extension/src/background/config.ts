@@ -3,7 +3,7 @@
  * Set VITE_API_BASE in .env.production for prod builds.
  * Falls back to localhost for dev (vite build --watch).
  */
-export const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? 'http://localhost:14667';
+export const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? 'http://localhost:14607';
 
 /**
  * API_BASE already ends without a trailing slash.

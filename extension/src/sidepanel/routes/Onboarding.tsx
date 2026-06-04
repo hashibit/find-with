@@ -158,7 +158,7 @@ export function Onboarding() {
         <input
           ref={fileInputRef}
           type="file"
-          accept=".pdf,.docx"
+          accept=".pdf,.docx,.txt,.md"
           data-testid="resume-file-input"
           style={{ display: 'none' }}
           onChange={handleFileChange}
@@ -185,8 +185,8 @@ export function Onboarding() {
             {uploading
               ? 'Uploading...'
               : hasResume
-                ? 'Replace resume (PDF/DOCX)'
-                : 'Upload resume (PDF/DOCX)'}
+                ? 'Replace resume (PDF/DOCX/TXT/MD)'
+                : 'Upload resume (PDF/DOCX/TXT/MD)'}
           </span>
           {!hasResume && <span style={{ fontSize: 11, opacity: 0.7 }}>required</span>}
         </button>

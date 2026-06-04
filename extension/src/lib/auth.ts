@@ -1,6 +1,6 @@
-// Dev mode: use mock user ID as token (backend DevAuthAdapter accepts any string as userId)
-// Set VITE_DEV_MODE=false at build time to disable (e.g., for e2e tests).
-export const DEV_MODE = import.meta.env.VITE_DEV_MODE !== 'false';
+// Dev mode: true when Vite MODE is 'development' (pnpm dev / pnpm dev:web).
+// Production builds (pnpm build) use MODE='production', so DEV_MODE is false automatically.
+export const DEV_MODE = import.meta.env.MODE === 'development';
 export const DEV_USER_ID = 'dev_user_001';
 
 /**

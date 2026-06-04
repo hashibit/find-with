@@ -2,7 +2,7 @@ services:
   postgres-test:
     image: pgvector/pgvector:pg15
     ports:
-      - '5433:5432'
+      - '14700:5432'
     environment:
       POSTGRES_USER: findwith_test
       POSTGRES_PASSWORD: findwith_test
@@ -20,7 +20,7 @@ services:
   redis-test:
     image: redis:7-alpine
     ports:
-      - '6380:6379'
+      - '14701:6379'
     command: redis-server --save "" --appendonly no
     healthcheck:
       test: ['CMD', 'redis-cli', 'ping']

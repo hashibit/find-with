@@ -1,0 +1,70 @@
+{
+  "manifest_version": 3,
+  "name": "FindWith — AI Job Search Companion",
+  "version": "0.1.0",
+  "description": "Your AI career coach that helps you find, tailor, and land the right job.",
+  "permissions": [
+    "storage",
+    "sidePanel",
+    "alarms",
+    "activeTab",
+    "tabs"
+  ],
+  "host_permissions": [
+    "https://api.findwith.com/*",
+    "https://*.linkedin.com/*",
+    "https://mail.google.com/*",
+    "http://localhost:14667/*",
+    "http://localhost:8081/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "side_panel": {
+    "default_path": "src/sidepanel/index.html"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.linkedin.com/jobs/*",
+        "http://localhost:8081/linkedin-*.html"
+      ],
+      "js": [
+        "cs-linkedin-job.js"
+      ]
+    },
+    {
+      "matches": [
+        "https://www.linkedin.com/jobs/*/easy-apply/*",
+        "https://www.linkedin.com/jobs/search/*"
+      ],
+      "js": [
+        "cs-linkedin-apply.js"
+      ]
+    },
+    {
+      "matches": [
+        "https://mail.google.com/*",
+        "http://localhost:8081/gmail-*.html"
+      ],
+      "js": [
+        "cs-gmail.js"
+      ]
+    }
+  ],
+  "externally_connectable": {
+    "matches": [
+      "https://findwith.com/*",
+      "http://localhost:14666/*",
+      "http://localhost:14667/*"
+    ]
+  },
+  "action": {
+    "default_title": "FindWith"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  },
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwXFUMCf2UpGcB+bfuvWX/qCZO0mgwv66qd7zw2XPIcp+VdTXu4bFJsJX8JsjAy12btnEin5kINobJZXyp/RChoi0RSlgSqkx0AKZsK0upnI6lOb8p/VHB8QKfEBy3a+b3XkC31MqW1o1PuX9w5cOkgRnjdVdfDwsgDqxidQcJzUXyPxX+GsLYa3zSmHVtgYkc3Gzb9P1367JovU9v9bQ9AiEweqj7R3Fxn+ZV4XASehFQBAx8d7qlWCiPUvWRvZlNmPklQm5vfPsAueLn127WUTDjvyfDcbDWddEC/tF9UttHIbufq/6WR59V9IWfGnz6Sd6pRtmtInoV/FIHiiZqwIDAQAB"
+}

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 const envSchema = z.object({
-  PORT: z.coerce.number().default(3000),
+  PORT: z.coerce.number().default(14607),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   DATABASE_URL: z.string().url(),
   REDIS_URL: z.string().url(),
@@ -34,7 +34,8 @@ const envSchema = z.object({
   SENTRY_DSN: z.string().optional(),
   CRYPTO_KEK: z.string().min(1),
   CRYPTO_DEK_CIPHERTEXT: z.string().min(1),
-  CORS_ORIGINS: z.string().default('http://localhost:3000'),
+  CORS_ORIGINS: z.string().default('http://localhost:14606'),
+  ADMIN_SECRET: z.string().min(32),
 });
 
 type Env = z.infer<typeof envSchema>;
@@ -65,6 +66,7 @@ export interface AppConfig {
   sentry: { dsn?: string };
   crypto: { kek: string; dekCiphertext: string };
   cors: { origins: string[] };
+  admin: { secret: string };
 }
 
 export function validateEnv(raw: Record<string, unknown>): Env {
@@ -126,6 +128,9 @@ export const configuration = (): AppConfig => {
     },
     cors: {
       origins: env.CORS_ORIGINS.split(','),
+    },
+    admin: {
+      secret: env.ADMIN_SECRET,
     },
   };
 };

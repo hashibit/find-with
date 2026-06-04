@@ -56,7 +56,7 @@ test.describe('J-06: Offer Farewell', () => {
     // Send the farewell message via SSE prompt endpoint (GET with query param)
     const fareMsg = encodeURIComponent('I accepted the offer at Stripe');
     const promptRes = await fetch(
-      `http://localhost:14667/api/v1/conversations/${convId}/prompt?message=${fareMsg}`,
+      `http://localhost:14607/api/v1/conversations/${convId}/prompt?message=${fareMsg}`,
       {
         method: 'GET',
         headers: {

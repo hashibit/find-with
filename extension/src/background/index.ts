@@ -62,9 +62,11 @@ chrome.runtime.onConnect.addListener((port) => {
           (event) => {
             port.postMessage({ type: 'SSE_EVENT', data: event.data });
           },
-          undefined,
-          (err) => {
-            port.postMessage({ type: 'SSE_ERROR', error: err.message });
+          {
+            onError: (err) => {
+              port.postMessage({ type: 'SSE_ERROR', error: err.message });
+            },
+            persistEventId: (id) => void chrome.storage.session.set({ lastEventId: id }),
           },
         );
 
@@ -94,7 +96,7 @@ chrome.runtime.onMessage.addListener((msg: BgMsg, sender, sendResponse) => {
 // External messages: website → SW (U-03 auth flow)
 chrome.runtime.onMessageExternal.addListener((msg, sender, sendResponse) => {
   // Origin check
-  if (sender.origin !== 'https://findwith.com' && sender.origin !== 'http://localhost:14666') {
+  if (sender.origin !== 'https://findwith.com' && sender.origin !== 'http://localhost:14606') {
     return;
   }
 

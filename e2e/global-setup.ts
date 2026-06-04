@@ -6,7 +6,7 @@
  *   2. Create MinIO bucket for test artifacts
  *   3. Run TypeORM migrations against e2e DB
  *   4. Seed fixture data
- *   5. Start the NestJS backend on port 14667
+ *   5. Start the NestJS backend on port 14607
  */
 import { execSync, spawn } from 'child_process';
 import { readFileSync, writeFileSync } from 'fs';
@@ -24,8 +24,9 @@ export default async function globalSetup() {
   // ── 1. Services health check ───────────────────────────────────────────────
   console.log('[setup] Checking e2e services...');
   try {
-    execSync('curl -sf http://localhost:11435/health', { stdio: 'pipe' });
-    execSync('curl -sf http://localhost:9000/minio/health/live', { stdio: 'pipe' });
+    execSync('curl -sf http://localhost:14800/health', { stdio: 'pipe' });
+    execSync('curl -sf http://localhost:14801/health', { stdio: 'pipe' });
+    execSync('curl -sf http://localhost:14602/minio/health/live', { stdio: 'pipe' });
     console.log('[setup] Services OK');
   } catch {
     console.error('[setup] Services not ready. Run: docker compose -f docker-compose.e2e.yml up -d');
@@ -37,7 +38,7 @@ export default async function globalSetup() {
   try {
     // Try mc client first (fast path)
     execSync(
-      'mc alias set e2e http://localhost:9000 e2ekey e2esecret 2>/dev/null && mc mb --ignore-existing e2e/findwith-test 2>/dev/null',
+      'mc alias set e2e http://localhost:14602 e2ekey e2esecret 2>/dev/null && mc mb --ignore-existing e2e/findwith-test 2>/dev/null',
       { stdio: 'pipe', shell: true },
     );
     console.log('[setup] MinIO bucket ready (mc)');
@@ -50,7 +51,7 @@ export default async function globalSetup() {
       const s3 = new S3Client({
         region: 'us-east-1',
         credentials: { accessKeyId: 'e2ekey', secretAccessKey: 'e2esecret' },
-        endpoint: 'http://localhost:9000',
+        endpoint: 'http://localhost:14602',
         forcePathStyle: true,
       });
       try {
@@ -104,7 +105,7 @@ export default async function globalSetup() {
     writeFileSync(PID_FILE, String(backend.pid), 'utf8');
   }
 
-  await waitForBackend('http://localhost:14667/ready', 30_000);
+  await waitForBackend('http://localhost:14607/ready', 30_000);
   console.log('[setup] Backend ready');
 }
 

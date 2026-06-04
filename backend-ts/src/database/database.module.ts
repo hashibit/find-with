@@ -39,6 +39,7 @@ import { RecoRecommendation } from './entities/recommendation/recommendation.ent
 import { TelemetryEvent } from './entities/telemetry/telemetry-event.entity.js';
 import { OutboxEvent } from './entities/outbox/outbox-event.entity.js';
 import { IdempotencyKey } from './entities/idempotency/idempotency-key.entity.js';
+import { AuditLog } from './entities/admin/audit-log.entity.js';
 
 export const ALL_ENTITIES = [
   IamUser,
@@ -77,6 +78,7 @@ export const ALL_ENTITIES = [
   TelemetryEvent,
   OutboxEvent,
   IdempotencyKey,
+  AuditLog,
 ];
 
 @Module({

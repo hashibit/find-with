@@ -6,6 +6,7 @@ import { NotFoundException, ForbiddenException } from '@nestjs/common';
 import { JobsService, JOB_ANALYZE_QUEUE } from '../../../src/contexts/jobs/jobs.service.js';
 import { JobCapture } from '../../../src/database/entities/jobs/job-capture.entity.js';
 import { JobParsedJd } from '../../../src/database/entities/jobs/parsed-jd.entity.js';
+import { JobCompanyBrief } from '../../../src/database/entities/jobs/company-brief.entity.js';
 import { JobMatchResult } from '../../../src/database/entities/jobs/match-result.entity.js';
 import { JobRadarItem } from '../../../src/database/entities/jobs/radar-item.entity.js';
 
@@ -43,6 +44,7 @@ describe('JobsService', () => {
     find: ReturnType<typeof vi.fn>;
   };
   let jdRepo: { findOne: ReturnType<typeof vi.fn> };
+  let companyRepo: { findOne: ReturnType<typeof vi.fn> };
   let matchRepo: { findOne: ReturnType<typeof vi.fn> };
   let analyzeQueue: { add: ReturnType<typeof vi.fn> };
 
@@ -59,6 +61,7 @@ describe('JobsService', () => {
       find: vi.fn(),
     };
     jdRepo = { findOne: vi.fn().mockResolvedValue(null) };
+    companyRepo = { findOne: vi.fn().mockResolvedValue(null) };
     matchRepo = { findOne: vi.fn().mockResolvedValue(null) };
     analyzeQueue = { add: vi.fn().mockResolvedValue(undefined) };
 
@@ -67,6 +70,7 @@ describe('JobsService', () => {
         JobsService,
         { provide: getRepositoryToken(JobCapture), useValue: captureRepo },
         { provide: getRepositoryToken(JobParsedJd), useValue: jdRepo },
+        { provide: getRepositoryToken(JobCompanyBrief), useValue: companyRepo },
         { provide: getRepositoryToken(JobMatchResult), useValue: matchRepo },
         { provide: getRepositoryToken(JobRadarItem), useValue: radarRepo },
         { provide: getQueueToken(JOB_ANALYZE_QUEUE), useValue: analyzeQueue },
@@ -101,13 +105,15 @@ describe('JobsService', () => {
   });
 
   describe('getJob', () => {
-    it('returns capture, parsedJd, matchResult, radarItem', async () => {
+    it('returns id, status, parsedJd=null, matchResult=null, companyBrief=null when no enrichment', async () => {
       captureRepo.findOne.mockResolvedValue(makeCapture());
       radarRepo.findOne.mockResolvedValue(makeRadarItem());
       const result = await service.getJob('user_01', 'cap_01');
-      expect(result.capture.id).toBe('cap_01');
+      expect(result.id).toBe('cap_01');
+      expect(result.status).toBe('BROWSED');
       expect(result.parsedJd).toBeNull();
       expect(result.matchResult).toBeNull();
+      expect(result.companyBrief).toBeNull();
     });
 
     it('throws NotFoundException when capture does not exist', async () => {

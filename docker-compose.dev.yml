@@ -60,6 +60,28 @@ services:
       - '14604:1025'
       - '14605:8025'
 
+  mock-stripe:
+    build:
+      context: ./mocks/stripe
+    ports:
+      - '14802:14802'
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:14802/health']
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  mock-clerk:
+    build:
+      context: ./mocks/clerk
+    ports:
+      - '14803:14803'
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:14803/health']
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
 volumes:
   pgdata:
   miniodata:

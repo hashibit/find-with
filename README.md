@@ -99,7 +99,7 @@ Resume generation, bullet editing, and match recomputation run as BullMQ process
 
 ### Pluggable adapters
 
-Auth, payment, crypto, and storage are abstracted behind interfaces with dev stubs (`DevAuthAdapter`, `EphemeralCryptoAdapter`, etc.) so you can run the full stack without Clerk/Stripe credentials during development.
+Auth, payment, crypto, and storage are abstracted behind interfaces. External services (Clerk, Stripe, OpenAI) are replaced in dev/e2e by local mock servers in `mocks/` rather than in-process stubs — the real adapters run unchanged, just pointed at `localhost`.
 
 ---
 
@@ -130,10 +130,18 @@ All services use the `1466x` port range:
 | 14605 | Mailpit Web UI     | Email viewer                 |
 | 14606 | Website (Next.js)  | Marketing + account pages    |
 | 14607 | Backend API        | NestJS — `GET /health`       |
-| 14800 | mock-dom            | e2e HTML fixtures (nginx)    |
-| 14801 | mock-llm               | e2e LLM mock server          |
 | 14700 | PostgreSQL (test)  | unit/integration test DB     |
 | 14701 | Redis (test)       | unit/integration test Redis  |
+| 14800 | mock-dom           | static HTML fixture server   |
+| 14801 | mock-llm           | OpenAI-compatible LLM mock   |
+| 14802 | mock-stripe        | Stripe API mock              |
+| 14803 | mock-clerk         | Clerk JWKS + JWT signing     |
+
+Mock services live in `mocks/` and are defined in `docker-compose.mock.yml`. They are
+also included in `docker-compose.dev.yml` (stripe + clerk) and `docker-compose.e2e.yml`
+(all four). With these running, the backend uses its real adapters
+(`ClerkAuthAdapter`, `StripePaymentAdapter`) pointed at local URLs — no `Dev*` /
+`Stub*` adapters or hard-coded `dev_user_001` bypass remain in the code.
 
 ### 2. Configure environment
 
@@ -149,7 +157,7 @@ CRYPTO_KEK=<base64 32-byte>    # generate: openssl rand -base64 32
 CRYPTO_DEK_CIPHERTEXT=...      # generate: npm --prefix backend-ts run generate-keys
 ```
 
-For Clerk + Stripe, the dev adapters will stand in if you omit the keys — useful for unit/integration work without external accounts.
+For Clerk + Stripe, start the mock services (`docker compose -f docker-compose.mock.yml up -d`) and set `CLERK_JWKS_URL=http://localhost:14803/.well-known/jwks.json` and `STRIPE_MOCK_URL=http://localhost:14802` — the real adapters then run against the local mocks.
 
 ### 3. Install dependencies
 

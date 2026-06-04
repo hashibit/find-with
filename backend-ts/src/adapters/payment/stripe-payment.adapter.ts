@@ -10,7 +10,15 @@ export class StripePaymentAdapter implements PaymentGateway {
 
   constructor(private readonly config: ConfigService<AppConfig>) {
     const stripeConfig = this.config.get('stripe', { infer: true })!;
-    this.stripe = new Stripe(stripeConfig.secretKey, { apiVersion: '2024-06-20' });
+    const options: Stripe.StripeConfig = { apiVersion: '2024-06-20' };
+    if (stripeConfig.mockUrl) {
+      // Point the SDK at the local mock instead of api.stripe.com.
+      const u = new URL(stripeConfig.mockUrl);
+      options.host = u.hostname;
+      options.port = u.port ? Number(u.port) : (u.protocol === 'https:' ? 443 : 80);
+      options.protocol = u.protocol.replace(':', '') as 'http' | 'https';
+    }
+    this.stripe = new Stripe(stripeConfig.secretKey, options);
   }
 
   async createCheckoutSession(

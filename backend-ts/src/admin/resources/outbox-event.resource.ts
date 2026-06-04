@@ -1,9 +1,11 @@
 import type { ResourceWithOptions } from 'adminjs';
+import type { Repository } from 'typeorm';
 import { OutboxEvent } from '../../database/entities/outbox/outbox-event.entity.js';
+import { wrapRepo } from '../repository-resource.js';
 
-export function buildOutboxEventResource(): ResourceWithOptions {
+export function buildOutboxEventResource(repo: Repository<OutboxEvent>): ResourceWithOptions {
   return {
-    resource: OutboxEvent,
+    resource: wrapRepo(OutboxEvent, repo),
     options: {
       actions: {
         new: { isVisible: false },
@@ -21,10 +23,7 @@ export function buildOutboxEventResource(): ResourceWithOptions {
         dispatchedAt: { isVisible: { list: true, show: true, edit: false, filter: true } },
         payload: { isVisible: { list: false, show: true, edit: false, filter: false } },
       },
-      sort: {
-        direction: 'desc',
-        sortBy: 'createdAt',
-      },
+      sort: { direction: 'desc', sortBy: 'createdAt' },
     },
   };
 }

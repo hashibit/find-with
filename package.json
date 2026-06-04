@@ -35,6 +35,9 @@
   "pnpm": {
     "overrides": {
       "@tiptap/extension-horizontal-rule": "2.1.13"
+    },
+    "patchedDependencies": {
+      "@adminjs/nestjs@7.0.0": "patches/@adminjs__nestjs@7.0.0.patch"
     }
   }
 }

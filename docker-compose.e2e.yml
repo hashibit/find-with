@@ -59,7 +59,7 @@ services:
 
   mock-dom:
     build:
-      context: ./e2e/mock-dom
+      context: ./mocks/dom
     volumes:
       - ./e2e/fixtures/dom:/app/fixtures:ro
     ports:
@@ -72,7 +72,7 @@ services:
 
   mock-llm:
     build:
-      context: ./e2e/mock-llm
+      context: ./mocks/llm
     environment:
       LLM_RECORD: "${LLM_RECORD:-false}"
       OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
@@ -86,3 +86,25 @@ services:
       interval: 3s
       timeout: 3s
       retries: 10
+
+  mock-stripe:
+    build:
+      context: ./mocks/stripe
+    ports:
+      - "14802:14802"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:14802/health"]
+      interval: 3s
+      timeout: 3s
+      retries: 5
+
+  mock-clerk:
+    build:
+      context: ./mocks/clerk
+    ports:
+      - "14803:14803"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:14803/health"]
+      interval: 3s
+      timeout: 3s
+      retries: 5

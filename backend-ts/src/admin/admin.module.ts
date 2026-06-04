@@ -64,10 +64,27 @@ AdminJS.registerAdapter({ Database, Resource });
       { name: TAILORING_QUEUE },
     ),
     AdminJSNestModule.createAdminAsync({
-      imports: [TypeOrmModule.forFeature([AccountPurgeSaga, AuditLog])],
-      inject: [ConfigService, getRepositoryToken(AccountPurgeSaga), getRepositoryToken(AuditLog)],
+      imports: [TypeOrmModule.forFeature([
+        IamUser, BillingSubscription, QuotaUsageCounter, OutboxEvent, IamWebhookEvent,
+        AccountPurgeSaga, AuditLog,
+      ])],
+      inject: [
+        ConfigService,
+        getRepositoryToken(IamUser),
+        getRepositoryToken(BillingSubscription),
+        getRepositoryToken(QuotaUsageCounter),
+        getRepositoryToken(OutboxEvent),
+        getRepositoryToken(IamWebhookEvent),
+        getRepositoryToken(AccountPurgeSaga),
+        getRepositoryToken(AuditLog),
+      ],
       useFactory: (
         configService: ConfigService<AppConfig>,
+        userRepo: Repository<IamUser>,
+        subscriptionRepo: Repository<BillingSubscription>,
+        quotaRepo: Repository<QuotaUsageCounter>,
+        outboxRepo: Repository<OutboxEvent>,
+        webhookRepo: Repository<IamWebhookEvent>,
         sagaRepo: Repository<AccountPurgeSaga>,
         auditLogRepo: Repository<AuditLog>,
       ) => {
@@ -76,11 +93,11 @@ AdminJS.registerAdapter({ Database, Resource });
           adminJsOptions: {
             rootPath: '/admin',
             resources: [
-              buildUserResource(),
-              buildSubscriptionResource(),
-              buildQuotaResource(),
-              buildOutboxEventResource(),
-              buildWebhookEventResource(),
+              buildUserResource(userRepo),
+              buildSubscriptionResource(subscriptionRepo),
+              buildQuotaResource(quotaRepo),
+              buildOutboxEventResource(outboxRepo),
+              buildWebhookEventResource(webhookRepo),
               buildPurgeSagaResource(sagaRepo, auditLogRepo),
             ],
           },

@@ -24,8 +24,10 @@ export default async function globalSetup() {
   // ── 1. Services health check ───────────────────────────────────────────────
   console.log('[setup] Checking e2e services...');
   try {
-    execSync('curl -sf http://localhost:14800/health', { stdio: 'pipe' });
-    execSync('curl -sf http://localhost:14801/health', { stdio: 'pipe' });
+    execSync('curl -sf http://localhost:14800/health', { stdio: 'pipe' });   // mock-dom
+    execSync('curl -sf http://localhost:14801/health', { stdio: 'pipe' });   // mock-llm
+    execSync('curl -sf http://localhost:14802/health', { stdio: 'pipe' });   // mock-stripe
+    execSync('curl -sf http://localhost:14803/health', { stdio: 'pipe' });   // mock-clerk
     execSync('curl -sf http://localhost:14602/minio/health/live', { stdio: 'pipe' });
     console.log('[setup] Services OK');
   } catch {

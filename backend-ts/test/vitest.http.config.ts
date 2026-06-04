@@ -56,12 +56,13 @@ export default defineConfig({
         inline: [
           'express',
           '@bull-board/api',
-          /adminjs/,
-          /@adminjs/,
           // @tiptap/extension-horizontal-rule@2.27.x imports `canInsertNode`
           // from @tiptap/core@2.1.13 which doesn't export it (ESM strict check).
           // Inlining via Vite/esbuild converts named imports to CJS-style property
           // access, so missing exports become undefined instead of throwing.
+          // The root-level pnpm override pins extension-horizontal-rule to 2.1.13
+          // to avoid the canInsertNode import entirely — but we keep the inline for
+          // safety in case any transitive dep still pulls in a newer version.
           /@tiptap/,
         ],
       },

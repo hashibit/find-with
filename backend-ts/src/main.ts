@@ -49,9 +49,10 @@ async function bootstrap(): Promise<void> {
   // Global RFC 7807 exception filter
   app.useGlobalFilters(new HttpExceptionFilter());
 
-  // API prefix
+  // API prefix — admin/* routes are intentionally excluded so the AdminJS UI,
+  // Bull Board, and admin REST endpoints live at /admin/... without a versioned prefix.
   app.setGlobalPrefix('api/v1', {
-    exclude: ['health', 'ready', 'webhooks/:path*', 'ingest/:path*'],
+    exclude: ['health', 'ready', 'webhooks/:path*', 'ingest/:path*', 'admin/:path*'],
   });
 
   // Swagger (non-production)

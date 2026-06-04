@@ -12,11 +12,9 @@ import { BillingSubscription } from '../../database/entities/billing/subscriptio
 import { QuotaUsageCounter } from '../../database/entities/quota/quota-counter.entity.js';
 import { PAYMENT_GATEWAY } from '../../adapters/payment/payment.interface.js';
 import { StripePaymentAdapter } from '../../adapters/payment/stripe-payment.adapter.js';
-import { StubPaymentAdapter } from '../../adapters/payment/stub-payment.adapter.js';
 import { type AppConfig } from '../../config/configuration.js';
 import { AUTH_VERIFIER } from '../../adapters/auth/auth.interface.js';
 import { ClerkAuthAdapter } from '../../adapters/auth/clerk-auth.adapter.js';
-import { DevAuthAdapter } from '../../adapters/auth/dev-auth.adapter.js';
 import { NonceStore } from './services/nonce.store.js';
 import { AccountPurgeSagaService } from './services/account-purge-saga.service.js';
 import { AccountExportService } from './services/account-export.service.js';
@@ -53,18 +51,12 @@ import { RedisModule } from '../../redis/redis.module.js';
     {
       provide: AUTH_VERIFIER,
       inject: [ConfigService],
-      useFactory: (config: ConfigService<AppConfig>) => {
-        const env = config.get('env', { infer: true });
-        return env === 'production' ? new ClerkAuthAdapter(config) : new DevAuthAdapter();
-      },
+      useFactory: (config: ConfigService<AppConfig>) => new ClerkAuthAdapter(config),
     },
     {
       provide: PAYMENT_GATEWAY,
       inject: [ConfigService],
-      useFactory: (config: ConfigService<AppConfig>) => {
-        const env = config.get('env', { infer: true });
-        return env === 'production' ? new StripePaymentAdapter(config) : new StubPaymentAdapter();
-      },
+      useFactory: (config: ConfigService<AppConfig>) => new StripePaymentAdapter(config),
     },
   ],
   exports: [IamService, BillingService, AUTH_VERIFIER, PAYMENT_GATEWAY, NonceStore, AccountPurgeSagaService],

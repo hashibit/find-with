@@ -1,0 +1,57 @@
+# Standalone mock services for external dependencies.
+# Can be started independently for local dev exploration, or composed into
+# docker-compose.dev.yml / docker-compose.e2e.yml as needed.
+#
+# Services:
+#   mock-dom    :14800 — static HTML fixture server (LinkedIn / Gmail pages)
+#   mock-llm    :14801 — OpenAI-compatible LLM mock (fixtures + recording mode)
+#   mock-stripe :14802 — Stripe API mock (checkout, portal, subscriptions)
+#   mock-clerk  :14803 — Clerk JWKS + JWT signing mock
+services:
+  mock-dom:
+    build:
+      context: ./mocks/dom
+    ports:
+      - "14800:14800"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:14800/health"]
+      interval: 3s
+      timeout: 3s
+      retries: 5
+
+  mock-llm:
+    build:
+      context: ./mocks/llm
+    environment:
+      LLM_RECORD: "${LLM_RECORD:-false}"
+      OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
+      PORT: "11435"
+    ports:
+      - "14801:11435"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:11435/health"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  mock-stripe:
+    build:
+      context: ./mocks/stripe
+    ports:
+      - "14802:14802"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:14802/health"]
+      interval: 3s
+      timeout: 3s
+      retries: 5
+
+  mock-clerk:
+    build:
+      context: ./mocks/clerk
+    ports:
+      - "14803:14803"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:14803/health"]
+      interval: 3s
+      timeout: 3s
+      retries: 5

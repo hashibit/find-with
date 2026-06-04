@@ -1,0 +1,38 @@
+diff --git a/build/loaders/express.loader.js b/build/loaders/express.loader.js
+index c2aeb8ea4d51af2488d600b33e7dc43e9978dd25..5d9267ce85e783084e6235ff07742cfd7041b849 100644
+--- a/build/loaders/express.loader.js
++++ b/build/loaders/express.loader.js
+@@ -30,23 +30,23 @@ let ExpressLoader = class ExpressLoader extends AbstractLoader {
+         let jsonParser = [];
+         let urlencodedParser = [];
+         let admin = [];
+-        if (app && app.router && app.router.stack) {
+-            const jsonParserIndex = app.router.stack.findIndex((layer) => layer.name === 'jsonParser');
++        if (app && app._router && app._router.stack) {
++            const jsonParserIndex = app._router.stack.findIndex((layer) => layer.name === 'jsonParser');
+             if (jsonParserIndex >= 0) {
+-                jsonParser = app.router.stack.splice(jsonParserIndex, 1);
++                jsonParser = app._router.stack.splice(jsonParserIndex, 1);
+             }
+-            const urlencodedParserIndex = app.router.stack.findIndex((layer) => layer.name === 'urlencodedParser');
++            const urlencodedParserIndex = app._router.stack.findIndex((layer) => layer.name === 'urlencodedParser');
+             if (urlencodedParserIndex >= 0) {
+-                urlencodedParser = app.router.stack.splice(urlencodedParserIndex, 1);
++                urlencodedParser = app._router.stack.splice(urlencodedParserIndex, 1);
+             }
+-            const adminIndex = app.router.stack.findIndex((layer) => layer.name === 'admin');
++            const adminIndex = app._router.stack.findIndex((layer) => layer.name === 'admin');
+             if (adminIndex >= 0) {
+-                admin = app.router.stack.splice(adminIndex, 1);
++                admin = app._router.stack.splice(adminIndex, 1);
+             }
+-            const corsIndex = app.router.stack.findIndex((layer) => layer.name === 'corsMiddleware');
+-            const expressInitIndex = app.router.stack.findIndex((layer) => layer.name === 'expressInit');
++            const corsIndex = app._router.stack.findIndex((layer) => layer.name === 'corsMiddleware');
++            const expressInitIndex = app._router.stack.findIndex((layer) => layer.name === 'expressInit');
+             const initIndex = (corsIndex >= 0 ? corsIndex : expressInitIndex) + 1;
+-            app.router.stack.splice(initIndex, 0, ...admin, ...jsonParser, ...urlencodedParser);
++            app._router.stack.splice(initIndex, 0, ...admin, ...jsonParser, ...urlencodedParser);
+         }
+     }
+ };

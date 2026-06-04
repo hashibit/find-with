@@ -30,6 +30,9 @@ const envSchema = z.object({
   CLERK_JWKS_URL: z.string().url(),
   STRIPE_SECRET_KEY: z.string().min(1),
   STRIPE_WEBHOOK_SECRET: z.string().min(1),
+  // When set, the Stripe SDK is configured to talk to this host instead of api.stripe.com.
+  // Used to point at mocks/stripe in dev/e2e environments.
+  STRIPE_MOCK_URL: z.string().url().optional(),
   SVIX_SIGNING_SECRET: z.string().min(1),
   SENTRY_DSN: z.string().optional(),
   CRYPTO_KEK: z.string().min(1),
@@ -61,7 +64,7 @@ export interface AppConfig {
     embeddingModel: string;
   };
   clerk: { secretKey: string; jwksUrl: string };
-  stripe: { secretKey: string; webhookSecret: string };
+  stripe: { secretKey: string; webhookSecret: string; mockUrl?: string };
   svix: { signingSecret: string };
   sentry: { dsn?: string };
   crypto: { kek: string; dekCiphertext: string };
@@ -119,6 +122,7 @@ export const configuration = (): AppConfig => {
     stripe: {
       secretKey: env.STRIPE_SECRET_KEY,
       webhookSecret: env.STRIPE_WEBHOOK_SECRET,
+      mockUrl: env.STRIPE_MOCK_URL,
     },
     svix: { signingSecret: env.SVIX_SIGNING_SECRET },
     sentry: { dsn: env.SENTRY_DSN },

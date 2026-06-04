@@ -1,12 +1,12 @@
-import { DEV_MODE, DEV_USER_ID } from '../lib/auth';
+import { DEV_MODE } from '../lib/auth';
 import { API_BASE } from './config.js';
 
-export async function getToken(): Promise<string | null> {
-  // Dev mode bypass: return mock userId as token
-  if (DEV_MODE) {
-    return DEV_USER_ID;
-  }
+// mocks/clerk URL — only used in DEV_MODE. Override via VITE_MOCK_CLERK_URL if your mock runs elsewhere.
+const MOCK_CLERK_URL = (import.meta.env.VITE_MOCK_CLERK_URL as string | undefined) || 'http://localhost:14803';
+const DEV_USER_SUB = 'dev_user_001';
+const DEV_USER_EMAIL = 'dev@findwith.local';
 
+export async function getToken(): Promise<string | null> {
   const data = await chrome.storage.local.get(['token', 'expires_at']);
   if (!data.token) return null;
 
@@ -73,10 +73,55 @@ export async function handleAuthNonce(nonce: string): Promise<{ ok: boolean }> {
   }
 }
 
+/**
+ * Dev-only: bootstrap a real session token by signing a JWT via mocks/clerk,
+ * then exchanging it for an extension session via POST /v1/iam/auth/verify.
+ *
+ * This puts dev on the exact same code path as prod auth — no magic token,
+ * no guard bypass. The only difference is that JWKS is served locally.
+ */
+async function bootstrapDevSession(): Promise<void> {
+  const existing = await chrome.storage.local.get(['token', 'expires_at']);
+  if (existing.token && existing.expires_at && existing.expires_at > Date.now() / 1000 + 300) {
+    console.log('[Auth] Dev session already valid');
+    return;
+  }
+
+  try {
+    const signResp = await fetch(`${MOCK_CLERK_URL}/sign`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sub: DEV_USER_SUB, email: DEV_USER_EMAIL }),
+    });
+    if (!signResp.ok) throw new Error(`mock-clerk /sign HTTP ${signResp.status}`);
+    const { token: clerkJwt } = await signResp.json();
+
+    const verifyResp = await fetch(`${API_BASE}/v1/iam/auth/verify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clerkToken: clerkJwt }),
+    });
+    if (!verifyResp.ok) throw new Error(`backend /auth/verify HTTP ${verifyResp.status}`);
+    const data = await verifyResp.json();
+
+    await chrome.storage.local.set({
+      token: data.token,
+      expires_at: data.expires_at,
+      user_id: data.user_id,
+    });
+    chrome.action.setBadgeText({ text: '' });
+    console.log('[Auth] Dev session bootstrapped for', data.user_id);
+  } catch (e) {
+    console.error('[Auth] Dev session bootstrap failed', e);
+    chrome.action.setBadgeText({ text: '!' });
+    chrome.action.setBadgeBackgroundColor({ color: '#f59e0b' });
+  }
+}
+
 export function initAuth() {
-  // Dev mode: no auth check needed
   if (DEV_MODE) {
-    console.log('[Auth] Dev mode enabled, using mock user:', DEV_USER_ID);
+    // Fire-and-forget — service worker keeps running while we bootstrap.
+    void bootstrapDevSession();
     return;
   }
 

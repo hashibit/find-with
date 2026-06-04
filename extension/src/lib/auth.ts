@@ -1,18 +1,14 @@
 // Dev mode: true when Vite MODE is 'development' (pnpm dev / pnpm dev:web).
 // Production builds (pnpm build) use MODE='production', so DEV_MODE is false automatically.
+// In dev mode the background script bootstraps a real session token from mocks/clerk
+// on startup — there's no "magic" token bypass in this file anymore.
 export const DEV_MODE = import.meta.env.MODE === 'development';
-export const DEV_USER_ID = 'dev_user_001';
 
 /**
- * Get auth token for API calls.
- * In dev mode, returns mock userId.
- * In prod, reads from chrome.storage.
+ * Get auth token for API calls. Reads the session token stored in chrome.storage
+ * by either the website OAuth flow (prod) or the dev bootstrap (dev mode).
  */
 export async function getToken(): Promise<string | null> {
-  if (DEV_MODE) {
-    return DEV_USER_ID;
-  }
-
   return new Promise((resolve) => {
     chrome.storage.local.get(['token'], (res) => resolve(res['token'] ?? null));
   });

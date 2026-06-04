@@ -1,4 +1,5 @@
 import type { ResourceWithOptions, ActionContext } from 'adminjs';
+import { wrapRepo } from '../repository-resource.js';
 import type { Repository } from 'typeorm';
 import { AccountPurgeSaga } from '../../database/entities/iam/account-purge-saga.entity.js';
 import { AuditLog } from '../../database/entities/admin/audit-log.entity.js';
@@ -9,7 +10,7 @@ export function buildPurgeSagaResource(
   auditLogRepo: Repository<AuditLog>,
 ): ResourceWithOptions {
   return {
-    resource: AccountPurgeSaga,
+    resource: wrapRepo(AccountPurgeSaga, sagaRepo),
     options: {
       actions: {
         new: { isVisible: false },

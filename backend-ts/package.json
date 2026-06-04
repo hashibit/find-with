@@ -23,6 +23,7 @@
     "migration:revert": "pnpm run typeorm migration:revert -d src/database/data-source.ts"
   },
   "dependencies": {
+    "@adminjs/express": "^6.1.1",
     "@adminjs/nestjs": "^7.0.0",
     "@adminjs/typeorm": "^5.0.1",
     "@aws-sdk/client-s3": "^3.600.0",

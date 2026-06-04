@@ -16,11 +16,10 @@ echo "[build-extension-e2e] Building extension..."
 
 cd "$EXT_DIR"
 
-# Build with e2e API base and dev-mode disabled so the extension reads
-# auth tokens from chrome.storage.local (injected by Playwright helpers)
-# instead of the hardcoded DEV_USER_ID.
-VITE_API_BASE=http://localhost:14667 \
-VITE_DEV_MODE=false \
+# Build with e2e API base and production MODE so DEV_MODE is false.
+# Playwright helpers inject the session token directly into chrome.storage.local;
+# the extension reads it through the normal getToken() path — no dev bootstrap.
+VITE_API_BASE=http://localhost:14607 \
   pnpm exec vite build --outDir dist-e2e --emptyOutDir
 
 # Rebuild content scripts as self-contained IIFE bundles.

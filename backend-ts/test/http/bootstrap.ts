@@ -57,7 +57,11 @@ export class TestSessionGuard implements CanActivate {
   constructor(private readonly redis: RedisService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const req = context.switchToHttp().getRequest<{ headers: Record<string, string>; user?: unknown }>();
+    const req = context.switchToHttp().getRequest<{ path?: string; headers: Record<string, string>; user?: unknown }>();
+
+    // Admin routes use X-Admin-Secret, not Bearer. AdminGuard owns their auth.
+    if (req.path?.startsWith('/admin')) return true;
+
     const authHeader: string | undefined = req.headers['authorization'];
     const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
 
@@ -130,8 +134,15 @@ export async function getApp(): Promise<INestApplication> {
   _app.useGlobalPipes(new ZodValidationPipe());
   _app.useGlobalFilters(new HttpExceptionFilter());
   _app.setGlobalPrefix('api/v1', {
-    exclude: ['health', 'ready', 'webhooks/:path*', 'ingest/:path*'],
+    exclude: ['health', 'ready', 'webhooks/:path*', 'ingest/:path*', 'admin/:path*'],
   });
+
+  // @adminjs/nestjs v7 calls app.router in reorderRoutes(). Express 5 removed
+  // the `.router` getter, so we silently shim it to prevent a crash on startup.
+  const expressApp = _app.getHttpAdapter().getInstance() as { router?: unknown };
+  if (!('router' in expressApp)) {
+    Object.defineProperty(expressApp, 'router', { get: () => undefined, configurable: true });
+  }
 
   await _app.init();
 

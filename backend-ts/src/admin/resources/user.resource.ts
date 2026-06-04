@@ -1,9 +1,11 @@
 import type { ResourceWithOptions } from 'adminjs';
+import type { Repository } from 'typeorm';
 import { IamUser } from '../../database/entities/iam/iam-user.entity.js';
+import { wrapRepo } from '../repository-resource.js';
 
-export function buildUserResource(): ResourceWithOptions {
+export function buildUserResource(repo: Repository<IamUser>): ResourceWithOptions {
   return {
-    resource: IamUser,
+    resource: wrapRepo(IamUser, repo),
     options: {
       actions: {
         new: { isVisible: false },

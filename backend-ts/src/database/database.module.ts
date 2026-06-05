@@ -27,6 +27,7 @@ import { ConvMessage } from './entities/conversation/message.entity.js';
 import { ConvRollingSummary } from './entities/conversation/rolling-summary.entity.js';
 import { UserGoalMemory } from './entities/memory/user-goal-memory.entity.js';
 import { TailoringResume } from './entities/tailoring/tailoring-resume.entity.js';
+import { TailoringBullet } from './entities/tailoring/tailoring-bullet.entity.js';
 import { TailoringSnapshot } from './entities/tailoring/tailoring-snapshot.entity.js';
 import { ApplyFillPlan } from './entities/apply/fill-plan.entity.js';
 import { ApplyApplication } from './entities/apply/application.entity.js';
@@ -66,6 +67,7 @@ export const ALL_ENTITIES = [
   ConvRollingSummary,
   UserGoalMemory,
   TailoringResume,
+  TailoringBullet,
   TailoringSnapshot,
   ApplyFillPlan,
   ApplyApplication,

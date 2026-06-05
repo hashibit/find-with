@@ -1,9 +1,16 @@
-import { Injectable, NotFoundException, ForbiddenException, UnprocessableEntityException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  UnprocessableEntityException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { TailoringResume } from '../../database/entities/tailoring/tailoring-resume.entity.js';
+import { TailoringBullet, BulletStatus } from '../../database/entities/tailoring/tailoring-bullet.entity.js';
 import { TailoringSnapshot } from '../../database/entities/tailoring/tailoring-snapshot.entity.js';
 import { ProfileMaterial } from '../../database/entities/profile/material.entity.js';
 import { QuotaService } from '../quota/quota.service.js';
@@ -11,11 +18,29 @@ import { ulid } from 'ulid';
 
 export const TAILORING_QUEUE = 'TAILORING';
 
+type BulletDto = {
+  id: string;
+  text: string;
+  source: string;
+  sourceId: string | null;
+  status: string;
+};
+
+type SectionDto = {
+  title: string;
+  bullets: BulletDto[];
+};
+
+/** Shape returned to callers — resume with a reconstructed `sections` property for API compatibility. */
+export type TailoringResumeWithSections = TailoringResume & { sections: SectionDto[] };
+
 @Injectable()
 export class TailoringService {
   constructor(
     @InjectRepository(TailoringResume)
     private readonly resumeRepo: Repository<TailoringResume>,
+    @InjectRepository(TailoringBullet)
+    private readonly bulletRepo: Repository<TailoringBullet>,
     @InjectRepository(TailoringSnapshot)
     private readonly snapshotRepo: Repository<TailoringSnapshot>,
     @InjectRepository(ProfileMaterial)
@@ -31,11 +56,18 @@ export class TailoringService {
     return resume;
   }
 
-  async findOne(userId: string, id: string): Promise<TailoringResume> {
+  async findOne(userId: string, id: string): Promise<TailoringResumeWithSections> {
     const resume = await this.resumeRepo.findOne({ where: { id } });
     if (!resume) throw new NotFoundException('Tailored resume not found');
     if (resume.userId !== userId) throw new ForbiddenException();
-    return resume;
+
+    const bullets = await this.bulletRepo.find({
+      where: { resumeId: id },
+      order: { sectionTitle: 'ASC', position: 'ASC' },
+    });
+
+    const sections = this.groupBulletsIntoSections(bullets);
+    return Object.assign(resume, { sections });
   }
 
   async editBullet(
@@ -46,27 +78,23 @@ export class TailoringService {
     // kind is accepted for forward-compatibility; both 'direct' and 'natural_request'
     // perform direct replacement in v0.1 — LLM-mediated editing is a future TODO.
     _kind: 'direct' | 'natural_request' = 'direct',
-  ): Promise<TailoringResume> {
-    const resume = await this.findOne(userId, tailoredResumeId);
-    const sections = (resume.sections ?? []) as Array<{
-      bullets: Array<{ id: string; text: string; source: string; status?: string }>;
-    }>;
+  ): Promise<TailoringResumeWithSections> {
+    // Verify ownership first
+    const resume = await this.resumeRepo.findOne({ where: { id: tailoredResumeId } });
+    if (!resume) throw new NotFoundException('Tailored resume not found');
+    if (resume.userId !== userId) throw new ForbiddenException();
 
-    let updated = false;
-    for (const section of sections) {
-      for (const bullet of section.bullets) {
-        if (bullet.id === bulletId) {
-          bullet.text = newText;
-          bullet.source = 'USER_EDITED';
-          (bullet as Record<string, unknown>).status = 'USER_EDITED';
-          updated = true;
-        }
-      }
-    }
+    const bullet = await this.bulletRepo.findOne({
+      where: { id: bulletId, resumeId: tailoredResumeId },
+    });
+    if (!bullet) throw new NotFoundException('Bullet not found');
 
-    if (!updated) throw new NotFoundException('Bullet not found');
-    resume.sections = sections;
-    return this.resumeRepo.save(resume);
+    bullet.text = newText;
+    bullet.source = 'USER_EDITED';
+    bullet.status = BulletStatus.USER_EDITED;
+    await this.bulletRepo.save(bullet);
+
+    return this.findOne(userId, tailoredResumeId);
   }
 
   async reApplyMaterial(
@@ -74,8 +102,11 @@ export class TailoringService {
     tailoredResumeId: string,
     bulletId: string,
     materialId: string,
-  ): Promise<TailoringResume> {
-    const resume = await this.findOne(userId, tailoredResumeId);
+  ): Promise<TailoringResumeWithSections> {
+    // Verify ownership first
+    const resume = await this.resumeRepo.findOne({ where: { id: tailoredResumeId } });
+    if (!resume) throw new NotFoundException('Tailored resume not found');
+    if (resume.userId !== userId) throw new ForbiddenException();
 
     const material = await this.materialRepo.findOne({ where: { id: materialId } });
     if (!material || material.userId !== userId) {
@@ -85,78 +116,86 @@ export class TailoringService {
       throw new BadRequestException('Material not confirmed');
     }
 
-    const sections = (resume.sections ?? []) as Array<{
-      bullets: Array<{ id: string; text: string; sourceId?: string; status?: string }>;
-    }>;
+    const bullet = await this.bulletRepo.findOne({
+      where: { id: bulletId, resumeId: tailoredResumeId },
+    });
+    if (!bullet) throw new NotFoundException('Bullet not found');
 
-    let updated = false;
-    for (const section of sections) {
-      for (const bullet of section.bullets) {
-        if (bullet.id === bulletId) {
-          bullet.sourceId = materialId;
-          bullet.status = 'CONFIRMED';
-          updated = true;
-        }
-      }
-    }
+    bullet.sourceId = materialId;
+    bullet.status = BulletStatus.CONFIRMED;
+    await this.bulletRepo.save(bullet);
 
-    if (!updated) throw new NotFoundException('Bullet not found');
-    resume.sections = sections;
-    return this.resumeRepo.save(resume);
+    return this.findOne(userId, tailoredResumeId);
   }
 
   /**
-   * Shared type for resume sections with bullet status.
+   * Guard: throws 422 if any bullet for this resume is still in PENDING state.
    */
-  private getSections(resume: TailoringResume) {
-    return (resume.sections ?? []) as Array<{
-      title: string;
-      bullets: Array<{ id: string; text: string; status: string }>;
-    }>;
-  }
-
-  /**
-   * Guard: throws 422 if any bullet is still in PENDING state.
-   */
-  private assertNoPendingBullets(
-    sections: Array<{ title: string; bullets: Array<{ id: string; text: string; status: string }> }>,
-  ): void {
-    const pendingBulletIds = sections.flatMap((s) =>
-      s.bullets.filter((b) => b.status === 'PENDING').map((b) => b.id),
-    );
-    if (pendingBulletIds.length > 0) {
+  private async assertNoPendingBullets(resumeId: string): Promise<void> {
+    const pendingCount = await this.bulletRepo.count({
+      where: { resumeId, status: BulletStatus.PENDING },
+    });
+    if (pendingCount > 0) {
+      const pendingBullets = await this.bulletRepo.find({
+        where: { resumeId, status: BulletStatus.PENDING },
+        select: ['id'],
+      });
       throw new UnprocessableEntityException({
         message: 'Resume has unconfirmed bullets that must be resolved before export',
-        pendingBulletIds,
+        pendingBulletIds: pendingBullets.map((b) => b.id),
       });
     }
   }
 
   /**
-   * Build plain-text resume content from sections.
+   * Build plain-text resume content from bullets.
    */
-  private buildPlainText(
-    sections: Array<{ title: string; bullets: Array<{ text: string }> }>,
-  ): string {
+  private buildPlainText(bullets: TailoringBullet[]): string {
+    const sections = this.groupBulletsIntoSections(bullets);
     return sections
       .map((s) => `${s.title}\n${s.bullets.map((b) => `• ${b.text}`).join('\n')}`)
       .join('\n\n');
   }
 
   /**
+   * Group a flat list of TailoringBullet rows into the sections shape
+   * expected by the API response (and plain-text builder).
+   * Input should already be sorted by sectionTitle + position.
+   */
+  private groupBulletsIntoSections(bullets: TailoringBullet[]): SectionDto[] {
+    const map = new Map<string, BulletDto[]>();
+    for (const b of bullets) {
+      if (!map.has(b.sectionTitle)) map.set(b.sectionTitle, []);
+      map.get(b.sectionTitle)!.push({
+        id: b.id,
+        text: b.text,
+        source: b.source,
+        sourceId: b.sourceId,
+        status: b.status,
+      });
+    }
+    return Array.from(map.entries()).map(([title, bs]) => ({ title, bullets: bs }));
+  }
+
+  /**
    * Export consumes quota (not creation). §quota: consume_on_export.
    */
   async exportPlainText(userId: string, tailoredResumeId: string): Promise<string> {
-    const resume = await this.findOne(userId, tailoredResumeId);
-    const sections = this.getSections(resume);
+    const resume = await this.resumeRepo.findOne({ where: { id: tailoredResumeId } });
+    if (!resume) throw new NotFoundException('Tailored resume not found');
+    if (resume.userId !== userId) throw new ForbiddenException();
 
-    // Guard: reject if any bullets are still PENDING
-    this.assertNoPendingBullets(sections);
+    await this.assertNoPendingBullets(tailoredResumeId);
+
+    const bullets = await this.bulletRepo.find({
+      where: { resumeId: tailoredResumeId },
+      order: { sectionTitle: 'ASC', position: 'ASC' },
+    });
 
     // Consume quota slot (idempotent on retry)
     await this.quota.consumeOnExport(userId, tailoredResumeId);
 
-    return this.buildPlainText(sections);
+    return this.buildPlainText(bullets);
   }
 
   /**
@@ -169,19 +208,25 @@ export class TailoringService {
     tailoredResumeId: string,
     fmt: string | undefined,
   ): Promise<{ content: string; filename: string; contentType: string }> {
-    const resume = await this.findOne(userId, tailoredResumeId);
-    const sections = this.getSections(resume);
+    const resume = await this.resumeRepo.findOne({ where: { id: tailoredResumeId } });
+    if (!resume) throw new NotFoundException('Tailored resume not found');
+    if (resume.userId !== userId) throw new ForbiddenException();
 
-    // Guard: reject if any bullets are still PENDING
-    this.assertNoPendingBullets(sections);
+    await this.assertNoPendingBullets(tailoredResumeId);
+
+    const bullets = await this.bulletRepo.find({
+      where: { resumeId: tailoredResumeId },
+      order: { sectionTitle: 'ASC', position: 'ASC' },
+    });
 
     // Consume quota slot (idempotent on retry)
     await this.quota.consumeOnExport(userId, tailoredResumeId);
 
-    const content = this.buildPlainText(sections);
+    const content = this.buildPlainText(bullets);
 
     // TODO: When pdf-lib is added, branch on fmt === 'pdf' to return a real PDF Buffer.
     // For v0.1 both fmt values return plain text with a .txt filename.
+    void fmt;
     return {
       content,
       contentType: 'text/plain; charset=utf-8',

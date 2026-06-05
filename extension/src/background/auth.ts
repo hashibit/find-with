@@ -2,7 +2,7 @@ import { DEV_MODE } from '../lib/auth';
 import { API_BASE } from './config.js';
 
 // mocks/clerk URL — only used in DEV_MODE. Override via VITE_MOCK_CLERK_URL if your mock runs elsewhere.
-const MOCK_CLERK_URL = (import.meta.env.VITE_MOCK_CLERK_URL as string | undefined) || 'http://localhost:14803';
+const MOCK_CLERK_URL = (import.meta.env.VITE_MOCK_CLERK_URL as string | undefined) || 'http://localhost:14611';
 const DEV_USER_SUB = 'dev_user_001';
 const DEV_USER_EMAIL = 'dev@findwith.local';
 

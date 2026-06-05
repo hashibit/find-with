@@ -25,7 +25,7 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const PORT = parseInt(process.env.PORT || '11435', 10);
+const PORT = parseInt(process.env.PORT || '14609', 10);
 const LLM_RECORD = process.env.LLM_RECORD === 'true';
 const FIXTURES_DIR = join(__dirname, 'fixtures');
 

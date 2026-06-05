@@ -2,8 +2,8 @@
  * Integration test: TailoringProcessor against a real PostgreSQL DB.
  *
  * LLM is mocked — the integration value here is the real DB reads/writes:
- *   - Idempotency guard (skip if sections already populated) reads from DB.
- *   - Processor writes validated sections back to tailoring_resumes.
+ *   - Idempotency guard (skip if bullets already populated) reads from DB.
+ *   - Processor writes validated TailoringBullet rows to DB.
  *   - MaterialManager.forTailoring reads from profile_materials.
  */
 import { DataSource, Repository } from 'typeorm';
@@ -12,6 +12,7 @@ import { Job } from 'bullmq';
 import { TailoringProcessor } from '../../src/contexts/tailoring/tailoring.processor.js';
 import { MaterialManager } from '../../src/contexts/profile/material-manager.service.js';
 import { TailoringResume } from '../../src/database/entities/tailoring/tailoring-resume.entity.js';
+import { TailoringBullet } from '../../src/database/entities/tailoring/tailoring-bullet.entity.js';
 import { JobParsedJd } from '../../src/database/entities/jobs/parsed-jd.entity.js';
 import { ProfileBaseResume } from '../../src/database/entities/profile/base-resume.entity.js';
 import { ProfileMaterial } from '../../src/database/entities/profile/material.entity.js';
@@ -42,6 +43,7 @@ const mockLlm = {
 
 let ds: DataSource;
 let resumeRepo: Repository<TailoringResume>;
+let bulletRepo: Repository<TailoringBullet>;
 let jdRepo: Repository<JobParsedJd>;
 let baseResumeRepo: Repository<ProfileBaseResume>;
 let materialRepo: Repository<ProfileMaterial>;
@@ -61,6 +63,7 @@ beforeAll(async () => {
   await ds.initialize();
 
   resumeRepo = ds.getRepository(TailoringResume);
+  bulletRepo = ds.getRepository(TailoringBullet);
   jdRepo = ds.getRepository(JobParsedJd);
   baseResumeRepo = ds.getRepository(ProfileBaseResume);
   materialRepo = ds.getRepository(ProfileMaterial);
@@ -69,6 +72,7 @@ beforeAll(async () => {
 
   processor = new TailoringProcessor(
     resumeRepo,
+    bulletRepo,
     jdRepo,
     baseResumeRepo,
     mockLlm as any,
@@ -85,7 +89,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  // Delete in dependency order
+  // bullets cascade-delete with resume rows
   await resumeRepo.delete({ userId: USER });
   await jdRepo
     .createQueryBuilder()
@@ -105,14 +109,27 @@ describe('TailoringProcessor — integration', () => {
     expect(mockLlm.completeContext).not.toHaveBeenCalled();
   });
 
-  it('skips LLM generation when sections already populated (idempotency)', async () => {
+  it('skips LLM generation when bullets already exist (idempotency)', async () => {
     const resume = await resumeRepo.save(
       resumeRepo.create({
         id: ulid(),
         userId: USER,
         baseResumeId: 'br_01',
         parsedJdId: 'jd_01',
-        sections: [{ title: 'Experience', bullets: [{ id: 'b_01', text: 'existing' }] }],
+      }),
+    );
+
+    // Pre-populate a bullet row to trigger the idempotency guard
+    await bulletRepo.save(
+      bulletRepo.create({
+        id: ulid(),
+        resumeId: resume.id,
+        sectionTitle: 'Work Experience',
+        position: 0,
+        text: 'existing bullet',
+        source: 'MATERIAL',
+        sourceId: null,
+        status: 'CONFIRMED' as any,
       }),
     );
 
@@ -127,7 +144,6 @@ describe('TailoringProcessor — integration', () => {
         userId: USER,
         baseResumeId: 'br_missing',
         parsedJdId: 'jd_missing',
-        sections: [],
       }),
     );
 
@@ -135,7 +151,7 @@ describe('TailoringProcessor — integration', () => {
     expect(mockLlm.completeContext).not.toHaveBeenCalled();
   });
 
-  it('calls LLM and writes sections to DB when all dependencies exist', async () => {
+  it('calls LLM and writes bullet rows to DB when all dependencies exist', async () => {
     const material = await materialRepo.save(
       materialRepo.create({
         id: ulid(),
@@ -158,7 +174,7 @@ describe('TailoringProcessor — integration', () => {
       }),
     );
 
-    const parsedJd = await jdRepo.save(
+    const parsedJd: JobParsedJd = await jdRepo.save(
       jdRepo.create({
         id: ulid(),
         captureId: ulid(),
@@ -166,7 +182,7 @@ describe('TailoringProcessor — integration', () => {
         company: 'Stripe',
         hardSkills: ['TypeScript', 'PostgreSQL'],
       } as Partial<JobParsedJd> as any),
-    );
+    ) as unknown as JobParsedJd;
 
     // Point LLM mock sourceId at our real material
     mockLlm.completeContext.mockResolvedValueOnce(
@@ -192,7 +208,6 @@ describe('TailoringProcessor — integration', () => {
         userId: USER,
         baseResumeId: baseResume.id,
         parsedJdId: parsedJd.id,
-        sections: [],
       }),
     );
 
@@ -200,10 +215,10 @@ describe('TailoringProcessor — integration', () => {
 
     expect(mockLlm.completeContext).toHaveBeenCalledOnce();
 
-    const saved = await resumeRepo.findOne({ where: { id: resume.id } });
-    expect(saved!.sections).not.toHaveLength(0);
-    const bullets = (saved!.sections as any[])[0].bullets as any[];
+    const bullets = await bulletRepo.find({ where: { resumeId: resume.id } });
+    expect(bullets).toHaveLength(1);
     expect(bullets[0].status).toBe('CONFIRMED');
     expect(bullets[0].sourceId).toBe(material.id);
+    expect(bullets[0].sectionTitle).toBe('Work Experience');
   });
 });

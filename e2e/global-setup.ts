@@ -6,14 +6,12 @@
  *   2. Create MinIO bucket for test artifacts
  *   3. Run TypeORM migrations against e2e DB
  *   4. Seed fixture data
- *   5. Start the NestJS backend on port 14607
+ *   5. Start the NestJS backend on port 14807
  */
 import { execSync, spawn } from 'child_process';
-import { readFileSync, writeFileSync } from 'fs';
+import { readFileSync } from 'fs';
 import { createRequire } from 'module';
 import path from 'path';
-
-const PID_FILE = path.join(process.cwd(), '.e2e-backend.pid');
 
 // process.cwd() is the repo root when Playwright is invoked from there
 const ROOT = process.cwd();
@@ -24,11 +22,11 @@ export default async function globalSetup() {
   // ── 1. Services health check ───────────────────────────────────────────────
   console.log('[setup] Checking e2e services...');
   try {
-    execSync('curl -sf http://localhost:14800/health', { stdio: 'pipe' });   // mock-dom
-    execSync('curl -sf http://localhost:14801/health', { stdio: 'pipe' });   // mock-llm
-    execSync('curl -sf http://localhost:14802/health', { stdio: 'pipe' });   // mock-stripe
-    execSync('curl -sf http://localhost:14803/health', { stdio: 'pipe' });   // mock-clerk
-    execSync('curl -sf http://localhost:14602/minio/health/live', { stdio: 'pipe' });
+    execSync('curl -sf http://localhost:14808/health', { stdio: 'pipe' });   // mock-dom
+    execSync('curl -sf http://localhost:14809/health', { stdio: 'pipe' });   // mock-llm
+    execSync('curl -sf http://localhost:14810/health', { stdio: 'pipe' });   // mock-stripe
+    execSync('curl -sf http://localhost:14811/health', { stdio: 'pipe' });   // mock-clerk
+    execSync('curl -sf http://localhost:14802/minio/health/live', { stdio: 'pipe' });
     console.log('[setup] Services OK');
   } catch {
     console.error('[setup] Services not ready. Run: docker compose -f docker-compose.e2e.yml up -d');
@@ -40,7 +38,7 @@ export default async function globalSetup() {
   try {
     // Try mc client first (fast path)
     execSync(
-      'mc alias set e2e http://localhost:14602 e2ekey e2esecret 2>/dev/null && mc mb --ignore-existing e2e/findwith-test 2>/dev/null',
+      'mc alias set e2e http://localhost:14802 e2ekey e2esecret 2>/dev/null && mc mb --ignore-existing e2e/findwith-test 2>/dev/null',
       { stdio: 'pipe', shell: true },
     );
     console.log('[setup] MinIO bucket ready (mc)');
@@ -53,7 +51,7 @@ export default async function globalSetup() {
       const s3 = new S3Client({
         region: 'us-east-1',
         credentials: { accessKeyId: 'e2ekey', secretAccessKey: 'e2esecret' },
-        endpoint: 'http://localhost:14602',
+        endpoint: 'http://localhost:14802',
         forcePathStyle: true,
       });
       try {
@@ -84,7 +82,15 @@ export default async function globalSetup() {
   );
 
   // ── 5. Start backend ───────────────────────────────────────────────────────
+  // Kill any process already on port 14807 (leaked from a previous run).
   console.log('[setup] Starting backend...');
+  try {
+    execSync('lsof -ti :14807 | xargs kill -9', { stdio: 'pipe', shell: true });
+    await new Promise((r) => setTimeout(r, 500));
+  } catch {
+    // Nothing was listening — that's fine
+  }
+
   const backend = spawn('node', ['dist/main.js'], {
     cwd: BACKEND_DIR,
     env: { ...process.env, ...envVars },
@@ -101,13 +107,7 @@ export default async function globalSetup() {
     if (line) process.stderr.write(`[backend] ${line}\n`);
   });
 
-  // Write PID to file — global teardown runs in a separate Node process
-  // so globals don't persist; a file is the reliable cross-process channel.
-  if (backend.pid) {
-    writeFileSync(PID_FILE, String(backend.pid), 'utf8');
-  }
-
-  await waitForBackend('http://localhost:14607/ready', 30_000);
+  await waitForBackend('http://localhost:14807/ready', 30_000);
   console.log('[setup] Backend ready');
 }
 

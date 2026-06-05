@@ -10,13 +10,31 @@ import { expect } from '@playwright/test';
 export const E2E_USER_ID = 'e2e-user-1';
 export const E2E_USER_ONBOARD = 'e2e-user-onboard';
 export const E2E_USER_FREE = 'e2e-user-free';
-export const BACKEND_URL = 'http://localhost:14607';
-export const FIXTURES_URL = 'http://localhost:14800';
+export const BACKEND_URL = 'http://localhost:14807';
+export const FIXTURES_URL = 'http://localhost:14808';
+export const MOCK_CLERK_URL = 'http://localhost:14811';
 
 // Stable extension ID derived from e2e/extension-key.pem via e2e/manifest.e2e.json key field.
 // If the PEM key changes, recompute: python3 -c "import json,hashlib,base64; ..."
 const EXTENSION_ID = 'fljfnjaepjaejcnplikaaejcbjhpofon';
 export const SIDEPANEL_URL = `chrome-extension://${EXTENSION_ID}/src/sidepanel/index.html`;
+
+/**
+ * Get a signed Clerk JWT from mock-clerk for the given user ID.
+ * The backend verifies these JWTs via JWKS at mock-clerk.
+ */
+export async function getMockClerkToken(userId: string): Promise<string> {
+  const resp = await fetch(`${MOCK_CLERK_URL}/sign`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sub: userId }),
+  });
+  if (!resp.ok) {
+    throw new Error(`mock-clerk /sign failed: ${resp.status}`);
+  }
+  const data = (await resp.json()) as { token: string };
+  return data.token;
+}
 
 /**
  * Wait for an element matching `selector` to become visible.
@@ -33,14 +51,16 @@ export async function waitForElement(
 
 /**
  * Inject auth token into extension storage for a given user.
+ * Gets a signed Clerk JWT from mock-clerk and stores it.
  * Must be called on the extension side panel page (not the content page).
  */
 export async function injectAuthToken(page: Page, userId: string): Promise<void> {
+  const token = await getMockClerkToken(userId);
   // Key must match what extension/src/lib/auth.ts reads: chrome.storage.local.get(['token'])
   // Await the Promise so storage is committed before any page reload.
-  await page.evaluate(async (uid) => {
-    await chrome.storage.local.set({ token: uid });
-  }, userId);
+  await page.evaluate(async (tok) => {
+    await chrome.storage.local.set({ token: tok });
+  }, token);
 }
 
 /**
@@ -72,10 +92,11 @@ export async function apiCall(
   body?: unknown,
   userId = E2E_USER_ID,
 ): Promise<Response> {
+  const token = await getMockClerkToken(userId);
   return fetch(`${BACKEND_URL}/api/v1${path}`, {
     method,
     headers: {
-      Authorization: `Bearer ${userId}`,
+      Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
     },
     body: body !== undefined ? JSON.stringify(body) : undefined,
@@ -88,10 +109,11 @@ export async function triggerConversationPrompt(
   message: string,
   userId = E2E_USER_ID,
 ): Promise<Response> {
+  const token = await getMockClerkToken(userId);
   return fetch(`${BACKEND_URL}/api/v1/conversations/${conversationId}/prompt`, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${userId}`,
+      Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
       Accept: 'text/event-stream',
     },

@@ -10,7 +10,10 @@
  */
 import { test as base, chromium, expect, type BrowserContext } from '@playwright/test';
 import path from 'path';
+import os from 'os';
 
+// Playwright runs from repo root with testDir: 'e2e/tests'
+// process.cwd() = repo root, so extension is at extension/dist-e2e
 const EXT_PATH = path.resolve(process.cwd(), 'extension/dist-e2e');
 
 export { expect };
@@ -20,7 +23,9 @@ export const test = base.extend<{ context: BrowserContext }>({
   // which is required for Chrome extensions to load and for chrome-extension://
   // URL navigation to work.
   context: async ({}, use) => {
-    const context = await chromium.launchPersistentContext('', {
+    // Use a temp directory for user data
+    const userDataDir = path.join(os.tmpdir(), 'findwith-e2e-', Date.now().toString());
+    const context = await chromium.launchPersistentContext(userDataDir, {
       headless: false,
       args: [
         `--disable-extensions-except=${EXT_PATH}`,

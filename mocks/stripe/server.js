@@ -8,7 +8,7 @@
  *   DELETE /v1/subscriptions/:id   (cancel)
  *
  * Configure the backend to use this mock by setting:
- *   STRIPE_MOCK_URL=http://localhost:14802
+ *   STRIPE_MOCK_URL=http://localhost:14610  (dev) / 14710 (test) / 14810 (e2e)
  *
  * GET /health — Docker healthcheck
  */
@@ -16,7 +16,7 @@
 import { createServer } from 'http';
 import { randomUUID } from 'crypto';
 
-const PORT = parseInt(process.env.PORT || '14802', 10);
+const PORT = parseInt(process.env.PORT || '14610', 10);
 
 function readBody(req) {
   return new Promise((resolve, reject) => {

@@ -4,7 +4,7 @@
 # Produces: extension/dist-e2e/
 # Differences from the production build:
 #   - manifest patched with e2e/manifest.e2e.json fields (key, host_permissions, content_scripts, externally_connectable)
-#   - VITE_API_BASE=http://localhost:14667 (matches backend e2e port)
+#   - VITE_API_BASE=http://localhost:14807 (matches backend e2e port)
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -19,7 +19,7 @@ cd "$EXT_DIR"
 # Build with e2e API base and production MODE so DEV_MODE is false.
 # Playwright helpers inject the session token directly into chrome.storage.local;
 # the extension reads it through the normal getToken() path — no dev bootstrap.
-VITE_API_BASE=http://localhost:14607 \
+VITE_API_BASE=http://localhost:14807 \
   pnpm exec vite build --outDir dist-e2e --emptyOutDir
 
 # Rebuild content scripts as self-contained IIFE bundles.
@@ -40,7 +40,7 @@ do
     --platform=browser \
     --target=chrome120 \
     --outfile="$output" \
-    --define:VITE_API_BASE='"http://localhost:14667"'
+    --define:VITE_API_BASE='"http://localhost:14807"'
 done
 echo "[build-extension-e2e] Content scripts rebuilt"
 
@@ -49,7 +49,7 @@ node - <<'EOF'
 const fs = require('fs');
 const path = require('path');
 
-const baseManifest = JSON.parse(fs.readFileSync(path.join(process.env.EXT_DIR, 'manifest.json'), 'utf8'));
+const baseManifest = JSON.parse(fs.readFileSync(path.join(process.env.EXT_DIR, 'public/manifest.json'), 'utf8'));
 const patch = JSON.parse(fs.readFileSync(path.join(process.env.E2E_DIR, 'manifest.e2e.json'), 'utf8'));
 
 // Deep merge patch into base manifest

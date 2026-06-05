@@ -14,8 +14,8 @@
     "https://api.findwith.com/*",
     "https://*.linkedin.com/*",
     "https://mail.google.com/*",
-    "http://localhost:14667/*",
-    "http://localhost:8081/*"
+    "http://localhost:14807/*",
+    "http://localhost:14808/*"
   ],
   "background": {
     "service_worker": "background.js",
@@ -28,7 +28,7 @@
     {
       "matches": [
         "https://www.linkedin.com/jobs/*",
-        "http://localhost:8081/linkedin-*.html"
+        "http://localhost:14808/linkedin-*.html"
       ],
       "js": [
         "cs-linkedin-job.js"
@@ -46,7 +46,7 @@
     {
       "matches": [
         "https://mail.google.com/*",
-        "http://localhost:8081/gmail-*.html"
+        "http://localhost:14808/gmail-*.html"
       ],
       "js": [
         "cs-gmail.js"
@@ -56,8 +56,8 @@
   "externally_connectable": {
     "matches": [
       "https://findwith.com/*",
-      "http://localhost:14666/*",
-      "http://localhost:14667/*"
+      "http://localhost:14806/*",
+      "http://localhost:14807/*"
     ]
   },
   "action": {

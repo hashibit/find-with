@@ -12,7 +12,7 @@ import { join, extname, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const PORT = parseInt(process.env.PORT || '14800', 10);
+const PORT = parseInt(process.env.PORT || '14608', 10);
 const FIXTURES_DIR = join(__dirname, 'fixtures');
 
 const MIME = {

@@ -1,31 +1,16 @@
 /**
  * Playwright global teardown — runs once after all tests complete.
- * Kills the backend process started in global-setup.
+ * Kills whatever process is holding port 14807 (the backend).
  * Docker Compose services are left running (stopped manually or by CI).
  */
-import { readFileSync, unlinkSync } from 'fs';
-import path from 'path';
-
-const PID_FILE = path.join(process.cwd(), '.e2e-backend.pid');
+import { execSync } from 'child_process';
 
 export default async function globalTeardown() {
-  let pid: number | undefined;
+  console.log('[teardown] Stopping backend...');
   try {
-    pid = parseInt(readFileSync(PID_FILE, 'utf8').trim(), 10);
-    unlinkSync(PID_FILE);
+    execSync('lsof -ti :14807 | xargs kill -9', { stdio: 'pipe', shell: true });
   } catch {
-    // PID file missing — setup may not have run
+    // Nothing on the port — already dead
   }
-
-  if (pid && !isNaN(pid)) {
-    console.log(`[teardown] Stopping backend (pid=${pid})...`);
-    try {
-      process.kill(pid, 'SIGTERM');
-      await new Promise((r) => setTimeout(r, 1000));
-    } catch {
-      // Already dead
-    }
-  }
-
   console.log('[teardown] Done');
 }

@@ -6,7 +6,6 @@ import {
   type AssistantMessage,
   type Context,
   type Message,
-  type Tool,
   type ToolResultMessage,
   type Model,
   type Api,
@@ -14,19 +13,11 @@ import {
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { ConfigService } from '@nestjs/config';
-import { ConvMessage } from '../database/entities/conversation/message.entity.js';
 import { ConvConversation } from '../database/entities/conversation/conversation.entity.js';
 import { LLM_PROVIDER, type LlmProvider } from '../llm/llm-provider.interface.js';
-import { FIELD_CRYPTO, type FieldCrypto } from '../common/crypto/crypto.interface.js';
 import { ContextBuilderService } from './context-builder.service.js';
-import { SearchCompanyTool } from './tools/search-company.tool.js';
-import { MineShiningPointTool } from './tools/mine-shining-point.tool.js';
-import { DraftMotivationTool } from './tools/draft-motivation.tool.js';
-import { ClassifyEmailTool } from './tools/classify-email.tool.js';
-import { DraftReplyTool } from './tools/draft-reply.tool.js';
-import { SetConversationDensityTool } from './tools/set-conversation-density.tool.js';
-import { FarewellTool } from './tools/farewell.tool.js';
-import { RecomputeMatchTool } from './tools/recompute-match.tool.js';
+import { ConvMessageRepository } from './conv-message.repository.js';
+import { ToolRegistry, type ToolContext } from './tool-registry.js';
 import { ulid } from 'ulid';
 import { MEMORY_QUEUE, type MemoryJobData } from '../contexts/memory/memory.constants.js';
 import { PendingToolResult } from '../database/entities/agent/pending-tool-result.entity.js';
@@ -36,34 +27,6 @@ import { type AppConfig } from '../config/configuration.js';
 export interface AgentSseEvent {
   data: string;
   type?: string;
-}
-
-type Scene =
-  | 'JOB_ANALYSIS'
-  | 'ONBOARDING'
-  | 'GAP_MINING'
-  | 'TAILOR_EDIT'
-  | 'FOLLOWUP'
-  | 'FREE_CHAT'
-  | 'OFFER_ACCEPTED'
-  | 'ALL';
-
-interface ToolExecutor {
-  readonly name: string;
-  /** Conversation kinds this tool is available in. Use 'ALL' to allow in every kind. */
-  readonly scenes: readonly Scene[];
-  readonly description: string;
-  readonly parameters: unknown;
-  execute(
-    toolCallId: string,
-    params: Record<string, unknown>,
-    context: ToolContext,
-  ): Promise<{ content: Array<{ type: string; text: string }>; details: Record<string, unknown> }>;
-}
-
-interface ToolContext {
-  userId: string;
-  conversationId: string;
 }
 
 const MAX_ITERATION = 10;
@@ -86,7 +49,6 @@ const DEFAULT_BASE_URLS = {
 @Injectable()
 export class AgentService {
   private readonly logger = new Logger(AgentService.name);
-  private readonly toolMap: Map<string, ToolExecutor>;
   private readonly writeModel: Model<Api>;
   private readonly parseModel: Model<Api>;
   private readonly fallbackModel?: Model<Api>;
@@ -95,35 +57,16 @@ export class AgentService {
   private readonly embeddingModel: string;
 
   constructor(
-    @InjectRepository(ConvMessage) private readonly messageRepo: Repository<ConvMessage>,
     @InjectRepository(ConvConversation) private readonly convRepo: Repository<ConvConversation>,
     @InjectRepository(PendingToolResult) private readonly pendingToolRepo: Repository<PendingToolResult>,
     @InjectRepository(TelemetryEvent) private readonly telemetryRepo: Repository<TelemetryEvent>,
     @Inject(LLM_PROVIDER) private readonly llm: LlmProvider,
-    @Inject(FIELD_CRYPTO) private readonly fieldCrypto: FieldCrypto,
     @InjectQueue(MEMORY_QUEUE) private readonly memoryQueue: Queue<MemoryJobData>,
+    private readonly convMessages: ConvMessageRepository,
     private readonly contextBuilder: ContextBuilderService,
-    private readonly searchCompanyTool: SearchCompanyTool,
-    private readonly mineShiningPointTool: MineShiningPointTool,
-    private readonly draftMotivationTool: DraftMotivationTool,
-    private readonly classifyEmailTool: ClassifyEmailTool,
-    private readonly draftReplyTool: DraftReplyTool,
-    private readonly setDensityTool: SetConversationDensityTool,
-    private readonly farewellTool: FarewellTool,
-    private readonly recomputeMatchTool: RecomputeMatchTool,
+    private readonly toolRegistry: ToolRegistry,
     private readonly configService: ConfigService<AppConfig>,
   ) {
-    this.toolMap = new Map([
-      [this.searchCompanyTool.name, this.assertTool(this.searchCompanyTool)],
-      [this.mineShiningPointTool.name, this.assertTool(this.mineShiningPointTool)],
-      [this.draftMotivationTool.name, this.assertTool(this.draftMotivationTool)],
-      [this.classifyEmailTool.name, this.assertTool(this.classifyEmailTool)],
-      [this.draftReplyTool.name, this.assertTool(this.draftReplyTool)],
-      [this.setDensityTool.name, this.assertTool(this.setDensityTool)],
-      [this.farewellTool.name, this.assertTool(this.farewellTool)],
-      [this.recomputeMatchTool.name, this.assertTool(this.recomputeMatchTool)],
-    ]);
-
     // Build models from configuration
     const llmConfig = this.configService.get('llm', { infer: true });
     this.writeModel = this.buildModel(llmConfig, 'write');
@@ -231,17 +174,8 @@ export class AgentService {
     const toolCtx: ToolContext = { userId, conversationId };
 
     try {
-      // 1. Persist user message — text is encrypted at rest (U-10)
-      const encryptedUserText = await this.fieldCrypto.encrypt(userMessage);
-      await this.messageRepo.save(
-        this.messageRepo.create({
-          id: ulid(),
-          conversationId,
-          role: 'USER',
-          text: null,
-          encryptedText: encryptedUserText,
-        }),
-      );
+      // 1. Persist user message
+      await this.saveUserMessage(conversationId, userMessage);
 
       // 2. Build pi-ai Context (system prompt + history)
       const context: Context = await this.contextBuilder.build(
@@ -252,7 +186,7 @@ export class AgentService {
       );
 
       // Attach scene-filtered tools for the LLM to see
-      context.tools = this.getToolsForScene(conversationKind);
+      context.tools = this.toolRegistry.getToolsForScene(conversationKind);
 
       // Add the current user turn
       context.messages.push({ role: 'user', content: userMessage, timestamp: Date.now() });
@@ -301,20 +235,7 @@ export class AgentService {
           .map((b) => b.text)
           .join('');
 
-        // 3. Persist assistant message with full payload — text encrypted at rest (U-10)
-        const encryptedAssistantText = fullText
-          ? await this.fieldCrypto.encrypt(fullText)
-          : null;
-        await this.messageRepo.save(
-          this.messageRepo.create({
-            id: ulid(),
-            conversationId,
-            role: 'ASSISTANT',
-            text: null,
-            encryptedText: encryptedAssistantText,
-            payload: finalMessage,
-          }),
-        );
+        await this.saveAssistantMessage(conversationId, finalMessage, fullText);
 
         // 4. Execute tool calls and stream continuation
         const toolCalls = finalMessage.content.filter((b) => b.type === 'toolCall');
@@ -340,7 +261,7 @@ export class AgentService {
             }),
           });
 
-          const toolResultMsg = {
+          const toolResultMsg: ToolResultMessage = {
             role: 'toolResult' as const,
             toolCallId: call.id,
             toolName: call.name,
@@ -355,46 +276,64 @@ export class AgentService {
           };
 
           context.messages.push(toolResultMsg);
-
-          // 5. Persist each tool result as its own row
-          await this.messageRepo.save(
-            this.messageRepo.create({
-              id: ulid(),
-              conversationId,
-              role: 'TOOL_RESULT',
-              payload: toolResultMsg,
-            }),
-          );
+          await this.saveToolResult(conversationId, toolResultMsg);
         }
       }
 
-      // Emit telemetry if the loop exhausted its iteration budget
-      if (iteration > MAX_ITERATION) {
-        void this.telemetryRepo.save(
-          this.telemetryRepo.create({
-            id: ulid(),
-            eventType: 'agent.iteration_exhausted',
-            userId,
-            payload: { conversationId },
-          }),
-        );
-      }
-
-      // Enqueue async memory jobs — non-blocking, retried by BullMQ on failure
-      await Promise.all([
-        this.memoryQueue.add('compress', { type: 'COMPRESS_CONVERSATION', conversationId }),
-        this.memoryQueue.add('extract', { type: 'EXTRACT_PREFERENCES', conversationId, userId }),
-      ]);
-
-      await this.convRepo.update({ id: conversationId }, { lastActivity: new Date() });
-
-      subject.next({ data: JSON.stringify({ kind: 'done', promptTokens, completionTokens }) });
-      subject.complete();
+      await this.finalizeLoop(subject, conversationId, userId, iteration, promptTokens, completionTokens);
     } catch (err) {
       this.logger.error('Agent loop error', err instanceof Error ? err.stack : String(err));
       subject.next({ data: JSON.stringify({ kind: 'error', message: 'Internal agent error' }) });
       subject.complete();
     }
+  }
+
+  private async saveUserMessage(conversationId: string, userMessage: string): Promise<void> {
+    await this.convMessages.saveUser(conversationId, userMessage);
+  }
+
+  private async saveAssistantMessage(
+    conversationId: string,
+    finalMessage: AssistantMessage,
+    fullText: string,
+  ): Promise<void> {
+    await this.convMessages.saveAssistant(conversationId, finalMessage, fullText);
+  }
+
+  private async saveToolResult(conversationId: string, toolResultMsg: ToolResultMessage): Promise<void> {
+    await this.convMessages.saveToolResult(conversationId, toolResultMsg);
+  }
+
+  private async finalizeLoop(
+    subject: Subject<AgentSseEvent>,
+    conversationId: string,
+    userId: string,
+    iteration: number,
+    promptTokens: number,
+    completionTokens: number,
+  ): Promise<void> {
+    // Emit telemetry if the loop exhausted its iteration budget
+    if (iteration > MAX_ITERATION) {
+      void this.telemetryRepo.save(
+        this.telemetryRepo.create({
+          id: ulid(),
+          eventType: 'agent.iteration_exhausted',
+          userId,
+          payload: { conversationId },
+        }),
+      );
+    }
+
+    // Enqueue async memory jobs — non-blocking, retried by BullMQ on failure
+    await Promise.all([
+      this.memoryQueue.add('compress', { type: 'COMPRESS_CONVERSATION', conversationId }),
+      this.memoryQueue.add('extract', { type: 'EXTRACT_PREFERENCES', conversationId, userId }),
+    ]);
+
+    await this.convRepo.update({ id: conversationId }, { lastActivity: new Date() });
+
+    subject.next({ data: JSON.stringify({ kind: 'done', promptTokens, completionTokens }) });
+    subject.complete();
   }
 
   private async executeTool(
@@ -403,7 +342,7 @@ export class AgentService {
     callId: string,
     ctx: ToolContext,
   ): Promise<{ ok: boolean; data: Record<string, unknown>; error: string }> {
-    const executor = this.toolMap.get(toolName);
+    const executor = this.toolRegistry.get(toolName);
     if (!executor) return { ok: false, data: {}, error: `Unknown tool: ${toolName}` };
 
     try {
@@ -452,40 +391,12 @@ export class AgentService {
     }
   }
 
-  /** Assert tool implements ToolExecutor at registration time — catches missing methods early. */
-  private assertTool(tool: unknown): ToolExecutor {
-    const t = tool as Record<string, unknown>;
-    if (typeof t['name'] !== 'string' || !t['name']) {
-      throw new Error(`Tool registration error: missing string 'name' field`);
-    }
-    if (!Array.isArray(t['scenes']) || t['scenes'].length === 0) {
-      throw new Error(`Tool registration error: '${t['name']}' missing non-empty 'scenes' array`);
-    }
-    if (typeof t['execute'] !== 'function') {
-      throw new Error(`Tool registration error: '${t['name']}' missing 'execute' method`);
-    }
-    if (t['parameters'] === undefined || t['parameters'] === null) {
-      throw new Error(`Tool registration error: '${t['name']}' missing 'parameters' schema`);
-    }
-    return tool as ToolExecutor;
-  }
-
   /** Validate tool args against required parameter keys before execution. */
   private validateToolArgs(toolName: string, args: unknown): Record<string, unknown> {
     if (typeof args !== 'object' || args === null || Array.isArray(args)) {
       throw new BadRequestException(`Tool '${toolName}' received non-object arguments`);
     }
     return args as Record<string, unknown>;
-  }
-
-  private getToolsForScene(conversationKind: string): Tool[] {
-    return Array.from(this.toolMap.values())
-      .filter((tool) => tool.scenes.includes('ALL') || tool.scenes.includes(conversationKind as Scene))
-      .map((tool) => ({
-        name: tool.name,
-        description: tool.description,
-        parameters: tool.parameters as Record<string, unknown>,
-      }));
   }
 
   private shouldFailover(): boolean {

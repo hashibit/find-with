@@ -1,16 +1,19 @@
+name: findwith-dev
+
 services:
   postgres:
     image: pgvector/pgvector:pg15
-    ports:
-      - '14600:5432'
     environment:
       POSTGRES_USER: findwith
       POSTGRES_PASSWORD: findwith_dev
       POSTGRES_DB: findwith
+      PGPORT: "14600"
+    ports:
+      - '14600:14600'
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U findwith']
+      test: ['CMD-SHELL', 'pg_isready -p 14600 -U findwith']
       interval: 5s
       timeout: 3s
       retries: 5
@@ -18,10 +21,10 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - '14601:6379'
-    command: redis-server --save "" --appendonly no
+      - '14601:14601'
+    command: redis-server --port 14601 --save "" --appendonly no
     healthcheck:
-      test: ['CMD', 'redis-cli', 'ping']
+      test: ['CMD', 'redis-cli', '-p', '14601', 'ping']
       interval: 5s
       timeout: 3s
       retries: 5
@@ -29,16 +32,16 @@ services:
   minio:
     image: minio/minio:latest
     ports:
-      - '14602:9000'
-      - '14603:9001'
+      - '14602:14602'
+      - '14603:14603'
     environment:
       MINIO_ROOT_USER: findwith
       MINIO_ROOT_PASSWORD: findwith_dev
-    command: server /data --console-address ":9001"
+    command: server /data --address ":14602" --console-address ":14603"
     volumes:
       - miniodata:/data
     healthcheck:
-      test: ['CMD', 'mc', 'ready', 'local']
+      test: ['CMD', 'curl', '-f', 'http://localhost:14602/minio/health/live']
       interval: 5s
       timeout: 3s
       retries: 5
@@ -50,23 +53,56 @@ services:
         condition: service_healthy
     entrypoint: >
       /bin/sh -c "
-        mc alias set local http://minio:9000 findwith findwith_dev &&
+        mc alias set local http://minio:14602 findwith findwith_dev &&
         mc mb --ignore-existing local/findwith-dev
       "
 
   mailpit:
     image: axllent/mailpit:latest
+    environment:
+      MP_SMTP_BIND_ADDR: '0.0.0.0:14604'
+      MP_UI_BIND_ADDR: '0.0.0.0:14605'
     ports:
-      - '14604:1025'
-      - '14605:8025'
+      - '14604:14604'
+      - '14605:14605'
+
+  mock-dom:
+    build:
+      context: ./mocks/dom
+    environment:
+      PORT: '14608'
+    ports:
+      - '14608:14608'
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:14608/health']
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  mock-llm:
+    build:
+      context: ./mocks/llm
+    environment:
+      LLM_RECORD: '${LLM_RECORD:-false}'
+      OPENAI_API_KEY: '${OPENAI_API_KEY:-}'
+      PORT: '14609'
+    ports:
+      - '14609:14609'
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:14609/health']
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   mock-stripe:
     build:
       context: ./mocks/stripe
+    environment:
+      PORT: '14610'
     ports:
-      - '14802:14802'
+      - '14610:14610'
     healthcheck:
-      test: ['CMD', 'wget', '-qO-', 'http://localhost:14802/health']
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:14610/health']
       interval: 5s
       timeout: 3s
       retries: 5
@@ -74,10 +110,12 @@ services:
   mock-clerk:
     build:
       context: ./mocks/clerk
+    environment:
+      PORT: '14611'
     ports:
-      - '14803:14803'
+      - '14611:14611'
     healthcheck:
-      test: ['CMD', 'wget', '-qO-', 'http://localhost:14803/health']
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:14611/health']
       interval: 5s
       timeout: 3s
       retries: 5

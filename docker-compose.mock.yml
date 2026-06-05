@@ -1,20 +1,24 @@
+name: findwith-mock
+
 # Standalone mock services for external dependencies.
 # Can be started independently for local dev exploration, or composed into
 # docker-compose.dev.yml / docker-compose.e2e.yml as needed.
 #
-# Services:
-#   mock-dom    :14800 — static HTML fixture server (LinkedIn / Gmail pages)
-#   mock-llm    :14801 — OpenAI-compatible LLM mock (fixtures + recording mode)
-#   mock-stripe :14802 — Stripe API mock (checkout, portal, subscriptions)
-#   mock-clerk  :14803 — Clerk JWKS + JWT signing mock
+# Uses DEV port range (146xx):
+#   mock-dom    :14608 — static HTML fixture server (LinkedIn / Gmail pages)
+#   mock-llm    :14609 — OpenAI-compatible LLM mock (fixtures + recording mode)
+#   mock-stripe :14610 — Stripe API mock (checkout, portal, subscriptions)
+#   mock-clerk  :14611 — Clerk JWKS + JWT signing mock
 services:
   mock-dom:
     build:
       context: ./mocks/dom
+    environment:
+      PORT: "14608"
     ports:
-      - "14800:14800"
+      - "14608:14608"
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:14800/health"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:14608/health"]
       interval: 3s
       timeout: 3s
       retries: 5
@@ -25,11 +29,11 @@ services:
     environment:
       LLM_RECORD: "${LLM_RECORD:-false}"
       OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
-      PORT: "11435"
+      PORT: "14609"
     ports:
-      - "14801:11435"
+      - "14609:14609"
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:11435/health"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:14609/health"]
       interval: 3s
       timeout: 3s
       retries: 10
@@ -37,10 +41,12 @@ services:
   mock-stripe:
     build:
       context: ./mocks/stripe
+    environment:
+      PORT: "14610"
     ports:
-      - "14802:14802"
+      - "14610:14610"
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:14802/health"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:14610/health"]
       interval: 3s
       timeout: 3s
       retries: 5
@@ -48,10 +54,12 @@ services:
   mock-clerk:
     build:
       context: ./mocks/clerk
+    environment:
+      PORT: "14611"
     ports:
-      - "14803:14803"
+      - "14611:14611"
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:14803/health"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:14611/health"]
       interval: 3s
       timeout: 3s
       retries: 5

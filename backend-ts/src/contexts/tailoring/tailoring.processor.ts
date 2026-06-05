@@ -4,6 +4,7 @@ import { Job } from 'bullmq';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { TailoringResume } from '../../database/entities/tailoring/tailoring-resume.entity.js';
+import { TailoringBullet, BulletStatus } from '../../database/entities/tailoring/tailoring-bullet.entity.js';
 import { JobParsedJd } from '../../database/entities/jobs/parsed-jd.entity.js';
 import { ProfileBaseResume } from '../../database/entities/profile/base-resume.entity.js';
 import { LLM_PROVIDER, type LlmProvider } from '../../llm/llm-provider.interface.js';
@@ -11,7 +12,6 @@ import { MaterialManager } from '../profile/material-manager.service.js';
 import { TAILORING_QUEUE } from './tailoring.service.js';
 import { ulid } from 'ulid';
 
-type BulletStatus = 'CONFIRMED' | 'PENDING' | 'USER_EDITED';
 type TailoringMaterial = {
   id: string;
   shiningText: string;
@@ -24,6 +24,7 @@ export class TailoringProcessor extends WorkerHost {
 
   constructor(
     @InjectRepository(TailoringResume) private readonly resumeRepo: Repository<TailoringResume>,
+    @InjectRepository(TailoringBullet) private readonly bulletRepo: Repository<TailoringBullet>,
     @InjectRepository(JobParsedJd) private readonly jdRepo: Repository<JobParsedJd>,
     @InjectRepository(ProfileBaseResume)
     private readonly baseResumeRepo: Repository<ProfileBaseResume>,
@@ -38,9 +39,10 @@ export class TailoringProcessor extends WorkerHost {
     const tailored = await this.resumeRepo.findOne({ where: { id: tailoredResumeId } });
     if (!tailored) return;
 
-    // Idempotent: skip generation if sections are already populated
-    if (tailored.sections && (tailored.sections as unknown[]).length > 0) {
-      this.logger.log(`Tailoring ${tailoredResumeId} already has sections — skipping generation`);
+    // Idempotent: skip generation if bullets already exist
+    const existingCount = await this.bulletRepo.count({ where: { resumeId: tailoredResumeId } });
+    if (existingCount > 0) {
+      this.logger.log(`Tailoring ${tailoredResumeId} already has bullets — skipping generation`);
       return;
     }
 
@@ -105,47 +107,62 @@ Rules:
 
     // Validate and process sections with bullet-level validation
     const materialIds = new Set(relevantMaterials.map((m) => m.id));
-    const validatedSections: Array<{
-      title: string;
-      bullets: Array<{ id: string; text: string; source: string; sourceId: string | null; status: BulletStatus }>;
-    }> = [];
+    const bulletEntities: TailoringBullet[] = [];
 
-    for (const section of sections as Array<{ title?: string; bullets?: Array<{ id?: string; text?: string; source?: string; sourceId?: string; status?: BulletStatus }> }>) {
-      const bullets: Array<{ id: string; text: string; source: string; sourceId: string | null; status: BulletStatus }> = [];
+    for (const section of sections as Array<{
+      title?: string;
+      bullets?: Array<{
+        id?: string;
+        text?: string;
+        source?: string;
+        sourceId?: string;
+        status?: string;
+      }>;
+    }>) {
+      const sectionTitle = (section.title as string) ?? 'Work Experience';
+      const rawBullets = section.bullets ?? [];
 
-      for (const b of section.bullets ?? []) {
+      for (let pos = 0; pos < rawBullets.length; pos++) {
+        const b = rawBullets[pos];
         const id = b.id ?? ulid();
         const text = (b.text as string) ?? '';
-        const source = (b.source as string) ?? '';
+        const source = (b.source as string) ?? 'MATERIAL';
         const sourceId = b.sourceId as string | undefined;
-        let status: BulletStatus = (b.status as BulletStatus) ?? 'PENDING';
+        let status: BulletStatus = (b.status as BulletStatus) ?? BulletStatus.PENDING;
 
         // Bullet fail-fast validation: sourceId must reference a valid material
         // If not, we must mark it as PENDING (model inferred rather than confirmed)
         if (sourceId && materialIds.has(sourceId)) {
           // Valid sourceId referencing a confirmed material - accept CONFIRMED status
-          if (status === 'PENDING') {
+          if (status === BulletStatus.PENDING) {
             // LLM marked it as PENDING despite valid sourceId - trust the model
-            status = 'PENDING';
+            status = BulletStatus.PENDING;
           } else {
-            status = 'CONFIRMED';
+            status = BulletStatus.CONFIRMED;
           }
         } else {
           // No valid sourceId - LLM fabricated or incorrectly referenced
           this.logger.warn(`Bullet has no valid sourceId (sourceId=${sourceId}); marking as PENDING`);
-          status = 'PENDING';
+          status = BulletStatus.PENDING;
         }
 
-        bullets.push({ id, text, source, sourceId: sourceId ?? null, status });
+        bulletEntities.push(
+          this.bulletRepo.create({
+            id,
+            resumeId: tailoredResumeId,
+            sectionTitle,
+            position: pos,
+            text,
+            source,
+            sourceId: sourceId ?? null,
+            status,
+          }),
+        );
       }
-
-      validatedSections.push({
-        title: (section.title as string) ?? 'Work Experience',
-        bullets,
-      });
     }
 
-    tailored.sections = validatedSections;
+    await this.bulletRepo.save(bulletEntities);
+
     tailored.matchBefore = null;
     tailored.matchAfter = null;
     await this.resumeRepo.save(tailored);

@@ -1,4 +1,4 @@
-import { vi } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { TailoringProcessor } from '../../../src/contexts/tailoring/tailoring.processor.js';
 import type { Job } from 'bullmq';
 
@@ -11,6 +11,12 @@ const makeBullJob = (data: { tailoredResumeId: string; userId: string }) =>
 
 const makeResumeRepo = () => ({
   findOne: vi.fn(),
+  save: vi.fn().mockImplementation((e) => Promise.resolve(e)),
+});
+
+const makeBulletRepo = () => ({
+  count: vi.fn().mockResolvedValue(0),
+  create: vi.fn().mockImplementation((e) => e),
   save: vi.fn().mockImplementation((e) => Promise.resolve(e)),
 });
 
@@ -32,12 +38,14 @@ const makeMaterialManager = () => ({
 
 function buildProcessor(overrides: Partial<{
   resumeRepo: ReturnType<typeof makeResumeRepo>;
+  bulletRepo: ReturnType<typeof makeBulletRepo>;
   jdRepo: ReturnType<typeof makeJdRepo>;
   baseResumeRepo: ReturnType<typeof makeBaseResumeRepo>;
   llm: ReturnType<typeof makeLlm>;
   materialManager: ReturnType<typeof makeMaterialManager>;
 }> = {}) {
   const resumeRepo = overrides.resumeRepo ?? makeResumeRepo();
+  const bulletRepo = overrides.bulletRepo ?? makeBulletRepo();
   const jdRepo = overrides.jdRepo ?? makeJdRepo();
   const baseResumeRepo = overrides.baseResumeRepo ?? makeBaseResumeRepo();
   const llm = overrides.llm ?? makeLlm();
@@ -45,13 +53,14 @@ function buildProcessor(overrides: Partial<{
 
   const processor = new TailoringProcessor(
     resumeRepo as any,
+    bulletRepo as any,
     jdRepo as any,
     baseResumeRepo as any,
     llm as any,
     materialManager as any,
   );
 
-  return { processor, resumeRepo, jdRepo, baseResumeRepo, llm, materialManager };
+  return { processor, resumeRepo, bulletRepo, jdRepo, baseResumeRepo, llm, materialManager };
 }
 
 const BASE_TAILORED_RESUME = {
@@ -59,7 +68,6 @@ const BASE_TAILORED_RESUME = {
   userId: 'u1',
   parsedJdId: 'jd_01',
   baseResumeId: 'br_01',
-  sections: null,
 };
 
 const BASE_JD = {
@@ -113,12 +121,11 @@ describe('TailoringProcessor', () => {
       expect(llm.completeContext).not.toHaveBeenCalled();
     });
 
-    it('skips generation when sections are already populated (idempotent)', async () => {
-      const { processor, resumeRepo, llm } = buildProcessor();
-      resumeRepo.findOne.mockResolvedValue({
-        ...BASE_TAILORED_RESUME,
-        sections: [{ title: 'Experience', bullets: [{ id: 'b_1', text: 'did stuff' }] }],
-      });
+    it('skips generation when bullets already exist (idempotent)', async () => {
+      const { processor, resumeRepo, bulletRepo, llm } = buildProcessor();
+      resumeRepo.findOne.mockResolvedValue({ ...BASE_TAILORED_RESUME });
+      // Simulate pre-existing bullet rows
+      bulletRepo.count.mockResolvedValue(3);
 
       await processor.process(makeBullJob({ tailoredResumeId: 'tr_01', userId: 'u1' }));
 
@@ -126,8 +133,9 @@ describe('TailoringProcessor', () => {
     });
 
     it('returns early when parsedJd is missing', async () => {
-      const { processor, resumeRepo, jdRepo, baseResumeRepo, llm } = buildProcessor();
+      const { processor, resumeRepo, bulletRepo, jdRepo, baseResumeRepo, llm } = buildProcessor();
       resumeRepo.findOne.mockResolvedValue(BASE_TAILORED_RESUME);
+      bulletRepo.count.mockResolvedValue(0);
       jdRepo.findOne.mockResolvedValue(null);
       baseResumeRepo.findOne.mockResolvedValue(BASE_RESUME);
 
@@ -137,8 +145,9 @@ describe('TailoringProcessor', () => {
     });
 
     it('returns early when baseResume is missing', async () => {
-      const { processor, resumeRepo, jdRepo, baseResumeRepo, llm } = buildProcessor();
+      const { processor, resumeRepo, bulletRepo, jdRepo, baseResumeRepo, llm } = buildProcessor();
       resumeRepo.findOne.mockResolvedValue(BASE_TAILORED_RESUME);
+      bulletRepo.count.mockResolvedValue(0);
       jdRepo.findOne.mockResolvedValue(BASE_JD);
       baseResumeRepo.findOne.mockResolvedValue(null);
 
@@ -150,68 +159,66 @@ describe('TailoringProcessor', () => {
 
   describe('process() — bullet validation', () => {
     function setup() {
-      const { processor, resumeRepo, jdRepo, baseResumeRepo, llm, materialManager } = buildProcessor();
-      // Spread to prevent mutation of the shared constant between test runs.
-      // TailoringProcessor mutates `tailored.sections` in place, so each test
-      // must get a fresh object or subsequent tests will see sections already set.
+      const { processor, resumeRepo, bulletRepo, jdRepo, baseResumeRepo, llm, materialManager } = buildProcessor();
       resumeRepo.findOne.mockResolvedValue({ ...BASE_TAILORED_RESUME });
+      bulletRepo.count.mockResolvedValue(0);
       jdRepo.findOne.mockResolvedValue({ ...BASE_JD });
       baseResumeRepo.findOne.mockResolvedValue({ ...BASE_RESUME });
       materialManager.forTailoring.mockResolvedValue(MATERIALS);
-      return { processor, resumeRepo, llm };
+      return { processor, resumeRepo, bulletRepo, llm };
     }
 
     it('marks bullet CONFIRMED when sourceId references a valid material', async () => {
-      const { processor, resumeRepo, llm } = setup();
+      const { processor, bulletRepo, llm } = setup();
       llm.completeContext.mockResolvedValue(
         makeLlmSectionsResponse([{ text: 'Led React migration at scale', sourceId: 'm_01', status: 'CONFIRMED' }]),
       );
 
       await processor.process(makeBullJob({ tailoredResumeId: 'tr_01', userId: 'u1' }));
 
-      const saved = resumeRepo.save.mock.calls[0][0] as { sections: Array<{ bullets: Array<{ status: string; sourceId: string }> }> };
-      expect(saved.sections[0].bullets[0].status).toBe('CONFIRMED');
-      expect(saved.sections[0].bullets[0].sourceId).toBe('m_01');
+      const savedBullets = bulletRepo.save.mock.calls[0][0] as Array<{ status: string; sourceId: string }>;
+      expect(savedBullets[0].status).toBe('CONFIRMED');
+      expect(savedBullets[0].sourceId).toBe('m_01');
     });
 
     it('marks bullet PENDING when LLM marks PENDING despite valid sourceId (trust the model)', async () => {
-      const { processor, resumeRepo, llm } = setup();
+      const { processor, bulletRepo, llm } = setup();
       llm.completeContext.mockResolvedValue(
         makeLlmSectionsResponse([{ text: 'Some bullet', sourceId: 'm_01', status: 'PENDING' }]),
       );
 
       await processor.process(makeBullJob({ tailoredResumeId: 'tr_01', userId: 'u1' }));
 
-      const saved = resumeRepo.save.mock.calls[0][0] as { sections: Array<{ bullets: Array<{ status: string }> }> };
-      expect(saved.sections[0].bullets[0].status).toBe('PENDING');
+      const savedBullets = bulletRepo.save.mock.calls[0][0] as Array<{ status: string }>;
+      expect(savedBullets[0].status).toBe('PENDING');
     });
 
     it('marks bullet PENDING when sourceId is absent (LLM fabricated)', async () => {
-      const { processor, resumeRepo, llm } = setup();
+      const { processor, bulletRepo, llm } = setup();
       llm.completeContext.mockResolvedValue(
         makeLlmSectionsResponse([{ text: 'Made up achievement', sourceId: undefined, status: 'CONFIRMED' }]),
       );
 
       await processor.process(makeBullJob({ tailoredResumeId: 'tr_01', userId: 'u1' }));
 
-      const saved = resumeRepo.save.mock.calls[0][0] as { sections: Array<{ bullets: Array<{ status: string }> }> };
-      expect(saved.sections[0].bullets[0].status).toBe('PENDING');
+      const savedBullets = bulletRepo.save.mock.calls[0][0] as Array<{ status: string }>;
+      expect(savedBullets[0].status).toBe('PENDING');
     });
 
     it('marks bullet PENDING when sourceId does not match any confirmed material', async () => {
-      const { processor, resumeRepo, llm } = setup();
+      const { processor, bulletRepo, llm } = setup();
       llm.completeContext.mockResolvedValue(
         makeLlmSectionsResponse([{ text: 'Some bullet', sourceId: 'm_nonexistent', status: 'CONFIRMED' }]),
       );
 
       await processor.process(makeBullJob({ tailoredResumeId: 'tr_01', userId: 'u1' }));
 
-      const saved = resumeRepo.save.mock.calls[0][0] as { sections: Array<{ bullets: Array<{ status: string }> }> };
-      expect(saved.sections[0].bullets[0].status).toBe('PENDING');
+      const savedBullets = bulletRepo.save.mock.calls[0][0] as Array<{ status: string }>;
+      expect(savedBullets[0].status).toBe('PENDING');
     });
 
     it('handles multiple bullets with mixed validation outcomes', async () => {
-      const { processor, resumeRepo, llm } = setup();
+      const { processor, bulletRepo, llm } = setup();
       llm.completeContext.mockResolvedValue(
         makeLlmSectionsResponse([
           { text: 'Valid bullet', sourceId: 'm_01', status: 'CONFIRMED' },
@@ -222,21 +229,21 @@ describe('TailoringProcessor', () => {
 
       await processor.process(makeBullJob({ tailoredResumeId: 'tr_01', userId: 'u1' }));
 
-      const saved = resumeRepo.save.mock.calls[0][0] as { sections: Array<{ bullets: Array<{ status: string }> }> };
-      const bullets = saved.sections[0].bullets;
-      expect(bullets[0].status).toBe('CONFIRMED');
-      expect(bullets[1].status).toBe('PENDING');
-      expect(bullets[2].status).toBe('PENDING');
+      const savedBullets = bulletRepo.save.mock.calls[0][0] as Array<{ status: string }>;
+      expect(savedBullets[0].status).toBe('CONFIRMED');
+      expect(savedBullets[1].status).toBe('PENDING');
+      expect(savedBullets[2].status).toBe('PENDING');
     });
 
-    it('handles malformed LLM JSON gracefully (empty sections)', async () => {
-      const { processor, resumeRepo, llm } = setup();
+    it('handles malformed LLM JSON gracefully (saves empty bullets)', async () => {
+      const { processor, bulletRepo, llm } = setup();
       llm.completeContext.mockResolvedValue('not valid json');
 
       await processor.process(makeBullJob({ tailoredResumeId: 'tr_01', userId: 'u1' }));
 
-      const saved = resumeRepo.save.mock.calls[0][0] as { sections: unknown[] };
-      expect(saved.sections).toEqual([]);
+      // bulletRepo.save should be called with an empty array
+      const savedBullets = bulletRepo.save.mock.calls[0][0] as unknown[];
+      expect(savedBullets).toEqual([]);
     });
 
     it('persists the tailored resume after processing', async () => {
@@ -247,11 +254,12 @@ describe('TailoringProcessor', () => {
 
       await processor.process(makeBullJob({ tailoredResumeId: 'tr_01', userId: 'u1' }));
 
+      // resumeRepo.save is called once (to persist matchBefore/matchAfter)
       expect(resumeRepo.save).toHaveBeenCalledTimes(1);
     });
 
     it('assigns a ULID to bullets missing an id', async () => {
-      const { processor, resumeRepo, llm } = setup();
+      const { processor, bulletRepo, llm } = setup();
       llm.completeContext.mockResolvedValue(
         JSON.stringify([{
           title: 'Experience',
@@ -261,9 +269,31 @@ describe('TailoringProcessor', () => {
 
       await processor.process(makeBullJob({ tailoredResumeId: 'tr_01', userId: 'u1' }));
 
-      const saved = resumeRepo.save.mock.calls[0][0] as { sections: Array<{ bullets: Array<{ id: string }> }> };
-      expect(saved.sections[0].bullets[0].id).toBeTruthy();
-      expect(typeof saved.sections[0].bullets[0].id).toBe('string');
+      const savedBullets = bulletRepo.save.mock.calls[0][0] as Array<{ id: string }>;
+      expect(savedBullets[0].id).toBeTruthy();
+      expect(typeof savedBullets[0].id).toBe('string');
+    });
+
+    it('sets sectionTitle and position on each bullet entity', async () => {
+      const { processor, bulletRepo, llm } = setup();
+      llm.completeContext.mockResolvedValue(
+        makeLlmSectionsResponse([
+          { text: 'First bullet', sourceId: 'm_01', status: 'CONFIRMED' },
+          { text: 'Second bullet', sourceId: 'm_02', status: 'CONFIRMED' },
+        ]),
+      );
+
+      await processor.process(makeBullJob({ tailoredResumeId: 'tr_01', userId: 'u1' }));
+
+      const savedBullets = bulletRepo.save.mock.calls[0][0] as Array<{
+        sectionTitle: string;
+        position: number;
+        resumeId: string;
+      }>;
+      expect(savedBullets[0].sectionTitle).toBe('Work Experience');
+      expect(savedBullets[0].position).toBe(0);
+      expect(savedBullets[0].resumeId).toBe('tr_01');
+      expect(savedBullets[1].position).toBe(1);
     });
   });
 });

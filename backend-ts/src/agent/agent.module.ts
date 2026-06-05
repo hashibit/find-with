@@ -4,7 +4,9 @@ import { BullModule } from '@nestjs/bullmq';
 import { MEMORY_QUEUE } from '../contexts/memory/memory.constants.js';
 import { AgentService } from './agent.service.js';
 import { ContextBuilderService } from './context-builder.service.js';
+import { ConvMessageRepository } from './conv-message.repository.js';
 import { SemanticMaterialLoaderService } from './semantic-material-loader.service.js';
+import { ToolRegistry, TOOL_EXECUTORS } from './tool-registry.js';
 import { SearchCompanyTool } from './tools/search-company.tool.js';
 import { MineShiningPointTool } from './tools/mine-shining-point.tool.js';
 import { DraftMotivationTool } from './tools/draft-motivation.tool.js';
@@ -28,6 +30,10 @@ import { FollowupDraft } from '../database/entities/followup/followup-draft.enti
 import { PendingToolResult } from '../database/entities/agent/pending-tool-result.entity.js';
 import { TelemetryEvent } from '../database/entities/telemetry/telemetry-event.entity.js';
 import { FIELD_CRYPTO } from '../common/crypto/crypto.interface.js';
+import {
+  QUINN_PROMPT_PROVIDER,
+  defaultQuinnPromptProvider,
+} from './prompts/quinn-prompt.provider.js';
 import { EnvelopeCryptoService } from '../common/crypto/envelope-crypto.service.js';
 import { EphemeralCryptoService } from '../common/crypto/ephemeral-crypto.service.js';
 import { ConfigService } from '@nestjs/config';
@@ -66,6 +72,11 @@ import { type AppConfig } from '../config/configuration.js';
         return service;
       },
     },
+    {
+      provide: QUINN_PROMPT_PROVIDER,
+      useValue: defaultQuinnPromptProvider,
+    },
+    ConvMessageRepository,
     AgentService,
     ContextBuilderService,
     SemanticMaterialLoaderService,
@@ -77,6 +88,30 @@ import { type AppConfig } from '../config/configuration.js';
     SetConversationDensityTool,
     FarewellTool,
     RecomputeMatchTool,
+    {
+      provide: TOOL_EXECUTORS,
+      useFactory: (
+        searchCompany: SearchCompanyTool,
+        mineShiningPoint: MineShiningPointTool,
+        draftMotivation: DraftMotivationTool,
+        classifyEmail: ClassifyEmailTool,
+        draftReply: DraftReplyTool,
+        setDensity: SetConversationDensityTool,
+        farewell: FarewellTool,
+        recomputeMatch: RecomputeMatchTool,
+      ) => [searchCompany, mineShiningPoint, draftMotivation, classifyEmail, draftReply, setDensity, farewell, recomputeMatch],
+      inject: [
+        SearchCompanyTool,
+        MineShiningPointTool,
+        DraftMotivationTool,
+        ClassifyEmailTool,
+        DraftReplyTool,
+        SetConversationDensityTool,
+        FarewellTool,
+        RecomputeMatchTool,
+      ],
+    },
+    ToolRegistry,
   ],
   exports: [AgentService, ContextBuilderService],
 })

@@ -1,5 +1,5 @@
 {
-  "name": "findwith-web",
+  "name": "@findwith/web",
   "private": true,
   "version": "0.1.0",
   "scripts": {

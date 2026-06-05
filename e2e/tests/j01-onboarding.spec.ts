@@ -9,7 +9,8 @@ import path from 'path';
 import { waitForElement, injectAuthToken, getSidePanelPage, SIDEPANEL_URL, E2E_USER_ONBOARD } from '../helpers/sidepanel.js';
 import { getMaterialsCount } from '../helpers/db.js';
 
-// process.cwd() is the repo root when Playwright is invoked from there
+// Playwright runs from repo root with testDir: 'e2e/tests'
+// process.cwd() = repo root, fixtures are at e2e/fixtures/files
 const RESUME_PDF = path.resolve(process.cwd(), 'e2e/fixtures/files/resume-senior-pm.pdf');
 
 test.describe('J-01: Onboarding', () => {

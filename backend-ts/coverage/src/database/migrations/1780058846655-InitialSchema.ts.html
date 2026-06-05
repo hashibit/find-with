@@ -1,0 +1,487 @@
+
+<!doctype html>
+<html lang="en">
+
+<head>
+    <title>Code coverage report for src/database/migrations/1780058846655-InitialSchema.ts</title>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../../../prettify.css" />
+    <link rel="stylesheet" href="../../../base.css" />
+    <link rel="shortcut icon" type="image/x-icon" href="../../../favicon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style type='text/css'>
+        .coverage-summary .sorter {
+            background-image: url(../../../sort-arrow-sprite.png);
+        }
+    </style>
+</head>
+    
+<body>
+<div class='wrapper'>
+    <div class='pad1'>
+        <h1><a href="../../../index.html">All files</a> / <a href="index.html">src/database/migrations</a> 1780058846655-InitialSchema.ts</h1>
+        <div class='clearfix'>
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">0% </span>
+                <span class="quiet">Statements</span>
+                <span class='fraction'>0/130</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">0% </span>
+                <span class="quiet">Branches</span>
+                <span class='fraction'>0/1</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">0% </span>
+                <span class="quiet">Functions</span>
+                <span class='fraction'>0/1</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">0% </span>
+                <span class="quiet">Lines</span>
+                <span class='fraction'>0/130</span>
+            </div>
+        
+            
+        </div>
+        <p class="quiet">
+            Press <em>n</em> or <em>j</em> to go to the next uncovered block, <em>b</em>, <em>p</em> or <em>k</em> for the previous block.
+        </p>
+        <template id="filterTemplate">
+            <div class="quiet">
+                Filter:
+                <input type="search" id="fileSearch">
+            </div>
+        </template>
+    </div>
+    <div class='status-line low'></div>
+    <pre><table class="coverage">
+<tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
+<a name='L2'></a><a href='#L2'>2</a>
+<a name='L3'></a><a href='#L3'>3</a>
+<a name='L4'></a><a href='#L4'>4</a>
+<a name='L5'></a><a href='#L5'>5</a>
+<a name='L6'></a><a href='#L6'>6</a>
+<a name='L7'></a><a href='#L7'>7</a>
+<a name='L8'></a><a href='#L8'>8</a>
+<a name='L9'></a><a href='#L9'>9</a>
+<a name='L10'></a><a href='#L10'>10</a>
+<a name='L11'></a><a href='#L11'>11</a>
+<a name='L12'></a><a href='#L12'>12</a>
+<a name='L13'></a><a href='#L13'>13</a>
+<a name='L14'></a><a href='#L14'>14</a>
+<a name='L15'></a><a href='#L15'>15</a>
+<a name='L16'></a><a href='#L16'>16</a>
+<a name='L17'></a><a href='#L17'>17</a>
+<a name='L18'></a><a href='#L18'>18</a>
+<a name='L19'></a><a href='#L19'>19</a>
+<a name='L20'></a><a href='#L20'>20</a>
+<a name='L21'></a><a href='#L21'>21</a>
+<a name='L22'></a><a href='#L22'>22</a>
+<a name='L23'></a><a href='#L23'>23</a>
+<a name='L24'></a><a href='#L24'>24</a>
+<a name='L25'></a><a href='#L25'>25</a>
+<a name='L26'></a><a href='#L26'>26</a>
+<a name='L27'></a><a href='#L27'>27</a>
+<a name='L28'></a><a href='#L28'>28</a>
+<a name='L29'></a><a href='#L29'>29</a>
+<a name='L30'></a><a href='#L30'>30</a>
+<a name='L31'></a><a href='#L31'>31</a>
+<a name='L32'></a><a href='#L32'>32</a>
+<a name='L33'></a><a href='#L33'>33</a>
+<a name='L34'></a><a href='#L34'>34</a>
+<a name='L35'></a><a href='#L35'>35</a>
+<a name='L36'></a><a href='#L36'>36</a>
+<a name='L37'></a><a href='#L37'>37</a>
+<a name='L38'></a><a href='#L38'>38</a>
+<a name='L39'></a><a href='#L39'>39</a>
+<a name='L40'></a><a href='#L40'>40</a>
+<a name='L41'></a><a href='#L41'>41</a>
+<a name='L42'></a><a href='#L42'>42</a>
+<a name='L43'></a><a href='#L43'>43</a>
+<a name='L44'></a><a href='#L44'>44</a>
+<a name='L45'></a><a href='#L45'>45</a>
+<a name='L46'></a><a href='#L46'>46</a>
+<a name='L47'></a><a href='#L47'>47</a>
+<a name='L48'></a><a href='#L48'>48</a>
+<a name='L49'></a><a href='#L49'>49</a>
+<a name='L50'></a><a href='#L50'>50</a>
+<a name='L51'></a><a href='#L51'>51</a>
+<a name='L52'></a><a href='#L52'>52</a>
+<a name='L53'></a><a href='#L53'>53</a>
+<a name='L54'></a><a href='#L54'>54</a>
+<a name='L55'></a><a href='#L55'>55</a>
+<a name='L56'></a><a href='#L56'>56</a>
+<a name='L57'></a><a href='#L57'>57</a>
+<a name='L58'></a><a href='#L58'>58</a>
+<a name='L59'></a><a href='#L59'>59</a>
+<a name='L60'></a><a href='#L60'>60</a>
+<a name='L61'></a><a href='#L61'>61</a>
+<a name='L62'></a><a href='#L62'>62</a>
+<a name='L63'></a><a href='#L63'>63</a>
+<a name='L64'></a><a href='#L64'>64</a>
+<a name='L65'></a><a href='#L65'>65</a>
+<a name='L66'></a><a href='#L66'>66</a>
+<a name='L67'></a><a href='#L67'>67</a>
+<a name='L68'></a><a href='#L68'>68</a>
+<a name='L69'></a><a href='#L69'>69</a>
+<a name='L70'></a><a href='#L70'>70</a>
+<a name='L71'></a><a href='#L71'>71</a>
+<a name='L72'></a><a href='#L72'>72</a>
+<a name='L73'></a><a href='#L73'>73</a>
+<a name='L74'></a><a href='#L74'>74</a>
+<a name='L75'></a><a href='#L75'>75</a>
+<a name='L76'></a><a href='#L76'>76</a>
+<a name='L77'></a><a href='#L77'>77</a>
+<a name='L78'></a><a href='#L78'>78</a>
+<a name='L79'></a><a href='#L79'>79</a>
+<a name='L80'></a><a href='#L80'>80</a>
+<a name='L81'></a><a href='#L81'>81</a>
+<a name='L82'></a><a href='#L82'>82</a>
+<a name='L83'></a><a href='#L83'>83</a>
+<a name='L84'></a><a href='#L84'>84</a>
+<a name='L85'></a><a href='#L85'>85</a>
+<a name='L86'></a><a href='#L86'>86</a>
+<a name='L87'></a><a href='#L87'>87</a>
+<a name='L88'></a><a href='#L88'>88</a>
+<a name='L89'></a><a href='#L89'>89</a>
+<a name='L90'></a><a href='#L90'>90</a>
+<a name='L91'></a><a href='#L91'>91</a>
+<a name='L92'></a><a href='#L92'>92</a>
+<a name='L93'></a><a href='#L93'>93</a>
+<a name='L94'></a><a href='#L94'>94</a>
+<a name='L95'></a><a href='#L95'>95</a>
+<a name='L96'></a><a href='#L96'>96</a>
+<a name='L97'></a><a href='#L97'>97</a>
+<a name='L98'></a><a href='#L98'>98</a>
+<a name='L99'></a><a href='#L99'>99</a>
+<a name='L100'></a><a href='#L100'>100</a>
+<a name='L101'></a><a href='#L101'>101</a>
+<a name='L102'></a><a href='#L102'>102</a>
+<a name='L103'></a><a href='#L103'>103</a>
+<a name='L104'></a><a href='#L104'>104</a>
+<a name='L105'></a><a href='#L105'>105</a>
+<a name='L106'></a><a href='#L106'>106</a>
+<a name='L107'></a><a href='#L107'>107</a>
+<a name='L108'></a><a href='#L108'>108</a>
+<a name='L109'></a><a href='#L109'>109</a>
+<a name='L110'></a><a href='#L110'>110</a>
+<a name='L111'></a><a href='#L111'>111</a>
+<a name='L112'></a><a href='#L112'>112</a>
+<a name='L113'></a><a href='#L113'>113</a>
+<a name='L114'></a><a href='#L114'>114</a>
+<a name='L115'></a><a href='#L115'>115</a>
+<a name='L116'></a><a href='#L116'>116</a>
+<a name='L117'></a><a href='#L117'>117</a>
+<a name='L118'></a><a href='#L118'>118</a>
+<a name='L119'></a><a href='#L119'>119</a>
+<a name='L120'></a><a href='#L120'>120</a>
+<a name='L121'></a><a href='#L121'>121</a>
+<a name='L122'></a><a href='#L122'>122</a>
+<a name='L123'></a><a href='#L123'>123</a>
+<a name='L124'></a><a href='#L124'>124</a>
+<a name='L125'></a><a href='#L125'>125</a>
+<a name='L126'></a><a href='#L126'>126</a>
+<a name='L127'></a><a href='#L127'>127</a>
+<a name='L128'></a><a href='#L128'>128</a>
+<a name='L129'></a><a href='#L129'>129</a>
+<a name='L130'></a><a href='#L130'>130</a>
+<a name='L131'></a><a href='#L131'>131</a>
+<a name='L132'></a><a href='#L132'>132</a>
+<a name='L133'></a><a href='#L133'>133</a>
+<a name='L134'></a><a href='#L134'>134</a>
+<a name='L135'></a><a href='#L135'>135</a></td><td class="line-coverage quiet"><span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js"><span class="cstat-no" title="statement not covered" >import { type MigrationInterface, type QueryRunner } from "typeorm";<span class="fstat-no" title="function not covered" ><span class="branch-0 cbranch-no" title="branch not covered" ></span></span></span>
+&nbsp;
+<span class="cstat-no" title="statement not covered" >export class InitialSchema1780058846655 implements MigrationInterface {</span>
+<span class="cstat-no" title="statement not covered" >    name = 'InitialSchema1780058846655'</span>
+&nbsp;
+<span class="cstat-no" title="statement not covered" >    public async up(queryRunner: QueryRunner): Promise&lt;void&gt; {</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`CREATE TABLE "iam_users" ("id" character varying(26) NOT NULL, "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), "clerkUserId" character varying(255) NOT NULL, "email" character varying(255) NOT NULL, "fullName" character varying(255), "deletedAt" TIMESTAMP WITH TIME ZONE, "isActive" boolean NOT NULL DEFAULT true, CONSTRAINT "PK_02086c69f80fed8ae319ec498ec" PRIMARY KEY ("id"))`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`CREATE UNIQUE INDEX "IDX_33b21bb98119691bbb789d8010" ON "iam_users" ("clerkUserId") `);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`CREATE TABLE "iam_settings" ("userId" character varying(26) NOT NULL, "density" character varying(20) NOT NULL DEFAULT 'BALANCED', "locale" character varying(10) NOT NULL DEFAULT 'en-US', "timezone" character varying(50) NOT NULL DEFAULT 'UTC', CONSTRAINT "PK_837562e7d61042e8579f1af3dcb" PRIMARY KEY ("userId"))`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`CREATE TABLE "profile_resume_sources" ("id" character varying(26) NOT NULL, "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), "userId" character varying(26) NOT NULL, "filename" character varying(255) NOT NULL, "contentType" character varying(50) NOT NULL, "blobUri" text NOT NULL, "parseStatus" character varying(20) NOT NULL DEFAULT 'PENDING', "parseError" text, "uploadedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), CONSTRAINT "PK_f3847c4774392e1aca1e5c4f91e" PRIMARY KEY ("id"))`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`CREATE INDEX "IDX_4a3f37c03702fe667ef1db0c17" ON "profile_resume_sources" ("userId") `);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`CREATE TABLE "profile_profiles" ("userId" character varying(26) NOT NULL, "basicInfo" jsonb, "certifications" jsonb, "lastResumeUploadedAt" TIMESTAMP WITH TIME ZONE, "etag" character varying(64), "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), CONSTRAINT "PK_513a121235a77e86cf5137ee663" PRIMARY KEY ("userId"))`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`CREATE TABLE "profile_education" ("id" character varying(26) NOT NULL, "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), "userId" character varying(26) NOT NULL, "school" character varying(255) NOT NULL, "degree" character varying(100), "major" character varying(100), "start" character varying(7), "end" character varying(7), "gpa" character varying(10), "highlights" jsonb, CONSTRAINT "PK_4ee5074ee613d1e0ff7d1750bae" PRIMARY KEY ("id"))`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`CREATE INDEX "IDX_5296a32174641c1db380b0c7ee" ON "profile_education" ("userId") `);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`CREATE TABLE "profile_work_experiences" ("id" character varying(26) NOT NULL, "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), "userId" character varying(26) NOT NULL, "company" character varying(255) NOT NULL, "title" character varying(255) NOT NULL, "location" character varying(255), "start" character varying(7), "end" character varying(7), "bullets" jsonb, "linkedMaterialIds" jsonb, CONSTRAINT "PK_54cac1aae1de0b9e1322d327dcb" PRIMARY KEY ("id"))`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`CREATE INDEX "IDX_88dcee4e8d89ebe3888fb01d6b" ON "profile_work_experiences" ("userId") `);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`CREATE TABLE "profile_projects" ("id" character varying(26) NOT NULL, "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), "userId" character varying(26) NOT NULL, "name" character varying(255) NOT NULL, "description" text, "start" character varying(7), "end" character varying(7), "linkedMaterialIds" jsonb, CONSTRAINT "PK_d3149ffc17c374c007ccc7fafba" PRIMARY KEY ("id"))`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`CREATE INDEX "IDX_4c1f5bf73dd1dfc2fb9675ecf7" ON "profile_projects" ("userId") `);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`CREATE TABLE "profile_skills" ("id" character varying(26) NOT NULL, "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), "userId" character varying(26) NOT NULL, "name" character varying(100) NOT NULL, "kind" character varying(20) NOT NULL, CONSTRAINT "PK_9347b76dd1aff0f0285dbba7f79" PRIMARY KEY ("id"))`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`CREATE INDEX "IDX_19915e8836ec8438a154a7215a" ON "profile_skills" ("userId") `);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`CREATE TABLE "profile_materials" ("id" character varying(26) NOT NULL, "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), "userId" character varying(26) NOT NULL, "rawText" bytea, "shiningText" text, "rationale" text, "tags" jsonb, "quant" jsonb, "provenanceKind" character varying(20) NOT NULL, "provenanceData" jsonb, "status" character varying(20) NOT NULL DEFAULT 'PROPOSED', "linkedExperienceId" character varying(26), "embedding" jsonb, CONSTRAINT "PK_54ba85d6c64a412590bae6bb061" PRIMARY KEY ("id"))`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`CREATE INDEX "IDX_a30f796d2af3e1082915a9cc91" ON "profile_materials" ("userId") `);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`CREATE TABLE "profile_base_resumes" ("id" character varying(26) NOT NULL, "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), "userId" character varying(26) NOT NULL, "name" character varying(100) NOT NULL DEFAULT 'Default', "selectedMaterialIds" jsonb, "isDefault" boolean NOT NULL DEFAULT true, CONSTRAINT "PK_69fb6b68d5f0af61317de1508f7" PRIMARY KEY ("id"))`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`CREATE INDEX "IDX_b19bd7b032d8b7f1742c1c4e49" ON "profile_base_resumes" ("userId") `);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`CREATE TABLE "jobs_captures" ("id" character varying(26) NOT NULL, "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), "userId" character varying(26) NOT NULL, "source" character varying(20) NOT NULL, "sourceUrl" text NOT NULL, "sourceJobId" character varying(100), "capturedHtml" text, "capturedText" text, "meta" jsonb, "capturedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), CONSTRAINT "PK_1d9c4b813cdd619e90271029b0e" PRIMARY KEY ("id"))`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`CREATE INDEX "IDX_1fba4258f3904a96522fe28c55" ON "jobs_captures" ("userId") `);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`CREATE TABLE "jobs_parsed_jds" ("id" character varying(26) NOT NULL, "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), "captureId" character varying(26) NOT NULL, "title" character varying(255), "company" character varying(255), "location" character varying(255), "hardSkills" jsonb, "softSkills" jsonb, "experience" jsonb, "educationRequired" jsonb, "hiddenSignals" jsonb, "niceToHave" jsonb, "buzzwordTranslation" text, "parsedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), "jdEmbedding" jsonb, CONSTRAINT "PK_03758b01c894f22348fb1a6abf0" PRIMARY KEY ("id"))`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`CREATE INDEX "IDX_feb810b64cc6262bc5c38195be" ON "jobs_parsed_jds" ("captureId") `);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`CREATE TABLE "jobs_company_briefs" ("id" character varying(26) NOT NULL, "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), "company" character varying(255) NOT NULL, "whatTheyDo" text, "sizeStage" character varying(100), "recentNews" jsonb, "risks" jsonb, "glassdoorRating" double precision, "generatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), "ttlExpires" TIMESTAMP WITH TIME ZONE, CONSTRAINT "PK_2beb09a50858c66a256afa801fd" PRIMARY KEY ("id"))`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`CREATE UNIQUE INDEX "IDX_cc34ae7af8c63f31537a77aa0c" ON "jobs_company_briefs" ("company") `);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`CREATE TABLE "jobs_match_results" ("id" character varying(26) NOT NULL, "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), "parsedJdId" character varying(26) NOT NULL, "userId" character varying(26) NOT NULL, "surfaceScore" double precision, "deepScore" double precision, "gaps" jsonb, "hitsSurface" jsonb, "hitsDeep" jsonb, "overallAdvice" character varying(50), "adviceRationale" text, CONSTRAINT "PK_1c7111ca6c84a7e352bc6460a8c" PRIMARY KEY ("id"))`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`CREATE INDEX "IDX_3a002fcb4efba17b2ff5939c8a" ON "jobs_match_results" ("parsedJdId") `);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`CREATE INDEX "IDX_122b60c5adfa76a2fa0141be14" ON "jobs_match_results" ("userId") `);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`CREATE TABLE "jobs_radar_items" ("id" character varying(26) NOT NULL, "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), "userId" character varying(26) NOT NULL, "captureId" character varying(26), "parsedJdId" character varying(26), "matchId" character varying(26), "resumeSnapshotId" character varying(26), "status" character varying(30) NOT NULL DEFAULT 'BROWSED', "lastStatusAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), "userDecisionNote" text, CONSTRAINT "PK_b29f4bf2c8cd33bf01c5fffe786" PRIMARY KEY ("id"))`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`CREATE INDEX "IDX_e7ada921df8d0c0073267e6643" ON "jobs_radar_items" ("userId") `);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`CREATE TABLE "conv_conversations" ("id" character varying(26) NOT NULL, "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), "userId" character varying(26) NOT NULL, "kind" character varying(30) NOT NULL, "anchorId" character varying(26), "effectiveDensity" character varying(20) NOT NULL DEFAULT 'BALANCED', "lastActivity" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), "rollingSummary" text, "importantQuotes" jsonb, CONSTRAINT "PK_9a403e6f7f462d39761dbb193e9" PRIMARY KEY ("id"))`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`CREATE INDEX "IDX_1b00eb53aa1ed823bb9dc2fe95" ON "conv_conversations" ("userId") `);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`CREATE TABLE "conv_messages" ("id" character varying(26) NOT NULL, "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), "conversationId" character varying(26) NOT NULL, "role" character varying(20) NOT NULL, "text" text, "toolCalls" jsonb, "toolResult" jsonb, "tokenPrompt" integer, "tokenCompletion" integer, "tokenModel" character varying(50), "tokenCostUsd" double precision, "finishReason" character varying(20), "meta" jsonb, CONSTRAINT "PK_e92ff8a22164eef499dc4496aa9" PRIMARY KEY ("id"))`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`CREATE INDEX "IDX_57617cae4ce2e769ae633e89fa" ON "conv_messages" ("conversationId") `);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`CREATE TABLE "tailoring_resumes" ("id" character varying(26) NOT NULL, "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), "userId" character varying(26) NOT NULL, "baseResumeId" character varying(26) NOT NULL, "parsedJdId" character varying(26) NOT NULL, "sections" jsonb, "matchBefore" double precision, "matchAfter" double precision, CONSTRAINT "PK_eca5c946410626de850440abf4b" PRIMARY KEY ("id"))`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`CREATE INDEX "IDX_cf1a053e04a0acc15fc6256b47" ON "tailoring_resumes" ("userId") `);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`CREATE TABLE "tailoring_snapshots" ("id" character varying(26) NOT NULL, "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), "tailoredResumeId" character varying(26) NOT NULL, "blobUriPdf" text, "plainText" text, "frozenAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), CONSTRAINT "PK_46aaa492355ac1ef31938f96753" PRIMARY KEY ("id"))`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`CREATE INDEX "IDX_8f35fe30c138aa67526e626997" ON "tailoring_snapshots" ("tailoredResumeId") `);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`CREATE TABLE "apply_fill_plans" ("id" character varying(26) NOT NULL, "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), "radarItemId" character varying(26) NOT NULL, "userId" character varying(26) NOT NULL, "fields" jsonb, "previewSummary" character varying(2000), "userApproved" boolean NOT NULL DEFAULT false, "approvedAt" TIMESTAMP WITH TIME ZONE, CONSTRAINT "PK_4a3f1f599b45c642bfc96c47162" PRIMARY KEY ("id"))`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`CREATE INDEX "IDX_f2baa1916de9f9b4cc8fdee33e" ON "apply_fill_plans" ("userId") `);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`CREATE TABLE "apply_applications" ("id" character varying(26) NOT NULL, "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), "userId" character varying(26) NOT NULL, "radarItemId" character varying(26) NOT NULL, "resumeSnapshotId" character varying(26), "submittedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), CONSTRAINT "PK_31e27c9160641d82686f661deec" PRIMARY KEY ("id"))`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`CREATE INDEX "IDX_9283cf43582e6ae86d560a2ae6" ON "apply_applications" ("userId") `);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`CREATE TABLE "followup_emails" ("id" character varying(26) NOT NULL, "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), "userId" character varying(26) NOT NULL, "source" character varying(20) NOT NULL DEFAULT 'gmail-web', "subject" character varying(500), "fromAddr" character varying(255), "bodyText" bytea, "kind" character varying(30), "parsed" jsonb, "radarItemId" character varying(26), "receivedAt" TIMESTAMP WITH TIME ZONE, CONSTRAINT "PK_3a02419e4e21acd4b0a04b70f49" PRIMARY KEY ("id"))`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`CREATE INDEX "IDX_dcf9f24db17376bd7bc574e8d2" ON "followup_emails" ("userId") `);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`CREATE TABLE "followup_drafts" ("id" character varying(26) NOT NULL, "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), "emailId" character varying(26) NOT NULL, "userId" character varying(26) NOT NULL, "text" text, "intent" character varying(50), CONSTRAINT "PK_9ca515891639f6bc772ea8e3f57" PRIMARY KEY ("id"))`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`CREATE INDEX "IDX_cd1cd1ecebd998938029383c14" ON "followup_drafts" ("emailId") `);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`CREATE TABLE "billing_subscriptions" ("id" character varying(26) NOT NULL, "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), "userId" character varying(26) NOT NULL, "tier" character varying(20) NOT NULL DEFAULT 'FREE', "state" character varying(20) NOT NULL DEFAULT 'ACTIVE', "stripeCustomerId" character varying(255), "stripeSubscriptionId" character varying(255), "periodEnd" TIMESTAMP WITH TIME ZONE, "pausedReason" character varying(50), "lastEventId" character varying(255), "lastEventAt" TIMESTAMP WITH TIME ZONE, CONSTRAINT "PK_da12bd094f95ed1a9ad21b0b2df" PRIMARY KEY ("id"))`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`CREATE INDEX "IDX_59e19bfbcc389793e1beee1b84" ON "billing_subscriptions" ("userId") `);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`CREATE UNIQUE INDEX "IDX_44a362181c5bdbc13fbc16a4df" ON "billing_subscriptions" ("stripeSubscriptionId") `);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`CREATE TABLE "quota_usage_counters" ("userId" character varying(26) NOT NULL, "tailoringCompleted" integer NOT NULL DEFAULT '0', "tailoringLimit" integer NOT NULL DEFAULT '3', "windowStart" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), CONSTRAINT "PK_a07a690aad6023e5705b5a5f4f0" PRIMARY KEY ("userId"))`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`CREATE TABLE "quota_consume_log" ("id" character varying(26) NOT NULL, "userId" character varying(26) NOT NULL, "tailoredResumeId" character varying(26) NOT NULL, "consumedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), CONSTRAINT "PK_e267746ccd8c5c698be4b87d16a" PRIMARY KEY ("id"))`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`CREATE INDEX "IDX_55777e3d6da149ce8eddf7c1ff" ON "quota_consume_log" ("userId") `);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`CREATE UNIQUE INDEX "IDX_d98e7e3796b2016351ceea6013" ON "quota_consume_log" ("tailoredResumeId") `);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`CREATE TABLE "reco_recommendations" ("id" character varying(26) NOT NULL, "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), "userId" character varying(26) NOT NULL, "items" jsonb, "sentAt" TIMESTAMP WITH TIME ZONE, "feedback" jsonb, CONSTRAINT "PK_2e76d648b6aeea78f5788f2a846" PRIMARY KEY ("id"))`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`CREATE INDEX "IDX_aa652bfba5639fbf8be0385865" ON "reco_recommendations" ("userId") `);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`CREATE TABLE "telemetry_events" ("id" character varying(26) NOT NULL, "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), "eventType" character varying(100) NOT NULL, "userId" character varying(26), "payload" jsonb, CONSTRAINT "PK_17996ee1fa9a5ce42e7ffaa8c68" PRIMARY KEY ("id"))`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`CREATE INDEX "IDX_7f2c13bde4aec24fa23351c012" ON "telemetry_events" ("userId") `);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`CREATE TABLE "outbox_events" ("id" character varying(26) NOT NULL, "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), "eventType" character varying(100) NOT NULL, "payload" jsonb, "consumerGroup" character varying(50) NOT NULL, "dispatchedAt" TIMESTAMP WITH TIME ZONE, CONSTRAINT "PK_6689a16c00d09b8089f6237f1d2" PRIMARY KEY ("id"))`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`CREATE INDEX "IDX_40309f788055cd517e68f22958" ON "outbox_events" ("consumerGroup") `);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`CREATE TABLE "idempotency_keys" ("id" character varying(26) NOT NULL, "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), "userId" character varying(26) NOT NULL, "key" character varying(255) NOT NULL, "statusCode" integer NOT NULL, "responseBody" jsonb, "expiresAt" TIMESTAMP WITH TIME ZONE NOT NULL, CONSTRAINT "PK_8ad20779ad0411107a56e53d0f6" PRIMARY KEY ("id"))`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`CREATE INDEX "IDX_7a3aaa526470ebb79221693d32" ON "idempotency_keys" ("userId") `);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`CREATE UNIQUE INDEX "IDX_0afd83cbf08c9d12089a9bffc5" ON "idempotency_keys" ("key") `);</span>
+<span class="cstat-no" title="statement not covered" >    }</span>
+&nbsp;
+<span class="cstat-no" title="statement not covered" >    public async down(queryRunner: QueryRunner): Promise&lt;void&gt; {</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`DROP INDEX "public"."IDX_0afd83cbf08c9d12089a9bffc5"`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`DROP INDEX "public"."IDX_7a3aaa526470ebb79221693d32"`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`DROP TABLE "idempotency_keys"`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`DROP INDEX "public"."IDX_40309f788055cd517e68f22958"`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`DROP TABLE "outbox_events"`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`DROP INDEX "public"."IDX_7f2c13bde4aec24fa23351c012"`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`DROP TABLE "telemetry_events"`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`DROP INDEX "public"."IDX_aa652bfba5639fbf8be0385865"`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`DROP TABLE "reco_recommendations"`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`DROP INDEX "public"."IDX_d98e7e3796b2016351ceea6013"`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`DROP INDEX "public"."IDX_55777e3d6da149ce8eddf7c1ff"`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`DROP TABLE "quota_consume_log"`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`DROP TABLE "quota_usage_counters"`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`DROP INDEX "public"."IDX_44a362181c5bdbc13fbc16a4df"`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`DROP INDEX "public"."IDX_59e19bfbcc389793e1beee1b84"`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`DROP TABLE "billing_subscriptions"`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`DROP INDEX "public"."IDX_cd1cd1ecebd998938029383c14"`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`DROP TABLE "followup_drafts"`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`DROP INDEX "public"."IDX_dcf9f24db17376bd7bc574e8d2"`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`DROP TABLE "followup_emails"`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`DROP INDEX "public"."IDX_9283cf43582e6ae86d560a2ae6"`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`DROP TABLE "apply_applications"`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`DROP INDEX "public"."IDX_f2baa1916de9f9b4cc8fdee33e"`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`DROP TABLE "apply_fill_plans"`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`DROP INDEX "public"."IDX_8f35fe30c138aa67526e626997"`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`DROP TABLE "tailoring_snapshots"`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`DROP INDEX "public"."IDX_cf1a053e04a0acc15fc6256b47"`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`DROP TABLE "tailoring_resumes"`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`DROP INDEX "public"."IDX_57617cae4ce2e769ae633e89fa"`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`DROP TABLE "conv_messages"`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`DROP INDEX "public"."IDX_1b00eb53aa1ed823bb9dc2fe95"`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`DROP TABLE "conv_conversations"`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`DROP INDEX "public"."IDX_e7ada921df8d0c0073267e6643"`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`DROP TABLE "jobs_radar_items"`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`DROP INDEX "public"."IDX_122b60c5adfa76a2fa0141be14"`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`DROP INDEX "public"."IDX_3a002fcb4efba17b2ff5939c8a"`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`DROP TABLE "jobs_match_results"`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`DROP INDEX "public"."IDX_cc34ae7af8c63f31537a77aa0c"`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`DROP TABLE "jobs_company_briefs"`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`DROP INDEX "public"."IDX_feb810b64cc6262bc5c38195be"`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`DROP TABLE "jobs_parsed_jds"`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`DROP INDEX "public"."IDX_1fba4258f3904a96522fe28c55"`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`DROP TABLE "jobs_captures"`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`DROP INDEX "public"."IDX_b19bd7b032d8b7f1742c1c4e49"`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`DROP TABLE "profile_base_resumes"`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`DROP INDEX "public"."IDX_a30f796d2af3e1082915a9cc91"`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`DROP TABLE "profile_materials"`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`DROP INDEX "public"."IDX_19915e8836ec8438a154a7215a"`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`DROP TABLE "profile_skills"`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`DROP INDEX "public"."IDX_4c1f5bf73dd1dfc2fb9675ecf7"`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`DROP TABLE "profile_projects"`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`DROP INDEX "public"."IDX_88dcee4e8d89ebe3888fb01d6b"`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`DROP TABLE "profile_work_experiences"`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`DROP INDEX "public"."IDX_5296a32174641c1db380b0c7ee"`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`DROP TABLE "profile_education"`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`DROP TABLE "profile_profiles"`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`DROP INDEX "public"."IDX_4a3f37c03702fe667ef1db0c17"`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`DROP TABLE "profile_resume_sources"`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`DROP TABLE "iam_settings"`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`DROP INDEX "public"."IDX_33b21bb98119691bbb789d8010"`);</span>
+<span class="cstat-no" title="statement not covered" >        await queryRunner.query(`DROP TABLE "iam_users"`);</span>
+<span class="cstat-no" title="statement not covered" >    }</span>
+&nbsp;
+<span class="cstat-no" title="statement not covered" >}</span>
+&nbsp;</pre></td></tr></table></pre>
+
+                <div class='push'></div><!-- for sticky footer -->
+            </div><!-- /wrapper -->
+            <div class='footer quiet pad2 space-top1 center small'>
+                Code coverage generated by
+                <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
+                at 2026-06-05T03:01:39.806Z
+            </div>
+        <script src="../../../prettify.js"></script>
+        <script>
+            window.onload = function () {
+                prettyPrint();
+            };
+        </script>
+        <script src="../../../sorter.js"></script>
+        <script src="../../../block-navigation.js"></script>
+    </body>
+</html>
+    

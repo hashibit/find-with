@@ -14,6 +14,7 @@ import {
   injectAuthToken,
   getSidePanelPage,
   apiCall,
+  getMockClerkToken,
   E2E_USER_ID,
   SIDEPANEL_URL,
 } from '../helpers/sidepanel.js';
@@ -55,12 +56,13 @@ test.describe('J-06: Offer Farewell', () => {
 
     // Send the farewell message via SSE prompt endpoint (GET with query param)
     const fareMsg = encodeURIComponent('I accepted the offer at Stripe');
+    const token = await getMockClerkToken(E2E_USER_ID);
     const promptRes = await fetch(
-      `http://localhost:14607/api/v1/conversations/${convId}/prompt?message=${fareMsg}`,
+      `http://localhost:14807/api/v1/conversations/${convId}/prompt?message=${fareMsg}`,
       {
         method: 'GET',
         headers: {
-          Authorization: `Bearer ${E2E_USER_ID}`,
+          Authorization: `Bearer ${token}`,
           Accept: 'text/event-stream',
         },
       },

@@ -1,3 +1,5 @@
+name: findwith-e2e
+
 services:
   postgres:
     image: pgvector/pgvector:pg15
@@ -5,12 +7,13 @@ services:
       POSTGRES_USER: e2e
       POSTGRES_PASSWORD: e2e
       POSTGRES_DB: findwith_e2e
+      PGPORT: "14800"
     ports:
-      - "14600:5432"
+      - "14800:14800"
     volumes:
       - ./infra/init-test-db.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U e2e -d findwith_e2e"]
+      test: ["CMD-SHELL", "pg_isready -p 14800 -U e2e -d findwith_e2e"]
       interval: 3s
       timeout: 5s
       retries: 10
@@ -18,24 +21,25 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "14601:6379"
+      - "14801:14801"
+    command: redis-server --port 14801 --save "" --appendonly no
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-p", "14801", "ping"]
       interval: 3s
       timeout: 3s
       retries: 10
 
   minio:
     image: minio/minio
-    command: server /data --console-address ":9001"
+    command: server /data --address ":14802" --console-address ":14803"
     environment:
       MINIO_ROOT_USER: e2ekey
       MINIO_ROOT_PASSWORD: e2esecret
     ports:
-      - "14602:9000"
-      - "14603:9001"
+      - "14802:14802"
+      - "14803:14803"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      test: ["CMD", "curl", "-f", "http://localhost:14802/minio/health/live"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -47,25 +51,30 @@ services:
         condition: service_healthy
     entrypoint: >
       /bin/sh -c "
-        mc alias set local http://minio:9000 e2ekey e2esecret &&
+        mc alias set local http://minio:14802 e2ekey e2esecret &&
         mc mb --ignore-existing local/findwith-test
       "
 
   mailpit:
     image: axllent/mailpit
+    environment:
+      MP_SMTP_BIND_ADDR: '0.0.0.0:14804'
+      MP_UI_BIND_ADDR: '0.0.0.0:14805'
     ports:
-      - "14604:1025"
-      - "14605:8025"
+      - "14804:14804"
+      - "14805:14805"
 
   mock-dom:
     build:
       context: ./mocks/dom
     volumes:
       - ./e2e/fixtures/dom:/app/fixtures:ro
+    environment:
+      PORT: "14808"
     ports:
-      - "14800:14800"
+      - "14808:14808"
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:14800/health"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:14808/health"]
       interval: 3s
       timeout: 3s
       retries: 5
@@ -76,13 +85,13 @@ services:
     environment:
       LLM_RECORD: "${LLM_RECORD:-false}"
       OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
-      PORT: "11435"
+      PORT: "14809"
     ports:
-      - "14801:11435"
+      - "14809:14809"
     volumes:
       - ./e2e/fixtures/llm:/app/fixtures
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:11435/health"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:14809/health"]
       interval: 3s
       timeout: 3s
       retries: 10
@@ -90,10 +99,12 @@ services:
   mock-stripe:
     build:
       context: ./mocks/stripe
+    environment:
+      PORT: "14810"
     ports:
-      - "14802:14802"
+      - "14810:14810"
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:14802/health"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:14810/health"]
       interval: 3s
       timeout: 3s
       retries: 5
@@ -101,10 +112,12 @@ services:
   mock-clerk:
     build:
       context: ./mocks/clerk
+    environment:
+      PORT: "14811"
     ports:
-      - "14803:14803"
+      - "14811:14811"
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:14803/health"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:14811/health"]
       interval: 3s
       timeout: 3s
       retries: 5

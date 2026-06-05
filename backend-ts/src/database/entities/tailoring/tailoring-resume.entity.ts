@@ -13,9 +13,6 @@ export class TailoringResume extends BaseEntity {
   @Column({ type: 'varchar', length: 26 })
   parsedJdId: string;
 
-  @Column({ type: 'jsonb', nullable: true })
-  sections: unknown[] | null;
-
   @Column({ type: 'float', nullable: true })
   matchBefore: number | null;
 

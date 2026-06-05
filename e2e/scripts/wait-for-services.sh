@@ -22,10 +22,12 @@ wait_for() {
   echo "  $name is ready"
 }
 
-wait_for "PostgreSQL (e2e)"  "pg_isready -h localhost -p 5434 -U e2e -d findwith_e2e"
-wait_for "Redis (e2e)"       "redis-cli -p 6381 ping | grep -q PONG"
-wait_for "MinIO"             "curl -sf http://localhost:9000/minio/health/live"
-wait_for "LLM mock server"   "curl -sf http://localhost:11435/health"
-wait_for "DOM fixtures"      "curl -sf http://localhost:8081/"
+wait_for "PostgreSQL (e2e)"  "pg_isready -h localhost -p 14800 -U e2e -d findwith_e2e"
+wait_for "Redis (e2e)"       "redis-cli -p 14801 ping | grep -q PONG"
+wait_for "MinIO (e2e)"       "curl -sf http://localhost:14802/minio/health/live"
+wait_for "Mock DOM"          "curl -sf http://localhost:14808/health"
+wait_for "Mock LLM"          "curl -sf http://localhost:14809/health"
+wait_for "Mock Stripe"       "curl -sf http://localhost:14810/health"
+wait_for "Mock Clerk"        "curl -sf http://localhost:14811/health"
 
 echo "All e2e services are ready."

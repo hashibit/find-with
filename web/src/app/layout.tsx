@@ -1,4 +1,4 @@
-import { ClerkProvider } from '@clerk/nextjs';
+import { AuthProvider } from '@/lib/auth';
 import './globals.css';
 
 export const metadata = {
@@ -8,10 +8,10 @@ export const metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <ClerkProvider>
+    <AuthProvider>
       <html lang="en">
         <body className="font-sans antialiased bg-white text-gray-900">{children}</body>
       </html>
-    </ClerkProvider>
+    </AuthProvider>
   );
 }

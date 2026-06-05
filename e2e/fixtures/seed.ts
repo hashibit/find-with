@@ -10,7 +10,7 @@
 import { Client } from 'pg';
 
 const DB_URL =
-  process.env.DATABASE_URL || 'postgresql://e2e:e2e@localhost:14600/findwith_e2e';
+  process.env.DATABASE_URL || 'postgresql://e2e:e2e@localhost:14800/findwith_e2e';
 
 const NOW = new Date().toISOString();
 const FUTURE = new Date(Date.now() + 30 * 86_400_000).toISOString();
@@ -109,7 +109,7 @@ export async function seed() {
         'capture-e2e-1',
         'e2e-user-1',
         'linkedin',
-        'http://localhost:14800/linkedin-job-senior-pm.html',
+        'http://localhost:14808/linkedin-job-senior-pm.html',
         'Senior Product Manager at Acme Corp — 5+ years PM experience, B2B SaaS...',
         $1, $1, $1
       )
@@ -182,6 +182,72 @@ export async function seed() {
 
     // Clear any consume-log entries from previous runs (UNIQUE on tailoredResumeId)
     await client.query(`DELETE FROM quota_consume_log WHERE "userId" = 'e2e-user-1'`);
+
+    // ── Recommendation for e2e-user-1 (needed for j08) ───────────────────────
+    await client.query(`
+      INSERT INTO reco_recommendations (id, "userId", items, "sentAt", "createdAt", "updatedAt")
+      VALUES (
+        'reco-e2e-1',
+        'e2e-user-1',
+        '[{"id":"item-1","title":"Senior PM at Stripe","company":"Stripe","location":"Remote","url":"https://linkedin.com/jobs/1","snippet":"5+ years PM","source":"linkedin"},{"id":"item-2","title":"Product Lead at Linear","company":"Linear","location":"SF","url":"https://linkedin.com/jobs/2","snippet":"B2B SaaS PM","source":"linkedin"}]'::jsonb,
+        NULL,
+        $1, $1
+      ) ON CONFLICT (id) DO NOTHING
+    `, [NOW]);
+
+    // ── Rejection email for e2e-user-1 (needed for j11) ──────────────────────
+    await client.query(`
+      INSERT INTO followup_emails (id, "userId", "radarItemId", subject, "fromAddr", kind, parsed, "createdAt", "updatedAt")
+      VALUES (
+        'email-rejection-1',
+        'e2e-user-1',
+        'job-1',
+        'Your application to DataCo',
+        'noreply@dataco.com',
+        'REJECTION',
+        '{"keyInfo":{},"summary":"Unfortunately not moving forward"}'::jsonb,
+        $1, $1
+      ) ON CONFLICT (id) DO NOTHING
+    `, [NOW]);
+
+    // ── Tailoring record with PENDING bullets for e2e-user-1 (needed for j10) ──
+    // Pre-seeded so j10 can test the PENDING-bullet export guard without racing the queue processor.
+    await client.query(`
+      INSERT INTO tailoring_resumes (id, "userId", "baseResumeId", "parsedJdId", "matchBefore", "matchAfter", "createdAt", "updatedAt")
+      VALUES (
+        'tailoring-pending-e2e-1',
+        'e2e-user-1',
+        'base-resume-e2e-1',
+        'pjd-e2e-1',
+        0.65,
+        NULL,
+        $1, $1
+      ) ON CONFLICT (id) DO NOTHING
+    `, [NOW]);
+    await client.query(`
+      INSERT INTO tailoring_bullets (id, "resumeId", "sectionTitle", position, text, source, "sourceId", status, "createdAt", "updatedAt")
+      VALUES (
+        'b-pending-e2e-1',
+        'tailoring-pending-e2e-1',
+        'Work Experience',
+        0,
+        '',
+        'MATERIAL',
+        NULL,
+        'PENDING',
+        $1, $1
+      ) ON CONFLICT (id) DO NOTHING
+    `, [NOW]);
+
+    // ── Free-tier quota at limit for e2e-user-free (needed for j07 billing test) ──
+    await client.query(`
+      INSERT INTO quota_usage_counters ("userId", "tailoringCompleted", "tailoringLimit", "windowStart")
+      VALUES ('e2e-user-free', 3, 3, $1)
+      ON CONFLICT ("userId") DO UPDATE
+        SET "tailoringCompleted" = 3,
+            "tailoringLimit"     = 3,
+            "windowStart"        = $1
+    `, [NOW]);
 
     console.log('[seed] E2E fixture data seeded successfully');
   } finally {

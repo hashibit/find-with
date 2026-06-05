@@ -10,6 +10,7 @@ import {
   injectAuthToken,
   getSidePanelPage,
   apiCall,
+  getMockClerkToken,
   E2E_USER_ID,
   BACKEND_URL,
 } from '../helpers/sidepanel.js';
@@ -18,7 +19,7 @@ async function getOrCreateAnalyzedItem(userId: string) {
   // Capture + parse a job to have an ANALYZED item ready
   const captureRes = await apiCall('POST', '/jobs/capture', {
     source: 'linkedin',
-    sourceUrl: 'http://localhost:14800/linkedin-job-senior-pm.html',
+    sourceUrl: 'http://localhost:14808/linkedin-job-senior-pm.html',
     capturedText: 'Senior Product Manager at Acme Corp — 5+ years PM experience',
   }, userId);
   const capture = await captureRes.json();
@@ -36,9 +37,10 @@ async function getBaseResumeId(userId: string): Promise<string> {
 }
 
 async function getParsedJdId(): Promise<string> {
-  // Use the seeded parsedJd
+  // Use the seeded parsedJd - get signed JWT for auth
+  const token = await getMockClerkToken(E2E_USER_ID);
   const res = await fetch(`${BACKEND_URL}/api/v1/jobs/capture-e2e-1`, {
-    headers: { Authorization: `Bearer ${E2E_USER_ID}` },
+    headers: { Authorization: `Bearer ${token}` },
   });
   if (res.ok) {
     const job = await res.json();

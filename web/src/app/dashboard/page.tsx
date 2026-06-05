@@ -1,10 +1,31 @@
-import { auth } from '@clerk/nextjs/server';
-import { redirect } from 'next/navigation';
-import Link from 'next/link';
+'use client';
 
-export default async function DashboardPage() {
-  const { userId } = auth();
-  if (!userId) redirect('/login');
+import { useAuth, SignedOut, UserButton } from '@/lib/auth';
+import Link from 'next/link';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+
+export default function DashboardPage() {
+  const { isLoaded, isSignedIn, userId } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (isLoaded && !isSignedIn) {
+      router.push('/login');
+    }
+  }, [isLoaded, isSignedIn, router]);
+
+  if (!isLoaded) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <p className="text-gray-500">Loading...</p>
+      </div>
+    );
+  }
+
+  if (!isSignedIn) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -19,6 +40,7 @@ export default async function DashboardPage() {
           <Link href="/pricing" className="text-brand-600 hover:text-brand-700 font-medium">
             Upgrade
           </Link>
+          <UserButton />
         </div>
       </nav>
 

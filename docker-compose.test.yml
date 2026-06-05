@@ -1,17 +1,20 @@
+name: findwith-test
+
 services:
   postgres-test:
     image: pgvector/pgvector:pg15
-    ports:
-      - '14700:5432'
     environment:
       POSTGRES_USER: findwith_test
       POSTGRES_PASSWORD: findwith_test
       POSTGRES_DB: findwith_test
+      PGPORT: "14700"
+    ports:
+      - '14700:14700'
     # No volume — ephemeral, wiped on down
     volumes:
       - ./infra/init-test-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U findwith_test']
+      test: ['CMD-SHELL', 'pg_isready -p 14700 -U findwith_test']
       interval: 5s
       timeout: 3s
       retries: 10
@@ -20,10 +23,71 @@ services:
   redis-test:
     image: redis:7-alpine
     ports:
-      - '14701:6379'
-    command: redis-server --save "" --appendonly no
+      - '14701:14701'
+    command: redis-server --port 14701 --save "" --appendonly no
     healthcheck:
-      test: ['CMD', 'redis-cli', 'ping']
+      test: ['CMD', 'redis-cli', '-p', '14701', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  minio-test:
+    image: minio/minio:latest
+    environment:
+      MINIO_ROOT_USER: findwith_test
+      MINIO_ROOT_PASSWORD: findwith_test
+    command: server /data --address ":14702" --console-address ":14703"
+    ports:
+      - '14702:14702'
+      - '14703:14703'
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:14702/minio/health/live']
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  minio-init-test:
+    image: minio/mc:latest
+    depends_on:
+      minio-test:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+        mc alias set local http://minio-test:14702 findwith_test findwith_test &&
+        mc mb --ignore-existing local/findwith-test
+      "
+
+  mailpit-test:
+    image: axllent/mailpit:latest
+    environment:
+      MP_SMTP_BIND_ADDR: '0.0.0.0:14704'
+      MP_UI_BIND_ADDR: '0.0.0.0:14705'
+    ports:
+      - '14704:14704'
+      - '14705:14705'
+
+  mock-stripe-test:
+    build:
+      context: ./mocks/stripe
+    environment:
+      PORT: '14710'
+    ports:
+      - '14710:14710'
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:14710/health']
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  mock-clerk-test:
+    build:
+      context: ./mocks/clerk
+    environment:
+      PORT: '14711'
+    ports:
+      - '14711:14711'
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:14711/health']
       interval: 5s
       timeout: 3s
       retries: 5

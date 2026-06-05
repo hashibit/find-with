@@ -76,5 +76,6 @@ docker-compose.override.yml
 .claude/state/tool-failure-counter.txt
 backend/.claude/
 .claude
+.ccbus
 .understand-anything
 .e2e-backend.pid

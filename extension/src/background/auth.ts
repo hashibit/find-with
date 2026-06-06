@@ -96,7 +96,7 @@ async function bootstrapDevSession(): Promise<void> {
     if (!signResp.ok) throw new Error(`mock-clerk /sign HTTP ${signResp.status}`);
     const { token: clerkJwt } = await signResp.json();
 
-    const verifyResp = await fetch(`${API_BASE}/v1/iam/auth/verify`, {
+    const verifyResp = await fetch(`${API_BASE}/api/v1/iam/auth/verify`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ clerkToken: clerkJwt }),

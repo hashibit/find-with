@@ -7,6 +7,9 @@ import { ProfileProfile } from '../../database/entities/profile/profile.entity.j
 import { ProfileMaterial } from '../../database/entities/profile/material.entity.js';
 import { ProfileBaseResume } from '../../database/entities/profile/base-resume.entity.js';
 import { ProfileResumeSource } from '../../database/entities/profile/resume-source.entity.js';
+import { ProfileWorkExperience } from '../../database/entities/profile/work-experience.entity.js';
+import { ProfileEducation } from '../../database/entities/profile/education.entity.js';
+import { ProfileSkill } from '../../database/entities/profile/skill.entity.js';
 import { FIELD_CRYPTO, type FieldCrypto } from '../../common/crypto/crypto.interface.js';
 import { Inject } from '@nestjs/common';
 import { ulid } from 'ulid';
@@ -27,6 +30,12 @@ export class ProfileService {
     private readonly baseResumeRepo: Repository<ProfileBaseResume>,
     @InjectRepository(ProfileResumeSource)
     private readonly resumeSourceRepo: Repository<ProfileResumeSource>,
+    @InjectRepository(ProfileWorkExperience)
+    private readonly workExpRepo: Repository<ProfileWorkExperience>,
+    @InjectRepository(ProfileEducation)
+    private readonly educationRepo: Repository<ProfileEducation>,
+    @InjectRepository(ProfileSkill)
+    private readonly skillRepo: Repository<ProfileSkill>,
     @Inject(FIELD_CRYPTO) private readonly crypto: FieldCrypto,
     @InjectQueue(RESUME_PARSE_QUEUE) private readonly parseQueue: Queue,
   ) {}
@@ -51,7 +60,15 @@ export class ProfileService {
   }
 
   async getProfile(userId: string): Promise<ProfileProfile | null> {
-    return this.profileRepo.findOne({ where: { userId } });
+    const profile = await this.profileRepo.findOne({ where: { userId } });
+    if (!profile) return null;
+
+    // Fetch related entities separately (no join defined in entity)
+    const workExperience = await this.workExpRepo.find({ where: { userId }, order: { createdAt: 'DESC' } });
+    const education = await this.educationRepo.find({ where: { userId }, order: { createdAt: 'DESC' } });
+    const skills = await this.skillRepo.find({ where: { userId }, order: { createdAt: 'DESC' } });
+
+    return { ...profile, workExperience, education, skills };
   }
 
   async upsertProfile(

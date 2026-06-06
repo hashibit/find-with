@@ -5,19 +5,29 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import { type Request } from 'express';
 import { AUTH_VERIFIER, type AuthVerifier } from '../../adapters/auth/auth.interface.js';
 import { RedisService } from '../../redis/redis.module.js';
+import { IS_PUBLIC_KEY } from '../decorators/public.decorator.js';
 
 @Injectable()
 export class UserAuthGuard implements CanActivate {
   constructor(
     @Inject(AUTH_VERIFIER) private readonly verifier: AuthVerifier,
     private readonly redisService: RedisService,
+    private readonly reflector: Reflector,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<Request & { user?: unknown }>();
+
+    // Check if route is marked as public via @Public() decorator
+    const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+    if (isPublic) return true;
 
     // Admin routes (/admin/*) are protected by AdminGuard (X-Admin-Secret header).
     // The global JWT guard does not apply — skip and let AdminGuard handle it.

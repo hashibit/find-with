@@ -5,6 +5,7 @@ import { type Response } from 'express';
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 import { CurrentUser, type AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
+import { Public } from '../../common/decorators/public.decorator.js';
 import { IamService } from './iam.service.js';
 import { AUTH_VERIFIER, type AuthVerifier } from '../../adapters/auth/auth.interface.js';
 import { NonceStore } from './services/nonce.store.js';
@@ -101,6 +102,7 @@ export class IamController {
     return this.service.updateSettings(iamUser.id, dto);
   }
 
+  @Public()
   @Post('auth/exchange')
   @ApiOperation({ summary: 'Exchange nonce for session token (U-03 OAuth flow)' })
   async authExchange(@Body() dto: AuthExchangeDto): Promise<AuthExchangeResponse> {
@@ -151,6 +153,7 @@ export class IamController {
     return { ok: true };
   }
 
+  @Public()
   @Post('auth/verify')
   @ApiOperation({ summary: 'Verify Clerk JWT and issue extension session token' })
   async authVerify(@Body() dto: AuthVerifyDto): Promise<AuthVerifyResponse> {

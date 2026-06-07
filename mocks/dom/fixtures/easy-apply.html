@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Easy Apply - Stripe | LinkedIn</title>
+</head>
+<body>
+  <div class="jobs-easy-apply-modal" role="dialog" aria-label="Apply to Stripe">
+    <h2>Apply to Stripe — Senior Product Manager</h2>
+    <form>
+      <div>
+        <label for="phone">Phone number *</label>
+        <input id="phone" name="phoneNumber" type="tel" required />
+      </div>
+      <div>
+        <label for="location">Current location *</label>
+        <input id="location" name="location" type="text" required />
+      </div>
+      <div>
+        <label for="years-exp">Years of experience *</label>
+        <select id="years-exp" name="yearsExperience" required>
+          <option value="">Select</option>
+          <option value="3-5">3-5 years</option>
+          <option value="5-10">5-10 years</option>
+          <option value="10+">10+ years</option>
+        </select>
+      </div>
+      <div>
+        <label for="cover-letter">Why are you interested in this role?</label>
+        <textarea id="cover-letter" name="coverLetter" rows="4"></textarea>
+      </div>
+      <div>
+        <label for="salary">Desired salary</label>
+        <input id="salary" name="desiredSalary" type="text" />
+      </div>
+      <button type="submit">Submit application</button>
+    </form>
+  </div>
+</body>
+</html>

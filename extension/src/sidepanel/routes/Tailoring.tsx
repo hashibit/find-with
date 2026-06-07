@@ -47,9 +47,14 @@ export function Tailoring() {
     const jobLabel = tailoring.jobTitle
       ? `${tailoring.jobTitle}${tailoring.company ? ` at ${tailoring.company}` : ''}`
       : 'this position';
-    sendMessage(
-      `I've loaded my tailored resume for ${jobLabel}. What are the key gaps I should address to improve my match?`,
-    );
+    const bulletsSummary = tailoring.sections
+      .flatMap((s) => s.bullets)
+      .map((b) => `- ${b.text}`)
+      .join('\n');
+    const contextMsg = bulletsSummary
+      ? `I've loaded my tailored resume for ${jobLabel}. Here are my tailored bullets:\n\n${bulletsSummary}\n\nBased on these, what are the key gaps I should address to improve my match?`
+      : `I've loaded my tailored resume for ${jobLabel}. What are the key gaps I should address to improve my match?`;
+    sendMessage(contextMsg, 'TAILORING');
   }, [tailoring?.id]);
 
   useEffect(() => {

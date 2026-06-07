@@ -126,23 +126,21 @@ Rules:
         const b = rawBullets[pos];
         const id = ulid();
         const text = (b.text as string) ?? '';
-        const source = (b.source as string) ?? 'MATERIAL';
-        const sourceId = b.sourceId as string | undefined;
+        const source = ((b.source as string) ?? 'MATERIAL').slice(0, 30);
+        const rawSourceId = b.sourceId as string | undefined;
         let status: BulletStatus = (b.status as BulletStatus) ?? BulletStatus.PENDING;
 
-        // Bullet fail-fast validation: sourceId must reference a valid material
-        // If not, we must mark it as PENDING (model inferred rather than confirmed)
-        if (sourceId && materialIds.has(sourceId)) {
+        // sourceId is only valid if it references an actual material ULID (26 chars)
+        const validSourceId = (rawSourceId && materialIds.has(rawSourceId)) ? rawSourceId : null;
+
+        if (validSourceId) {
           // Valid sourceId referencing a confirmed material - accept CONFIRMED status
-          if (status === BulletStatus.PENDING) {
-            // LLM marked it as PENDING despite valid sourceId - trust the model
-            status = BulletStatus.PENDING;
-          } else {
-            status = BulletStatus.CONFIRMED;
-          }
+          status = status === BulletStatus.PENDING ? BulletStatus.PENDING : BulletStatus.CONFIRMED;
         } else {
-          // No valid sourceId - LLM fabricated or incorrectly referenced
-          this.logger.warn(`Bullet has no valid sourceId (sourceId=${sourceId}); marking as PENDING`);
+          // LLM fabricated or incorrectly referenced - null out the sourceId and mark PENDING
+          if (rawSourceId) {
+            this.logger.warn(`Bullet has no valid sourceId (sourceId=${rawSourceId}); marking as PENDING`);
+          }
           status = BulletStatus.PENDING;
         }
 
@@ -154,7 +152,7 @@ Rules:
             position: pos,
             text,
             source,
-            sourceId: sourceId ?? null,
+            sourceId: validSourceId,
             status,
           }),
         );

@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/lib/dev-auth';
-import { apiClient } from '@/lib/api';
 
 export default function DataExportPage() {
   const { getToken } = useAuth();
@@ -13,14 +12,20 @@ export default function DataExportPage() {
     setStatus('loading');
     try {
       const token = await getToken();
-      const data = await apiClient('/api/user/export', {
+      const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:14607';
+      const resp = await fetch(`${API_BASE}/api/v1/iam/account:export`, {
+        method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
       });
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      if (!resp.ok) throw new Error(`API error: ${resp.status}`);
+      const blob = await resp.blob();
+      const disposition = resp.headers.get('Content-Disposition') ?? '';
+      const filenameMatch = disposition.match(/filename="([^"]+)"/);
+      const filename = filenameMatch?.[1] ?? 'findwith-data-export.json';
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'findwith-data-export.json';
+      a.download = filename;
       a.click();
       URL.revokeObjectURL(url);
       setStatus('done');

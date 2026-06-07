@@ -38,8 +38,17 @@ export class FollowupService {
     return this.emailRepo.save(email);
   }
 
-  async listEmails(userId: string): Promise<FollowupEmail[]> {
-    return this.emailRepo.find({ where: { userId }, order: { receivedAt: 'DESC' } });
+  async listEmails(userId: string): Promise<Array<Omit<FollowupEmail, 'bodyText'> & { bodyText?: string }>> {
+    const emails = await this.emailRepo.find({ where: { userId }, order: { receivedAt: 'DESC' } });
+    return Promise.all(
+      emails.map(async (e) => {
+        const { bodyText, ...rest } = e;
+        return {
+          ...rest,
+          bodyText: bodyText ? await this.crypto.decrypt(bodyText) : undefined,
+        };
+      }),
+    );
   }
 
   async listDrafts(userId: string): Promise<FollowupDraft[]> {

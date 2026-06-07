@@ -206,7 +206,12 @@ export function Onboarding() {
         <button
           data-testid="lets-start-btn"
           disabled={!hasResume}
-          onClick={() => navigate('/')}
+          onClick={() => {
+            void sendMessage(
+              "Let's do a deep profile session. Ask me questions one at a time to understand my background, key achievements, and what makes me a strong candidate. Start with my most recent role.",
+              'ONBOARDING',
+            );
+          }}
           style={{
             padding: '12px 16px',
             background: '#f3f4f6',

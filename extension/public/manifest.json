@@ -7,6 +7,7 @@
   "host_permissions": [
     "https://api.findwith.com/*",
     "http://localhost:14607/*",
+    "http://localhost:14608/*",
     "https://*.linkedin.com/*",
     "https://mail.google.com/*"
   ],
@@ -19,18 +20,19 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://www.linkedin.com/jobs/*"],
+      "matches": ["https://www.linkedin.com/jobs/*", "http://localhost:14608/linkedin-job.html"],
       "js": ["cs-linkedin-job.js"]
     },
     {
       "matches": [
         "https://www.linkedin.com/jobs/*/easy-apply/*",
-        "https://www.linkedin.com/jobs/search/*"
+        "https://www.linkedin.com/jobs/search/*",
+        "http://localhost:14608/easy-apply.html"
       ],
       "js": ["cs-linkedin-apply.js"]
     },
     {
-      "matches": ["https://mail.google.com/*"],
+      "matches": ["https://mail.google.com/*", "http://localhost:14608/gmail.html"],
       "js": ["cs-gmail.js"]
     }
   ],

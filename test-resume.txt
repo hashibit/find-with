@@ -1,0 +1,19 @@
+Alex Chen
+alex.chen@email.com | (415) 555-0123 | San Francisco, CA
+
+EDUCATION
+University of California, Berkeley — B.S. Computer Science, May 2020, GPA 3.7
+
+WORK EXPERIENCE
+Senior Software Engineer — Stripe, San Francisco, CA (2022 – Present)
+- Led migration of payment processing pipeline to event-driven architecture, reducing latency by 40%
+- Designed and shipped cross-functional API gateway used by 12 internal teams
+- Mentored 3 junior engineers; conducted 30+ technical interviews
+
+Software Engineer — Linear, San Francisco, CA (2020 – 2022)
+- Built real-time collaboration features using WebSockets, supporting 50k+ concurrent users
+- Reduced CI pipeline runtime by 60% through parallelization and caching improvements
+- Proactively audited and refactored team deployment process in first 2 months
+
+SKILLS
+TypeScript, Python, Go, Node.js, React, NestJS, PostgreSQL, Redis, Docker, Kubernetes

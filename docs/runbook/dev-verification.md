@@ -47,7 +47,7 @@ docker compose -f docker-compose.dev.yml ps
 # Request JWT from mock-clerk
 JWT=$(curl -s -X POST http://localhost:14611/sign \
   -H 'content-type: application/json' \
-  -d '{"sub":"dev_user_001","email":"dev@findwith.local"}' | jq -r .token)
+  -d '{"sub":"user_dev_001","email":"dev@findwith.local"}' | jq -r .token)
 
 echo "JWT: $JWT"
 
@@ -64,7 +64,7 @@ echo "User ID: $USER_ID"
 
 # Verify token stored in Redis (internal port 14601)
 docker exec findwith-dev-redis-1 redis-cli -p 14601 GET "session:$TOKEN"
-# Expected: dev_user_001
+# Expected: user_dev_001
 
 # Verify protected endpoint
 curl -s http://localhost:14607/api/v1/iam/me \
@@ -256,7 +256,7 @@ curl -s "http://localhost:14607/api/v1/jobs/$CAPTURE_ID" \
 
 > **Primary verification path. Do this in browser.**
 
-1. Open `http://localhost:14612/job-analysis?captureId=<CAPTURE_ID>` (use the ID from Step 5.1)
+1. Open `http://localhost:14612/job-analysis?id=<CAPTURE_ID>` (use the ID from Step 5.1)
 2. Should show:
    - Company name and job title at top
    - Match score visualization (surface match %, deep match %)
@@ -564,7 +564,7 @@ redis-cli -p 14601 PING
 echo "=== Auth ==="
 JWT=$(curl -s -X POST http://localhost:14611/sign \
   -H 'content-type: application/json' \
-  -d '{"sub":"dev_user_001","email":"dev@findwith.local"}' | jq -r .token)
+  -d '{"sub":"user_dev_001","email":"dev@findwith.local"}' | jq -r .token)
 
 RESPONSE=$(curl -s -X POST http://localhost:14607/api/v1/iam/auth/verify \
   -H "content-type: application/json" \

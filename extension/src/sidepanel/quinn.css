@@ -1,0 +1,534 @@
+/* FindWith / Quinn — design system (adapted from docs/hi-ui/Findwith/styles.css) */
+
+* {
+  box-sizing: border-box;
+}
+
+:root {
+  /* Variation A — light/blue (default theme) */
+  --bg: #ffffff;
+  --bg-soft: #fafafa;
+  --bg-sunk: #f4f4f5;
+  --ink: #09090b;
+  --ink-2: #27272a;
+  --mute: #71717a;
+  --mute-2: #a1a1aa;
+  --line: #e4e4e7;
+  --line-2: #f4f4f5;
+  --accent: #1e40af;
+  --accent-soft: #eff2ff;
+  --good: #166534;
+  --warn: #92400e;
+  --bad: #991b1b;
+  --shadow-1: 0 1px 0 rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-2: 0 1px 0 rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.06);
+}
+
+/* ---------- side panel shell ---------- */
+.sp {
+  width: 100%;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  font-family:
+    'Inter',
+    -apple-system,
+    BlinkMacSystemFont,
+    sans-serif;
+  font-feature-settings: 'cv11', 'ss01', 'ss03';
+  letter-spacing: -0.005em;
+  color: var(--ink);
+  background: var(--bg);
+  overflow: hidden;
+}
+
+/* ---------- top bar ---------- */
+.sp-top {
+  height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg);
+  flex-shrink: 0;
+}
+.sp-top .qicon {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+}
+.sp-top .name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+}
+.sp-top .status {
+  font-size: 11px;
+  color: var(--mute);
+  margin-top: 1px;
+}
+.sp-top .meta {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+.sp-top .actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--mute);
+}
+.sp-top .iconbtn {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border: none;
+  background: transparent;
+  color: var(--mute);
+  cursor: pointer;
+  border-radius: 6px;
+}
+.sp-top .iconbtn:hover {
+  background: var(--bg-sunk);
+  color: var(--ink);
+}
+
+/* ---------- tabs ---------- */
+.sp-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 8px 12px 0;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg);
+  flex-shrink: 0;
+}
+.sp-tab {
+  padding: 8px 12px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--mute);
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: inherit;
+  letter-spacing: -0.005em;
+}
+.sp-tab.active {
+  color: var(--ink);
+  border-bottom-color: var(--ink);
+}
+.sp-tab .badge {
+  background: var(--bg-sunk);
+  color: var(--mute);
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 99px;
+  font-variant-numeric: tabular-nums;
+}
+.sp-tab.active .badge {
+  background: var(--ink);
+  color: var(--bg);
+}
+
+/* ---------- conversation ---------- */
+.sp-body {
+  flex: 1;
+  overflow: hidden;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+}
+.sp-conv {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 14px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.sp-bottom {
+  border-top: 1px solid var(--line);
+  padding: 10px 12px 12px;
+  background: var(--bg);
+  flex-shrink: 0;
+}
+.sp-input {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+}
+.sp-input input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--ink);
+  outline: none;
+}
+.sp-input input::placeholder {
+  color: var(--mute-2);
+}
+.sp-input .send {
+  width: 24px;
+  height: 24px;
+  background: var(--ink);
+  color: var(--bg);
+  border: none;
+  border-radius: 6px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+.sp-input.dim .send {
+  background: var(--bg-sunk);
+  color: var(--mute-2);
+}
+.sp-density {
+  display: flex;
+  gap: 4px;
+  margin-top: 8px;
+  align-items: center;
+  font-size: 10px;
+  color: var(--mute);
+}
+.sp-density .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 99px;
+  background: var(--mute-2);
+}
+.sp-density .on {
+  background: var(--accent);
+}
+
+/* ---------- message bubbles ---------- */
+.msg {
+  display: flex;
+  gap: 8px;
+  max-width: 100%;
+}
+.msg.user {
+  justify-content: flex-end;
+}
+.msg .qavatar {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.bubble {
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-size: 13px;
+  line-height: 1.55;
+  max-width: 320px;
+  letter-spacing: -0.003em;
+}
+.msg.quinn .bubble {
+  background: var(--bg-sunk);
+  color: var(--ink);
+  border-top-left-radius: 4px;
+}
+.msg.user .bubble {
+  background: var(--ink);
+  color: var(--bg);
+  border-top-right-radius: 4px;
+}
+.bubble strong {
+  font-weight: 600;
+}
+.bubble .sub {
+  color: var(--mute);
+  font-size: 12px;
+}
+
+.sys-line {
+  align-self: center;
+  font-size: 10.5px;
+  color: var(--mute);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 0;
+  letter-spacing: 0.01em;
+}
+.sys-line::before,
+.sys-line::after {
+  content: '';
+  display: block;
+  height: 1px;
+  width: 24px;
+  background: var(--line);
+}
+
+/* ---------- inline cards inside bubbles ---------- */
+.qcard {
+  margin-top: 8px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+  overflow: hidden;
+}
+.qcard-h {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line-2);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--mute);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.qcard-b {
+  padding: 12px;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+/* ---------- buttons / chips ---------- */
+.btn {
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 7px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--ink);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  letter-spacing: -0.005em;
+}
+.btn:hover {
+  background: var(--bg-sunk);
+}
+.btn.primary {
+  background: var(--ink);
+  color: var(--bg);
+  border-color: var(--ink);
+}
+.btn.primary:hover {
+  background: var(--ink-2);
+}
+.btn.accent {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 99px;
+  border: 1px solid var(--line);
+  color: var(--ink-2);
+  background: var(--bg);
+}
+.chip.soft {
+  background: var(--bg-sunk);
+  border-color: transparent;
+}
+.chip.good {
+  color: var(--good);
+  border-color: color-mix(in srgb, var(--good) 30%, transparent);
+  background: color-mix(in srgb, var(--good) 8%, transparent);
+}
+.chip.warn {
+  color: var(--warn);
+  border-color: color-mix(in srgb, var(--warn) 30%, transparent);
+  background: color-mix(in srgb, var(--warn) 8%, transparent);
+}
+.chip.bad {
+  color: var(--bad);
+  border-color: color-mix(in srgb, var(--bad) 30%, transparent);
+  background: color-mix(in srgb, var(--bad) 8%, transparent);
+}
+.chip.dot::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-radius: 99px;
+  background: currentColor;
+  display: block;
+}
+
+/* ---------- progress bars ---------- */
+.bar {
+  height: 4px;
+  background: var(--bg-sunk);
+  border-radius: 99px;
+  overflow: hidden;
+  position: relative;
+}
+.bar > i {
+  display: block;
+  height: 100%;
+  background: var(--ink);
+  border-radius: 99px;
+}
+.bar.accent > i {
+  background: var(--accent);
+}
+.bar.good > i {
+  background: var(--good);
+}
+.bar-segs {
+  display: flex;
+  gap: 2px;
+  height: 4px;
+}
+.bar-segs .seg {
+  flex: 1;
+  background: var(--bg-sunk);
+  border-radius: 99px;
+}
+.bar-segs .seg.on {
+  background: var(--ink);
+}
+
+/* ---------- helpers ---------- */
+.h {
+  display: flex;
+  align-items: center;
+}
+.gap-4 {
+  gap: 4px;
+}
+.gap-6 {
+  gap: 6px;
+}
+.gap-8 {
+  gap: 8px;
+}
+.gap-12 {
+  gap: 12px;
+}
+.col {
+  display: flex;
+  flex-direction: column;
+}
+.between {
+  justify-content: space-between;
+}
+.muted {
+  color: var(--mute);
+}
+.mute2 {
+  color: var(--mute-2);
+}
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+.kbd {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 10px;
+  padding: 1px 5px;
+  border: 1px solid var(--line);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  color: var(--mute);
+  background: var(--bg);
+}
+
+/* ---------- typography ---------- */
+.serif {
+  font-family: 'Source Serif 4', 'Iowan Old Style', Georgia, serif;
+  letter-spacing: -0.01em;
+}
+.serif-name {
+  font-family: 'Source Serif 4', Georgia, serif;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+}
+.italic {
+  font-style: italic;
+}
+.tiny {
+  font-size: 11px;
+}
+.huge {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.disp {
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  line-height: 1.05;
+}
+.lab {
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--mute);
+}
+
+/* meter fancy */
+.meter {
+  display: grid;
+  grid-template-columns: 78px 1fr 36px;
+  gap: 10px;
+  align-items: center;
+  font-size: 11.5px;
+}
+.meter .lbl {
+  color: var(--mute);
+}
+.meter .val {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  font-weight: 500;
+}
+
+/* ---------- icon button (generic) ---------- */
+.iconbtn {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border: none;
+  background: transparent;
+  color: var(--mute);
+  cursor: pointer;
+  border-radius: 6px;
+}
+.iconbtn:hover {
+  background: var(--bg-sunk);
+  color: var(--ink);
+}
+
+/* ---------- scrollbar ---------- */
+.sp-conv::-webkit-scrollbar {
+  width: 4px;
+}
+.sp-conv::-webkit-scrollbar-track {
+  background: transparent;
+}
+.sp-conv::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 99px;
+}

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useProfileStore, Material } from '../stores/profile';
+import { useProfileStore, Material, UserProfile, Education, WorkExperience, Project, Skill } from '../stores/profile';
 import { Icons } from '../components/Quinn';
 
 const TAG_COLORS: Record<string, string> = {
@@ -231,15 +231,16 @@ function MaterialRow({ material, expanded, onToggle }: MaterialRowProps) {
 }
 
 export function Library() {
-  const { materials, baseResumes, fetchMaterials, fetchBaseResumes, isLoading } = useProfileStore();
+  const { profile, materials, baseResumes, fetchProfile, fetchMaterials, fetchBaseResumes, isLoading } = useProfileStore();
   const [activeProfileTab, setActiveProfileTab] = useState<ProfileNavTab>('素材库');
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
+    fetchProfile();
     fetchMaterials();
     fetchBaseResumes();
-  }, [fetchMaterials, fetchBaseResumes]);
+  }, [fetchProfile, fetchMaterials, fetchBaseResumes]);
 
   const toggleExpanded = (id: string) => {
     setExpandedIds((prev) => {
@@ -398,22 +399,230 @@ export function Library() {
         </>
       )}
 
-      {activeProfileTab !== '素材库' && (
-        <div
-          style={{
-            flex: 1,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'var(--mute-2)',
-            fontSize: 13,
-            padding: 24,
-            textAlign: 'center',
-          }}
-        >
-          {activeProfileTab} 功能即将推出
-        </div>
-      )}
+      {activeProfileTab === '基本' && <BasicInfoSection />}
+      {activeProfileTab === '工作' && <WorkExperienceSection />}
+      {activeProfileTab === '项目' && <ProjectsSection />}
+      {activeProfileTab === '技能' && <SkillsSection />}
     </>
   );
+}
+
+// ============= Basic Info Section =============
+function BasicInfoSection() {
+  const { profile, isLoading } = useProfileStore();
+
+  if (isLoading) {
+    return (
+      <div style={{ padding: 40, textAlign: 'center', color: 'var(--mute-2)', fontSize: 13 }}>
+        Loading...
+      </div>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <div style={{ padding: 40, textAlign: 'center', color: 'var(--mute-2)', fontSize: 13 }}>
+        请先上传简历建立档案
+      </div>
+    );
+  }
+
+  const { basic } = profile;
+  const fields = [
+    { label: '姓名', value: basic.fullName },
+    { label: '邮箱', value: basic.email },
+    { label: '电话', value: basic.phone },
+    { label: '地点', value: basic.location },
+    { label: 'LinkedIn', value: basic.linkedinUrl },
+    { label: '网站', value: basic.website },
+  ];
+
+  return (
+    <div style={{ flex: 1, overflow: 'auto', padding: '14px 0' }}>
+      {fields.map((f) => (
+        <div
+          key={f.label}
+          style={{
+            display: 'flex',
+            padding: '10px 16px',
+            borderBottom: '1px solid var(--line-2)',
+            fontSize: 12,
+          }}
+        >
+          <span style={{ width: 72, color: 'var(--mute)', flexShrink: 0 }}>{f.label}</span>
+          <span style={{ color: 'var(--ink)', flex: 1 }}>
+            {f.value || <span style={{ color: 'var(--mute-2)' }}>—</span>}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ============= Work Experience Section =============
+function WorkExperienceSection() {
+  const { profile, isLoading } = useProfileStore();
+
+  if (isLoading) {
+    return (
+      <div style={{ padding: 40, textAlign: 'center', color: 'var(--mute-2)', fontSize: 13 }}>
+        Loading...
+      </div>
+    );
+  }
+
+  if (!profile || profile.experience.length === 0) {
+    return (
+      <div style={{ padding: 40, textAlign: 'center', color: 'var(--mute-2)', fontSize: 13 }}>
+        请先上传简历建立档案
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ flex: 1, overflow: 'auto' }}>
+      {profile.experience.map((exp) => (
+        <div key={exp.id} style={{ padding: '14px 16px', borderBottom: '1px solid var(--line-2)' }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>{exp.title}</span>
+            <span style={{ fontSize: 12, color: 'var(--mute)' }}>@ {exp.company}</span>
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--mute-2)', marginTop: 2 }}>
+            {exp.location} · {formatDateRange(exp.start, exp.end)}
+          </div>
+          {exp.bullets.length > 0 && (
+            <ul style={{ margin: '10px 0 0', paddingLeft: 16, fontSize: 12, color: 'var(--ink)', lineHeight: 1.5 }}>
+              {exp.bullets.map((b, i) => (
+                <li key={i} style={{ marginBottom: 4 }}>{b}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ============= Projects Section =============
+function ProjectsSection() {
+  const { profile, isLoading } = useProfileStore();
+
+  if (isLoading) {
+    return (
+      <div style={{ padding: 40, textAlign: 'center', color: 'var(--mute-2)', fontSize: 13 }}>
+        Loading...
+      </div>
+    );
+  }
+
+  if (!profile || profile.projects.length === 0) {
+    return (
+      <div style={{ padding: 40, textAlign: 'center', color: 'var(--mute-2)', fontSize: 13 }}>
+        请先上传简历建立档案
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ flex: 1, overflow: 'auto' }}>
+      {profile.projects.map((proj) => (
+        <div key={proj.id} style={{ padding: '14px 16px', borderBottom: '1px solid var(--line-2)' }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>{proj.name}</div>
+          <div style={{ fontSize: 11, color: 'var(--mute-2)', marginTop: 2 }}>
+            {formatDateRange(proj.start, proj.end)}
+          </div>
+          {proj.description && (
+            <div style={{ fontSize: 12, color: 'var(--ink)', marginTop: 8, lineHeight: 1.5 }}>
+              {proj.description}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ============= Skills Section =============
+function SkillsSection() {
+  const { profile, isLoading } = useProfileStore();
+
+  if (isLoading) {
+    return (
+      <div style={{ padding: 40, textAlign: 'center', color: 'var(--mute-2)', fontSize: 13 }}>
+        Loading...
+      </div>
+    );
+  }
+
+  if (!profile || profile.skills.length === 0) {
+    return (
+      <div style={{ padding: 40, textAlign: 'center', color: 'var(--mute-2)', fontSize: 13 }}>
+        请先上传简历建立档案
+      </div>
+    );
+  }
+
+  const hardSkills = profile.skills.filter((s) => s.kind === 'HARD' || s.kind === 'TOOL');
+  const softSkills = profile.skills.filter((s) => s.kind === 'SOFT');
+
+  return (
+    <div style={{ flex: 1, overflow: 'auto', padding: '14px 16px' }}>
+      {hardSkills.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--mute)', marginBottom: 8 }}>
+            硬技能 / 工具
+          </div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {hardSkills.map((s) => (
+              <span
+                key={s.name}
+                className="chip soft"
+                style={{ fontSize: 11, padding: '4px 8px' }}
+              >
+                {s.name}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+      {softSkills.length > 0 && (
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--mute)', marginBottom: 8 }}>
+            软技能
+          </div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {softSkills.map((s) => (
+              <span
+                key={s.name}
+                className="chip soft"
+                style={{ fontSize: 11, padding: '4px 8px' }}
+              >
+                {s.name}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+      {profile.certifications.length > 0 && (
+        <div style={{ marginTop: 16 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--mute)', marginBottom: 8 }}>
+            证书
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--ink)', lineHeight: 1.5 }}>
+            {profile.certifications.join(', ')}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============= Helpers =============
+function formatDateRange(start: string, end: string): string {
+  const fmt = (d: string) => {
+    if (!d) return '';
+    const [y, m] = d.split('-');
+    return `${y}年${m ? parseInt(m) : ''}月`;
+  };
+  return `${fmt(start)} – ${end === 'present' ? '至今' : fmt(end)}`;
 }

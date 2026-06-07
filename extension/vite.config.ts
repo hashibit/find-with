@@ -4,6 +4,7 @@ import { resolve } from 'path';
 import hotReloadExtension from 'hot-reload-extension-vite';
 
 export default defineConfig(({ mode }) => ({
+  base: './', // Use relative paths for Chrome extension
   plugins: [
     react(),
     // hot-reload-extension-vite assumes Chrome extension context — skip in web dev mode
@@ -33,6 +34,7 @@ export default defineConfig(({ mode }) => ({
     rollupOptions: {
       input: {
         sidepanel: resolve(__dirname, 'src/sidepanel/index.html'),
+        fullscreen: resolve(__dirname, 'src/fullscreen/index.html'),
         background: resolve(__dirname, 'src/background/index.ts'),
         'cs-linkedin-job': resolve(__dirname, 'src/content-scripts/linkedin/job-detail.ts'),
         'cs-linkedin-apply': resolve(__dirname, 'src/content-scripts/linkedin/easy-apply.ts'),

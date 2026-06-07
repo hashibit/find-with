@@ -1,6 +1,8 @@
 import { Controller, Get, Res } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { type Response } from 'express';
+import { ConfigService } from '@nestjs/config';
+import type { AppConfig } from '../../config/configuration.js';
 
 const SELECTORS_PAYLOAD = {
   version: '1.0.0',
@@ -24,10 +26,20 @@ const SELECTORS_PAYLOAD = {
 @ApiTags('config')
 @Controller('config')
 export class SelectorsController {
+  constructor(private config: ConfigService<AppConfig>) {}
+
   @Get('selectors')
   @ApiOperation({ summary: 'Return CSS selectors for content-script scraping (public, no auth)' })
   getSelectors(@Res() res: Response): void {
     res.setHeader('Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400');
     res.json(SELECTORS_PAYLOAD);
+  }
+
+  @Get('auth')
+  @ApiOperation({ summary: 'Return auth configuration for clients (public, no auth)' })
+  getAuthConfig(): { authMode: 'mock' | 'clerk'; jwksUrl: string } {
+    const jwksUrl = this.config.get('clerk', { infer: true })!.jwksUrl;
+    const authMode = jwksUrl.includes('localhost') || jwksUrl.includes('14611') ? 'mock' : 'clerk';
+    return { authMode, jwksUrl };
   }
 }

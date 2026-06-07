@@ -40,6 +40,12 @@
   "externally_connectable": {
     "matches": ["https://findwith.com/*", "http://localhost:14606/*"]
   },
+  "web_accessible_resources": [
+    {
+      "resources": ["src/fullscreen/index.html", "fullscreen.js", "assets/*", "chunks/*"],
+      "matches": ["<all_urls>"]
+    }
+  ],
   "action": {
     "default_title": "FindWith"
   },

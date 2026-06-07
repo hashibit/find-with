@@ -1,13 +1,60 @@
 import { create } from 'zustand';
 import { runtimeCall } from '../../lib/runtime';
 
+export interface BasicInfo {
+  fullName: string;
+  email: string;
+  phone: string;
+  location: string;
+  linkedinUrl: string;
+  website: string;
+}
+
+export interface Education {
+  id: string;
+  school: string;
+  degree: string;
+  major: string;
+  start: string;
+  end: string;
+  gpa: string;
+  highlights: string[];
+}
+
+export interface WorkExperience {
+  id: string;
+  company: string;
+  title: string;
+  location: string;
+  start: string;
+  end: string;
+  bullets: string[];
+  linkedMaterialIds: string[];
+}
+
+export interface Project {
+  id: string;
+  name: string;
+  description: string;
+  start: string;
+  end: string;
+  linkedMaterialIds: string[];
+}
+
+export interface Skill {
+  name: string;
+  kind: 'HARD' | 'SOFT' | 'TOOL';
+}
+
 export interface UserProfile {
   userId: string;
-  displayName: string;
-  email: string;
-  targetRoles: string[];
-  targetLocations: string[];
-  yearsExperience?: number;
+  basic: BasicInfo;
+  education: Education[];
+  experience: WorkExperience[];
+  projects: Project[];
+  skills: Skill[];
+  certifications: string[];
+  lastResumeUploadedAt?: number;
 }
 
 export interface Material {
@@ -70,12 +117,51 @@ export const useProfileStore = create<ProfileState>((set) => ({
         return;
       }
       const profile: UserProfile = {
-        userId: result.id || result.userId,
-        displayName: result.basicInfo?.fullName || result.displayName || '',
-        email: result.basicInfo?.email || result.email || '',
-        targetRoles: result.targetRoles || [],
-        targetLocations: result.targetLocations || [],
-        yearsExperience: result.yearsExperience,
+        userId: result.userId || result.id || '',
+        basic: {
+          fullName: result.basic?.fullName || result.basicInfo?.fullName || '',
+          email: result.basic?.email || result.basicInfo?.email || '',
+          phone: result.basic?.phone || result.basicInfo?.phone || '',
+          location: result.basic?.location || result.basicInfo?.location || '',
+          linkedinUrl: result.basic?.linkedinUrl || result.basicInfo?.linkedinUrl || '',
+          website: result.basic?.website || result.basicInfo?.website || '',
+        },
+        education: (result.education || []).map((e: any) => ({
+          id: e.id?.value || e.id || '',
+          school: e.school || '',
+          degree: e.degree || '',
+          major: e.major || '',
+          start: e.start || '',
+          end: e.end || '',
+          gpa: e.gpa || '',
+          highlights: e.highlights || [],
+        })),
+        experience: (result.experience || []).map((w: any) => ({
+          id: w.id?.value || w.id || '',
+          company: w.company || '',
+          title: w.title || '',
+          location: w.location || '',
+          start: w.start || '',
+          end: w.end || '',
+          bullets: w.bullets || [],
+          linkedMaterialIds: (w.linkedMaterialIds || []).map((id: any) => id?.value || id),
+        })),
+        projects: (result.projects || []).map((p: any) => ({
+          id: p.id?.value || p.id || '',
+          name: p.name || '',
+          description: p.description || '',
+          start: p.start || '',
+          end: p.end || '',
+          linkedMaterialIds: (p.linkedMaterialIds || []).map((id: any) => id?.value || id),
+        })),
+        skills: (result.skills || []).map((s: any) => ({
+          name: s.name || '',
+          kind: s.kind || 'HARD',
+        })),
+        certifications: result.certifications || [],
+        lastResumeUploadedAt: result.lastResumeUploadedAt
+          ? new Date(result.lastResumeUploadedAt).getTime()
+          : undefined,
       };
       set({ profile, isLoading: false });
     } catch (e) {

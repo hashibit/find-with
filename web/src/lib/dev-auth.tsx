@@ -124,147 +124,98 @@ export function useDevAuth() {
   return useContext(MockAuthContext);
 }
 
-// Hook aliases matching Clerk's API
-export function useAuth() {
-  return useDevAuth();
+export function useDevUser() {
+  const { user, isLoaded } = useDevAuth();
+  return { user, isLoaded };
 }
 
-export function useUser() {
-  const { user } = useDevAuth();
-  return { user, isLoaded: true };
-}
-
-export function useSession() {
+export function useDevSession() {
   const { sessionId, user, isLoaded } = useDevAuth();
   return {
     session: sessionId ? { id: sessionId, user } : null,
-    isLoaded
+    isLoaded,
   };
 }
 
-export function useSignIn() {
+export function useDevSignIn() {
   const { isLoaded, user } = useDevAuth();
-
   return {
     isLoaded,
     signIn: user ? { status: 'complete' } : null,
-    // Mock sign-in function
-    attemptFirstFactor: async ({ password }: { password: string }) => {
-      // Always succeeds in dev
-      window.location.reload();
-    },
+    attemptFirstFactor: async () => window.location.reload(),
   };
 }
 
-export function useSignUp() {
+export function useDevSignUp() {
   const { isLoaded, user } = useDevAuth();
-
   return {
     isLoaded,
     signUp: user ? { status: 'complete' } : null,
-    // Mock sign-up function
-    create: async ({ email, password, firstName, lastName }: any) => {
-      // Always succeeds in dev
-      window.location.reload();
-    },
+    create: async () => window.location.reload(),
   };
 }
 
-export function SignedIn({ children }: { children: ReactNode }) {
+export function DevSignedIn({ children }: { children: ReactNode }) {
   const { isSignedIn } = useDevAuth();
   return isSignedIn ? <>{children}</> : null;
 }
 
-export function SignedOut({ children }: { children: ReactNode }) {
+export function DevSignedOut({ children }: { children: ReactNode }) {
   const { isSignedIn } = useDevAuth();
   return isSignedIn ? null : <>{children}</>;
 }
 
-export function UserButton() {
+export function DevUserButton() {
   const { user, signOut } = useDevAuth();
-
   if (!user) return null;
-
   return (
     <div className="flex items-center gap-2">
       <img src={user.imageUrl} alt="" className="w-8 h-8 rounded-full" />
       <span className="text-sm">{user.fullName || user.email}</span>
-      <button
-        onClick={signOut}
-        className="text-xs text-gray-500 hover:text-gray-700"
-      >
+      <button onClick={signOut} className="text-xs text-gray-500 hover:text-gray-700">
         Sign out
       </button>
     </div>
   );
 }
 
-// Mock SignIn component
-export function SignIn({ redirectUrl, signUpUrl }: { redirectUrl?: string; signUpUrl?: string; appearance?: any }) {
-  const { isSignedIn, user } = useDevAuth();
-
+export function DevSignIn({ redirectUrl }: { redirectUrl?: string }) {
+  const { isSignedIn } = useDevAuth();
   if (isSignedIn) {
     window.location.href = redirectUrl || '/dashboard';
     return null;
   }
-
   return (
     <div className="w-full max-w-md mx-auto p-6 bg-white rounded-lg shadow">
-      <h1 className="text-xl font-semibold mb-4 text-center">Sign in (Dev Mode)</h1>
-      <p className="text-sm text-gray-500 mb-4 text-center">
-        Using mock authentication. Any credentials will work.
-      </p>
+      <h1 className="text-xl font-semibold mb-4 text-center">Sign in (Dev)</h1>
+      <p className="text-sm text-gray-500 mb-4 text-center">Any credentials work</p>
       <form onSubmit={(e) => { e.preventDefault(); window.location.reload(); }}>
         <div className="mb-4">
           <label className="block text-sm font-medium mb-1">Email</label>
-          <input
-            type="email"
-            className="w-full px-3 py-2 border rounded-md"
-            defaultValue="dev@findwith.local"
-          />
+          <input type="email" className="w-full px-3 py-2 border rounded-md" defaultValue="dev@findwith.local" />
         </div>
         <div className="mb-4">
           <label className="block text-sm font-medium mb-1">Password</label>
-          <input
-            type="password"
-            className="w-full px-3 py-2 border rounded-md"
-            defaultValue="dev123"
-          />
+          <input type="password" className="w-full px-3 py-2 border rounded-md" defaultValue="dev123" />
         </div>
-        <button
-          type="submit"
-          className="w-full py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
-        >
+        <button type="submit" className="w-full py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">
           Sign in
         </button>
       </form>
-      {signUpUrl && (
-        <p className="text-sm text-center mt-4">
-          Don't have an account?{' '}
-          <a href={signUpUrl} className="text-indigo-600 hover:underline">
-            Sign up
-          </a>
-        </p>
-      )}
     </div>
   );
 }
 
-// Mock SignUp component
-export function SignUp({ redirectUrl, signInUrl }: { redirectUrl?: string; signInUrl?: string; appearance?: any }) {
+export function DevSignUp({ redirectUrl }: { redirectUrl?: string }) {
   const { isSignedIn } = useDevAuth();
-
   if (isSignedIn) {
     window.location.href = redirectUrl || '/dashboard';
     return null;
   }
-
   return (
     <div className="w-full max-w-md mx-auto p-6 bg-white rounded-lg shadow">
-      <h1 className="text-xl font-semibold mb-4 text-center">Sign up (Dev Mode)</h1>
-      <p className="text-sm text-gray-500 mb-4 text-center">
-        Using mock authentication. Account will be auto-created.
-      </p>
+      <h1 className="text-xl font-semibold mb-4 text-center">Sign up (Dev)</h1>
+      <p className="text-sm text-gray-500 mb-4 text-center">Account auto-created</p>
       <form onSubmit={(e) => { e.preventDefault(); window.location.reload(); }}>
         <div className="mb-4">
           <label className="block text-sm font-medium mb-1">First name</label>
@@ -282,21 +233,10 @@ export function SignUp({ redirectUrl, signInUrl }: { redirectUrl?: string; signI
           <label className="block text-sm font-medium mb-1">Password</label>
           <input type="password" className="w-full px-3 py-2 border rounded-md" />
         </div>
-        <button
-          type="submit"
-          className="w-full py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
-        >
+        <button type="submit" className="w-full py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">
           Create account
         </button>
       </form>
-      {signInUrl && (
-        <p className="text-sm text-center mt-4">
-          Already have an account?{' '}
-          <a href={signInUrl} className="text-indigo-600 hover:underline">
-            Sign in
-          </a>
-        </p>
-      )}
     </div>
   );
 }

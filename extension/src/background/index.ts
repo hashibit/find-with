@@ -4,6 +4,9 @@ import { initAuth, getToken, handleAuthNonce, handleAuthToken } from './auth';
 import { openSseStream } from './sse';
 import { API_V1 } from './config.js';
 
+// Bootstrap auth on service worker startup
+initAuth();
+
 // Open Side Panel on action click
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
 

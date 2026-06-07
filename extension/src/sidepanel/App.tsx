@@ -52,9 +52,9 @@ function useAuthUser() {
 }
 
 const TAB_DEFS = [
-  { key: 'chat',    label: '对话',  path: '/onboarding' },
-  { key: 'radar',   label: '雷达',  path: '/radar' },
-  { key: 'profile', label: '档案',  path: '/library' },
+  { key: 'chat',    label: '对话',  path: '/onboarding', fullscreen: false },
+  { key: 'radar',   label: '雷达',  path: '/radar', fullscreen: false },
+  { key: 'profile', label: '档案',  path: '/library', fullscreen: true },
 ] as const;
 
 type TabKey = typeof TAB_DEFS[number]['key'];
@@ -123,7 +123,14 @@ function AppShell() {
           <button
             key={tab.key}
             className={`sp-tab${activeTab === tab.key ? ' active' : ''}`}
-            onClick={() => navigate(tab.path)}
+            onClick={() => {
+              if (tab.fullscreen) {
+                // Open fullscreen archive page in new tab
+                chrome.tabs.create({ url: chrome.runtime.getURL('src/fullscreen/index.html') });
+              } else {
+                navigate(tab.path);
+              }
+            }}
           >
             <span>{tab.label}</span>
           </button>

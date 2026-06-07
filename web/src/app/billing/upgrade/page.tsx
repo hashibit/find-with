@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useAuth } from '@clerk/nextjs';
+import { useAuth } from '@/lib/dev-auth';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 import { apiClient } from '@/lib/api';

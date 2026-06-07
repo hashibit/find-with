@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useAuth } from '@clerk/nextjs';
+import { useAuth } from '@/lib/dev-auth';
 import { apiClient } from '@/lib/api';
 
 export default function DataExportPage() {

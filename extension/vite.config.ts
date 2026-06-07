@@ -23,6 +23,11 @@ export default defineConfig(({ mode }) => ({
   resolve: {
     alias: { '@': resolve(__dirname, 'src') },
   },
+  // Dev server for Side Panel web mode (pnpm dev:web)
+  server: {
+    port: 14612,
+    strictPort: true,
+  },
   build: {
     outDir: 'dist',
     rollupOptions: {

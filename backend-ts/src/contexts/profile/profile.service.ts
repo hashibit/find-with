@@ -108,7 +108,7 @@ export class ProfileService {
       tags?: string[];
       provenanceKind: string;
     },
-  ): Promise<ProfileMaterial> {
+  ): Promise<ProfileMaterialView> {
     const encryptedRaw = data.rawText ? await this.crypto.encrypt(data.rawText) : null;
     const material = this.materialRepo.create({
       id: ulid(),
@@ -120,7 +120,12 @@ export class ProfileService {
       provenanceKind: data.provenanceKind,
       status: 'PROPOSED',
     });
-    return this.materialRepo.save(material);
+    const saved = await this.materialRepo.save(material);
+    const { rawText, ...rest } = saved;
+    return {
+      ...rest,
+      rawText: rawText ? await this.crypto.decrypt(rawText) : undefined,
+    } as ProfileMaterialView;
   }
 
   async updateMaterial(

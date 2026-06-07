@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useAuth } from '@clerk/nextjs';
+import { useAuth } from '@/lib/dev-auth';
 import Link from 'next/link';
 import { sendToExtension } from '@/lib/extension';
 

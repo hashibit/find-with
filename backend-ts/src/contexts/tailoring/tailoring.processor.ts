@@ -124,7 +124,7 @@ Rules:
 
       for (let pos = 0; pos < rawBullets.length; pos++) {
         const b = rawBullets[pos];
-        const id = b.id ?? ulid();
+        const id = ulid();
         const text = (b.text as string) ?? '';
         const source = (b.source as string) ?? 'MATERIAL';
         const sourceId = b.sourceId as string | undefined;

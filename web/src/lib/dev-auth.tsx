@@ -32,7 +32,7 @@ const MockAuthContext = createContext<MockAuth>({
   signOut: async () => {},
 });
 
-const MOCK_API = 'http://localhost:14803';
+const MOCK_API = 'http://localhost:14611'; // mock-clerk host port (not container port 14803)
 
 export function DevAuthProvider({ children }: { children: ReactNode }) {
   const [isLoaded, setIsLoaded] = useState(false);

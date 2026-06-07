@@ -1,4 +1,4 @@
-import { Column, Entity, OneToMany } from 'typeorm';
+import { Column, Entity } from 'typeorm';
 import { UserOwnedSingletonEntity } from '../base.entity.js';
 import { ProfileWorkExperience } from './work-experience.entity.js';
 import { ProfileEducation } from './education.entity.js';
@@ -24,12 +24,9 @@ export class ProfileProfile extends UserOwnedSingletonEntity {
   @Column({ type: 'timestamptz', default: () => 'NOW()', onUpdate: 'NOW()' })
   updatedAt: Date;
 
-  @OneToMany(() => ProfileWorkExperience, (exp) => exp.userId)
   workExperience: ProfileWorkExperience[];
 
-  @OneToMany(() => ProfileEducation, (edu) => edu.userId)
   education: ProfileEducation[];
 
-  @OneToMany(() => ProfileSkill, (skill) => skill.userId)
   skills: ProfileSkill[];
 }

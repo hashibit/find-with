@@ -1,4 +1,4 @@
-import { API_BASE } from './config.js';
+import { API_BASE, API_V1 } from './config.js';
 
 export async function getToken(): Promise<string | null> {
   const data = await chrome.storage.local.get(['token', 'expires_at']);
@@ -64,6 +64,31 @@ export async function handleAuthNonce(nonce: string): Promise<{ ok: boolean }> {
   } catch (e) {
     console.error('[Auth] nonce exchange failed', e);
     return { ok: false };
+  }
+}
+
+/**
+ * Fetch entitlements and broadcast to all connected nav ports.
+ * Called when backend pushes ENTITLEMENTS_INVALIDATE.
+ */
+export async function handleEntitlementsInvalidate(
+  navPorts: Set<chrome.runtime.Port>,
+): Promise<void> {
+  const data = await chrome.storage.local.get(['token']);
+  if (!data.token) return;
+
+  try {
+    const resp = await fetch(`${API_V1}/iam/me/entitlements`, {
+      headers: { Authorization: `Bearer ${data.token}` },
+    });
+    if (resp.ok) {
+      const entitlements = await resp.json();
+      await chrome.storage.local.set({ entitlements });
+      // Notify all connected sidepanels
+      navPorts.forEach((port) => port.postMessage({ type: 'ENTITLEMENTS_UPDATED', data: entitlements }));
+    }
+  } catch (e) {
+    console.error('[Auth] entitlements refresh failed', e);
   }
 }
 

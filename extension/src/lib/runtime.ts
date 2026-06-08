@@ -2,7 +2,7 @@
  * Runtime seam: abstracts chrome.runtime.* so sidepanel can run in plain Vite dev server.
  *
  * DEV_MODE=true  → direct fetch / SSE (no chrome required)
- * DEV_MODE=false → chrome.runtime.sendMessage / connect (production extension)
+ * DEV_MODE=false → chrome.runtime.sendMessage for content script messages, direct fetch/SSE for API calls
  */
 import { DEV_MODE } from './auth';
 import { API_V1 } from '../background/config';
@@ -14,11 +14,12 @@ import type { BgMsg } from '../background/bus';
 // ─── runtimeCall ────────────────────────────────────────────────────────────
 
 /**
- * Replaces chrome.runtime.sendMessage for sidepanel stores.
- * Returns the same response shape as the background message handler.
+ * For most API calls: direct fetch to backend.
+ * For content script messages (JOB_CAPTURE, OPEN_SIDEPANEL): route through background.
  */
 export async function runtimeCall(msg: BgMsg): Promise<any> {
-  if (!DEV_MODE) {
+  // Content script messages must go through background (chrome.sidePanel.open, etc.)
+  if (!DEV_MODE && (msg.type === 'JOB_CAPTURE' || msg.type === 'EMAIL_CAPTURE' || msg.type === 'OPEN_SIDEPANEL')) {
     return chrome.runtime.sendMessage(msg);
   }
 
@@ -58,8 +59,8 @@ export type StreamMessage =
   | { type: 'SSE_ERROR'; error: string };
 
 /**
- * Replaces chrome.runtime.connect('conversation') for SSE streaming.
- * Returns an abort/cleanup function.
+ * Direct SSE connection to backend (no background forwarding needed).
+ * Sidepanel has full DOM API access, can use fetch + ReadableStream directly.
  */
 export function runtimeStream(
   conversationId: string,
@@ -67,14 +68,6 @@ export function runtimeStream(
   onMessage: (msg: StreamMessage) => void,
   onDisconnect: () => void,
 ): () => void {
-  if (!DEV_MODE) {
-    const port = chrome.runtime.connect({ name: 'conversation' });
-    port.postMessage({ type: 'CONVERSATION_PROMPT', payload: { conversationId, message } });
-    port.onMessage.addListener((msg: StreamMessage) => onMessage(msg));
-    port.onDisconnect.addListener(() => onDisconnect());
-    return () => { try { port.disconnect(); } catch {} };
-  }
-
   let aborted = false;
   let ctrlRef: AbortController | null = null;
 
@@ -93,7 +86,6 @@ export function runtimeStream(
         onError: (err) => {
           if (!aborted) onMessage({ type: 'SSE_ERROR', error: err.message });
         },
-        // persistEventId omitted — no SSE resume in dev mode
       },
     ).then((ctrl) => {
       if (aborted) {
@@ -116,9 +108,8 @@ export function runtimeStream(
 // ─── runtimeNavBus ──────────────────────────────────────────────────────────
 
 /**
- * Replaces chrome.runtime.connect('nav') for background-pushed navigation.
+ * Receives navigation commands from background (content script → background → sidepanel).
  * In dev mode: no-op (no background to push nav events).
- * Returns a cleanup function.
  */
 export function runtimeNavBus(onNavigate: (route: string) => void): () => void {
   if (!DEV_MODE) {

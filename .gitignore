@@ -79,3 +79,4 @@ backend/.claude/
 .ccbus
 .understand-anything
 .e2e-backend.pid
+test-results

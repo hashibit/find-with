@@ -62,7 +62,7 @@ interface CreateMaterialPayload {
 export async function handleMessage(
   msg: BgMsg,
   sender: chrome.runtime.MessageSender,
-  connectedPorts: Set<chrome.runtime.Port>,
+  navPorts: Set<chrome.runtime.Port>,
 ): Promise<any> {
   switch (msg.type) {
     case 'JOB_CAPTURE':
@@ -72,7 +72,7 @@ export async function handleMessage(
     case 'EASY_APPLY_FORM':
       return { received: true };
     case 'EASY_APPLY_SUBMITTED':
-      connectedPorts.forEach((port) =>
+      navPorts.forEach((port) =>
         port.postMessage({ type: 'EASY_APPLY_SUBMITTED' }),
       );
       return { received: true };
@@ -80,8 +80,8 @@ export async function handleMessage(
       if (sender.tab?.windowId) {
         await chrome.sidePanel.open({ windowId: sender.tab.windowId });
       }
-      // Notify all connected sidepanel ports (e.g. the NavBus 'nav' port) to navigate.
-      connectedPorts.forEach((port) => {
+      // Notify all connected sidepanel ports to navigate.
+      navPorts.forEach((port) => {
         port.postMessage({ type: 'NAVIGATE', route: msg.payload.route ?? '/onboarding' });
       });
       return { opened: true };

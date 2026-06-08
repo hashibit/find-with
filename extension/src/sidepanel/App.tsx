@@ -51,6 +51,51 @@ function useAuthUser() {
   return user;
 }
 
+/**
+ * Fetch entitlements on mount and listen for ENTITLEMENTS_UPDATED from background.
+ */
+function useEntitlements() {
+  const [entitlements, setEntitlements] = useState<any>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchEntitlements = async () => {
+      const token = await getToken();
+      if (!token) return;
+      try {
+        const resp = await fetch(`${API_V1}/iam/me/entitlements`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!resp.ok || cancelled) return;
+        const data = await resp.json();
+        if (!cancelled) {
+          setEntitlements(data);
+          chrome.storage.local.set({ entitlements: data });
+        }
+      } catch { /* ignore */ }
+    };
+
+    // Fetch on mount
+    fetchEntitlements();
+
+    // Listen for ENTITLEMENTS_UPDATED from background (push notification)
+    const port = chrome.runtime.connect({ name: 'nav' });
+    port.onMessage.addListener((msg) => {
+      if (msg.type === 'ENTITLEMENTS_UPDATED') {
+        setEntitlements(msg.data);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      try { port.disconnect(); } catch {}
+    };
+  }, []);
+
+  return entitlements;
+}
+
 const TAB_DEFS = [
   { key: 'chat',    label: '对话',  path: '/onboarding', fullscreen: false },
   { key: 'radar',   label: '雷达',  path: '/radar', fullscreen: false },
@@ -69,6 +114,7 @@ function AppShell() {
   const navigate = useNavigate();
   const location = useLocation();
   const user = useAuthUser();
+  const entitlements = useEntitlements(); // Fetch on mount, listen for push
 
   const activeTab = pathToTab(location.pathname);
 

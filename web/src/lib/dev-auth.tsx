@@ -180,11 +180,7 @@ export function DevUserButton() {
 }
 
 export function DevSignIn({ redirectUrl }: { redirectUrl?: string }) {
-  const { isSignedIn } = useDevAuth();
-  if (isSignedIn) {
-    window.location.href = redirectUrl || '/dashboard';
-    return null;
-  }
+  // Just render the form - redirect is handled by the page component
   return (
     <div className="w-full max-w-md mx-auto p-6 bg-white rounded-lg shadow">
       <h1 className="text-xl font-semibold mb-4 text-center">Sign in (Dev)</h1>

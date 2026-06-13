@@ -43,11 +43,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     fetch(`${API_BASE}/config/auth`)
-      .then((res) => res.json())
-      .then((data: AuthConfig) => setConfig(data))
+      .then((res) => {
+        if (!res.ok) throw new Error(`Config endpoint returned ${res.status}`);
+        return res.json();
+      })
+      .then((data: AuthConfig) => {
+        if (data.authMode === 'mock' || data.authMode === 'clerk') {
+          setConfig(data);
+        } else {
+          throw new Error('Invalid authMode in config');
+        }
+      })
       .catch((e) => {
         console.error('[AuthProvider] Failed to fetch auth config:', e);
-        setConfig({ authMode: 'clerk', jwksUrl: '' });
+        // Fallback to mock in dev (backend may not have /config/auth endpoint)
+        setConfig({ authMode: 'mock', jwksUrl: 'http://localhost:14611/.well-known/jwks.json' });
       });
   }, []);
 

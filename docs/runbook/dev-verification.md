@@ -8,10 +8,12 @@ Each section lists both a browser check (primary) and API check (supporting). Do
 
 - Dev infrastructure running (`make up`)
 - Backend running (`cd backend-ts && pnpm run start:dev`)
-- Extension dev server running (`pnpm ext:dev` or `cd extension && pnpm dev:web`)
+- Extension built (`cd extension && pnpm dev` — Vite watch build, outputs to `extension/dist/`)
 - Web dev server running (`pnpm web:dev` or `cd web && pnpm dev`)
 - All services healthy (see Step 1)
 - Real LLM API configured in `backend-ts/.env` (Anthropic or OpenAI key)
+
+**Extension testing**: Load `extension/dist/` unpacked in Chrome (Developer mode). All extension verification uses `agent-browser --extension ./extension/dist` or direct `chrome-extension://` URLs.
 
 ---
 
@@ -97,13 +99,23 @@ curl -s http://localhost:14607/api/v1/iam/me \
 
 ### 2.3 Browser: Extension auth bootstrap
 
-> **Do this in browser.**
+> **Do this in browser with extension loaded.**
 
-1. Open `http://localhost:14612` (extension side panel dev server)
-2. It should auto-redirect to `http://localhost:14612/onboarding`
-3. Open browser DevTools → Application → Local Storage → `http://localhost:14612`
-4. A key `findwith_token` (or similar) should be present after a few seconds
-5. If missing, check the browser console for auth errors
+```bash
+# Get extension ID from chrome://extensions after loading unpacked
+EXT_ID="fljfnjaepjaejcnplikaaejcbjhpofon"  # replace with your extension ID
+
+# Open side panel
+agent-browser --extension ./extension/dist open "chrome-extension://$EXT_ID/src/sidepanel/index.html"
+
+# Or open auth callback page to trigger auth flow
+agent-browser open "http://localhost:14606/auth/extension-callback"
+```
+
+1. Side panel should show Quinn's onboarding page
+2. If "未登录" appears, click it → opens auth callback page
+3. Auth callback page shows "You're connected!" after successful auth
+4. Back to side panel → should show user name instead of "未登录"
 
 ---
 
@@ -111,11 +123,15 @@ curl -s http://localhost:14607/api/v1/iam/me \
 
 ### 3.1 Browser: Upload resume via extension onboarding
 
-> **Primary verification path. Do this in browser.**
+> **Primary verification path. Do this in browser with extension loaded.**
 
-1. Open `http://localhost:14612/onboarding`
-2. You should see Quinn's intro and an "Upload resume" button (or file picker)
-3. Create a test resume file:
+```bash
+EXT_ID="fljfnjaepjaejcnplikaaejcbjhpofon"  # replace with your extension ID
+agent-browser --extension ./extension/dist open "chrome-extension://$EXT_ID/src/sidepanel/index.html"
+```
+
+1. You should see Quinn's intro and an "Upload resume" button (or file picker)
+2. Create a test resume file:
 
 ```bash
 cat > /tmp/test-resume.txt << 'EOF'
@@ -140,10 +156,10 @@ Skills:
 EOF
 ```
 
-4. Upload the file through the extension UI
-5. After upload, Quinn should acknowledge receipt and show parsing in progress
-6. Wait ~30 seconds for the LLM to parse (real LLM call)
-7. Navigate to `http://localhost:14612/library` → verify profile data appears
+3. Upload the file through the extension UI
+4. After upload, Quinn should acknowledge receipt and show parsing in progress
+5. Wait ~30 seconds for the LLM to parse (real LLM call)
+6. Click "档案" tab → verify profile data appears
 
 ### 3.2 API: Alternative upload and parse check
 
@@ -176,9 +192,9 @@ curl -s http://localhost:14607/api/v1/profile/resume-sources \
 
 ### 4.1 Browser: Extension Library view
 
-> **Primary verification path. Do this in browser.**
+> **Primary verification path. Do this in browser with extension loaded.**
 
-1. Open `http://localhost:14612/library`
+1. Open side panel and click "档案" tab
 2. You should see two tabs: "Resumes" and "Shining moments" (or similar)
 3. **Resumes tab**: shows base resumes (empty if none created yet)
 4. **Shining moments tab**: shows materials grouped by tags, with status badges
@@ -254,23 +270,27 @@ curl -s "http://localhost:14607/api/v1/jobs/$CAPTURE_ID" \
 
 ### 5.2 Browser: Extension JobAnalysis view
 
-> **Primary verification path. Do this in browser.**
+> **Primary verification path. Do this in browser with extension loaded.**
 
-1. Open `http://localhost:14612/job-analysis?id=<CAPTURE_ID>` (use the ID from Step 5.1)
-2. Should show:
+```bash
+EXT_ID="fljfnjaepjaejcnplikaaejcbjhpofon"
+agent-browser --extension ./extension/dist open "chrome-extension://$EXT_ID/src/sidepanel/index.html#/job-analysis?id=<CAPTURE_ID>"
+```
+
+1. Should show:
    - Company name and job title at top
    - Match score visualization (surface match %, deep match %)
    - Skills breakdown (required skills, matched skills, gap skills)
    - Quinn chat panel with initial analysis message
-3. Try sending a message to Quinn in the chat panel
-4. Quinn should respond with a streaming SSE response visible in real-time
-5. Bottom should have "Want to apply?" action buttons
+2. Try sending a message to Quinn in the chat panel
+3. Quinn should respond with a streaming SSE response visible in real-time
+4. Bottom should have "Want to apply?" action buttons
 
 ### 5.3 Browser: Extension Radar view
 
-> **Primary verification path. Do this in browser.**
+> **Primary verification path. Do this in browser with extension loaded.**
 
-1. Open `http://localhost:14612/radar`
+1. Open side panel and click "雷达" tab
 2. Should show a list of jobs you've captured, each as a card with:
    - Company name, job title
    - Status badge (e.g., "saved", "applied", "interview", "offer", "rejected")
@@ -303,13 +323,13 @@ curl -N "http://localhost:14607/api/v1/conversations/$CONV_ID/prompt?message=Wha
 
 ### 6.2 Browser: Quinn chat in extension
 
-> **Do this in browser.**
+> **Do this in browser with extension loaded.**
 
-1. Open `http://localhost:14612/onboarding` or navigate within the extension
+1. Open side panel (onboarding page)
 2. Type a message in the "Ask Quinn..." input at the bottom
 3. Press Enter or click Send
 4. Quinn's response should stream in real-time (token by token, not all at once)
-5. If response appears all at once or not at all, check the SSE connection in DevTools → Network
+5. If response appears all at once or not at once, check the SSE connection in DevTools → Network
 
 ---
 
@@ -362,18 +382,22 @@ curl -s "http://localhost:14607/api/v1/tailoring/$TAILOR_ID" \
 
 ### 7.2 Browser: Extension Tailoring view
 
-> **Primary verification path. Do this in browser.**
+> **Primary verification path. Do this in browser with extension loaded.**
 
-1. Open `http://localhost:14612/tailoring?tailoringId=<TAILOR_ID>` (from Step 7.1)
-2. Should show:
+```bash
+EXT_ID="fljfnjaepjaejcnplikaaejcbjhpofon"
+agent-browser --extension ./extension/dist open "chrome-extension://$EXT_ID/src/sidepanel/index.html#/tailoring?tailoringId=<TAILOR_ID>"
+```
+
+1. Should show:
    - Match score before/after tailoring
    - Sections (e.g., "Work Experience") with bullet points
    - Each bullet has a source indicator (green = confirmed material, yellow = pending/inferred)
    - Edit controls on each bullet (rewrite, accept, reject)
-3. Click "Edit" or "Rewrite" on a bullet → Quinn should offer alternatives
-4. Confirm a bullet → status changes to accepted
-5. Reject a bullet → it is removed or marked for removal
-6. Check that "pending" bullets (LLM inferred, no direct material source) are visually distinct
+2. Click "Edit" or "Rewrite" on a bullet → Quinn should offer alternatives
+3. Confirm a bullet → status changes to accepted
+4. Reject a bullet → it is removed or marked for removal
+5. Check that "pending" bullets (LLM inferred, no direct material source) are visually distinct
 
 ---
 
@@ -381,10 +405,10 @@ curl -s "http://localhost:14607/api/v1/tailoring/$TAILOR_ID" \
 
 ### 8.1 Browser: Extension EasyApply view
 
-> **Do this in browser — this view is UI-only, no direct API equivalent.**
+> **Do this in browser with extension loaded — this view is UI-only, no direct API equivalent.**
 
 1. First ensure a radar item exists (from Step 5.1 — use `$RADAR_ITEM_ID`)
-2. Open `http://localhost:14612/easy-apply?radarItemId=<RADAR_ITEM_ID>`
+2. Open side panel and navigate to EasyApply view for the radar item
 3. Should show a "fill plan" — the fields Quinn plans to fill and proposed values:
    - Resume: which tailored resume will be attached
    - Contact info: phone, email from profile
@@ -393,7 +417,7 @@ curl -s "http://localhost:14607/api/v1/tailoring/$TAILOR_ID" \
 4. Each field should be editable
 5. "Approve and fill" button should be present (does NOT submit — user submits manually)
 
-> **Note**: EasyApply auto-fill only works on the real LinkedIn page with the Chrome extension loaded. In dev server mode (`localhost:14612`), this view shows the plan but cannot execute the fill. Test execution requires loading the extension in Chrome (see Step 9 note).
+> **Note**: EasyApply auto-fill only works on the real LinkedIn page with the Chrome extension loaded. The view shows the plan but cannot execute the fill on external pages.
 
 ---
 
@@ -463,7 +487,7 @@ Navigate to `http://localhost:14606/install`:
 
 ## Step 10 — Content Script (LinkedIn injection)
 
-> **Cannot be fully tested in dev server mode.**
+> **Requires extension loaded in Chrome.**
 
 Content script injection (the "Ask Quinn" button on LinkedIn job postings) requires:
 1. The extension built and loaded unpacked in Chrome
@@ -478,9 +502,9 @@ Content script injection (the "Ask Quinn" button on LinkedIn job postings) requi
 5. The "Ask Quinn" button should appear injected into the job description area
 6. Click it → Side Panel opens with that job's JD pre-loaded
 
-**What the content script does NOT do in dev server mode** (`localhost:14612`):
+**What the content script does NOT do without Chrome:**
 - No DOM injection on external pages
-- The side panel routes work but content auto-capture does not trigger
+- Side panel routes only work when loaded as an extension
 
 ---
 
@@ -503,7 +527,7 @@ curl -s -X PATCH "http://localhost:14607/api/v1/jobs/radar/$RADAR_ITEM_ID" \
   -d '{"status": "interview"}' | jq '{id, status}'
 
 # Verify status updated in browser:
-# Open http://localhost:14612/radar — badge on the job card should change
+# Open side panel → "雷达" tab — badge on the job card should change
 ```
 
 ---
@@ -653,12 +677,16 @@ grep MOCK_API web/src/lib/dev-auth.tsx
 ### Extension side panel blank or shows error
 
 ```bash
-# Check ext dev server is running on 14612
-curl -s http://localhost:14612 -o /dev/null -w '%{http_code}'
-# Expected: 200
+# Check extension is loaded in Chrome (chrome://extensions)
+# Check extension build output exists
+ls -la extension/dist/
 
-# Check console in browser DevTools at localhost:14612
-# Look for: auth errors, API 401s, missing env vars
+# Open side panel directly
+EXT_ID="fljfnjaepjaejcnplikaaejcbjhpofon"
+agent-browser --extension ./extension/dist open "chrome-extension://$EXT_ID/src/sidepanel/index.html"
+
+# Check console in browser DevTools
+# Look for: auth errors, API 401s, missing chrome API
 ```
 
 ### Extension auth/verify returns 400
@@ -716,7 +744,7 @@ Resume parsing populates these via separate entities — if `GET /profile` retur
 
 ## Known Product Gaps (Not Bugs)
 
-1. **Content script not testable in dev server** — LinkedIn button injection requires real extension loaded in Chrome. `localhost:14612` dev server only tests side panel routing.
+1. **Content script requires Chrome** — LinkedIn button injection requires real extension loaded in Chrome. Side panel only works via `chrome-extension://` URLs.
 
 2. **Follow-up flow not implemented** — Scheduled follow-up reminders (Quinn asks "heard back?" 3 days post-apply) are PRD-defined but not yet built.
 

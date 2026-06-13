@@ -8,10 +8,10 @@ export const metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <AuthProvider>
-      <html lang="en">
-        <body className="font-sans antialiased bg-white text-gray-900">{children}</body>
-      </html>
-    </AuthProvider>
+    <html lang="en">
+      <body className="font-sans antialiased bg-white text-gray-900">
+        <AuthProvider>{children}</AuthProvider>
+      </body>
+    </html>
   );
 }

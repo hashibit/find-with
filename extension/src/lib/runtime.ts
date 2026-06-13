@@ -1,10 +1,10 @@
 /**
- * Runtime seam: abstracts chrome.runtime.* so sidepanel can run in plain Vite dev server.
+ * Runtime seam: routes API calls and chrome messages for the side panel.
  *
- * DEV_MODE=true  → direct fetch / SSE (no chrome required)
- * DEV_MODE=false → chrome.runtime.sendMessage for content script messages, direct fetch/SSE for API calls
+ * API calls → direct fetch to backend.
+ * Content script messages (JOB_CAPTURE, OPEN_SIDEPANEL) → chrome.runtime.sendMessage to background.
+ * Navigation events → chrome.runtime.connect port from background.
  */
-import { DEV_MODE } from './auth';
 import { API_V1 } from '../background/config';
 import { bgMsgToRequest } from './api-routes';
 import { openSseStream } from './sse';
@@ -13,13 +13,9 @@ import type { BgMsg } from '../background/bus';
 
 // ─── runtimeCall ────────────────────────────────────────────────────────────
 
-/**
- * For most API calls: direct fetch to backend.
- * For content script messages (JOB_CAPTURE, OPEN_SIDEPANEL): route through background.
- */
 export async function runtimeCall(msg: BgMsg): Promise<any> {
   // Content script messages must go through background (chrome.sidePanel.open, etc.)
-  if (!DEV_MODE && (msg.type === 'JOB_CAPTURE' || msg.type === 'EMAIL_CAPTURE' || msg.type === 'OPEN_SIDEPANEL')) {
+  if (msg.type === 'JOB_CAPTURE' || msg.type === 'EMAIL_CAPTURE' || msg.type === 'OPEN_SIDEPANEL') {
     return chrome.runtime.sendMessage(msg);
   }
 
@@ -59,7 +55,7 @@ export type StreamMessage =
   | { type: 'SSE_ERROR'; error: string };
 
 /**
- * Direct SSE connection to backend (no background forwarding needed).
+ * Direct SSE connection to backend.
  * Sidepanel has full DOM API access, can use fetch + ReadableStream directly.
  */
 export function runtimeStream(
@@ -109,19 +105,13 @@ export function runtimeStream(
 
 /**
  * Receives navigation commands from background (content script → background → sidepanel).
- * In dev mode: no-op (no background to push nav events).
  */
 export function runtimeNavBus(onNavigate: (route: string) => void): () => void {
-  if (!DEV_MODE) {
-    const port = chrome.runtime.connect({ name: 'nav' });
-    port.onMessage.addListener((msg: { type: string; route?: string }) => {
-      if (msg.type === 'NAVIGATE' && msg.route) {
-        onNavigate(msg.route);
-      }
-    });
-    return () => { try { port.disconnect(); } catch {} };
-  }
-
-  // Dev: no background, nav bus is a no-op
-  return () => {};
+  const port = chrome.runtime.connect({ name: 'nav' });
+  port.onMessage.addListener((msg: { type: string; route?: string }) => {
+    if (msg.type === 'NAVIGATE' && msg.route) {
+      onNavigate(msg.route);
+    }
+  });
+  return () => { try { port.disconnect(); } catch {} };
 }

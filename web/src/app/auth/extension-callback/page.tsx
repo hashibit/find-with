@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useAuth } from '@/lib/dev-auth';
+import { useAuth } from '@/lib/auth';
 
 // This page handles the OAuth flow for the Chrome extension.
 // Flow: extension opens this page → web validates Clerk JWT → calls backend auth endpoint →

@@ -1,8 +1,3 @@
-// Dev mode: true when Vite MODE is 'development' (pnpm dev / pnpm dev:web).
-// Production builds (pnpm build) use MODE='production', so DEV_MODE is false.
-// This controls runtime behavior (direct fetch vs chrome.runtime.sendMessage).
-export const DEV_MODE = import.meta.env.MODE === 'development';
-
 /**
  * Get auth token for API calls.
  * Token is written by website OAuth flow or background script bootstrap.

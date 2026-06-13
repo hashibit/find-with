@@ -176,7 +176,7 @@ export const useProfileStore = create<ProfileState>((set) => ({
       const materials: Material[] = (result.items || result || []).map((m: any) => ({
         id: m.id,
         type: m.provenanceKind || 'shining_point',
-        label: m.shiningText || m.rawText || '',
+        label: m.rawText || '',
         content: m.shiningText || m.rawText || '',
         tags: m.tags || [],
         status: m.status || 'CONFIRMED',

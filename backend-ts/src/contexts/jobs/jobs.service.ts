@@ -112,8 +112,48 @@ export class JobsService {
     };
   }
 
-  async listRadar(userId: string): Promise<JobRadarItem[]> {
-    return this.radarRepo.find({ where: { userId }, order: { lastStatusAt: 'DESC' } });
+  async listRadar(userId: string) {
+    const items = await this.radarRepo.find({
+      where: { userId },
+      order: { lastStatusAt: 'DESC' },
+    });
+
+    if (items.length === 0) {
+      return [];
+    }
+
+    // Get unique captureIds (filter out nulls)
+    const captureIds = items.filter((i) => i.captureId).map((i) => i.captureId!);
+
+    // Fetch related captures and parsed JDs only if there are captureIds
+    const captureMap = new Map<string, JobCapture>();
+    const jdMap = new Map<string, JobParsedJd>();
+
+    if (captureIds.length > 0) {
+      const captures = await this.captureRepo.find({
+        where: captureIds.map((id) => ({ id })),
+      });
+      captures.forEach((c) => captureMap.set(c.id, c));
+
+      const parsedJds = await this.jdRepo.find({
+        where: captureIds.map((id) => ({ captureId: id })),
+      });
+      parsedJds.forEach((jd) => jdMap.set(jd.captureId, jd));
+    }
+
+    return items.map((item) => {
+      const capture = item.captureId ? captureMap.get(item.captureId) : null;
+      const jd = item.captureId ? jdMap.get(item.captureId) : null;
+      return {
+        id: item.id,
+        status: item.status,
+        lastActivity: item.lastStatusAt,
+        captureId: item.captureId,
+        jobTitle: jd?.title ?? null,
+        companyName: jd?.company ?? null,
+        sourceUrl: capture?.sourceUrl ?? null,
+      };
+    });
   }
 
   async updateRadarStatus(

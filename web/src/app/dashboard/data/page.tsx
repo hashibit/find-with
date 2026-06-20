@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useAuth } from '@/lib/dev-auth';
+import { useAuth } from '@/lib/auth';
 
 export default function DataExportPage() {
   const { getToken } = useAuth();

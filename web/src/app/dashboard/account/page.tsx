@@ -1,6 +1,6 @@
 'use client';
 
-import { useAuth, useUser } from '@/lib/dev-auth';
+import { useAuth, useUser } from '@/lib/auth';
 import Link from 'next/link';
 import { useEffect } from 'react';
 

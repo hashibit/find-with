@@ -103,14 +103,24 @@ export function runtimeStream(
 
 // ─── runtimeNavBus ──────────────────────────────────────────────────────────
 
+export type NavBusMessage =
+  | { type: 'NAVIGATE'; route: string }
+  | { type: 'RECALL_MATERIAL'; materialId: string; content: string; tags?: string[] };
+
 /**
- * Receives navigation commands from background (content script → background → sidepanel).
+ * Receives navigation commands and other events from background/content scripts.
  */
-export function runtimeNavBus(onNavigate: (route: string) => void): () => void {
+export function runtimeNavBus(
+  onNavigate: (route: string) => void,
+  onMessage?: (msg: NavBusMessage) => void,
+): () => void {
   const port = chrome.runtime.connect({ name: 'nav' });
-  port.onMessage.addListener((msg: { type: string; route?: string }) => {
-    if (msg.type === 'NAVIGATE' && msg.route) {
+  port.onMessage.addListener((msg: NavBusMessage) => {
+    if (msg.type === 'NAVIGATE') {
       onNavigate(msg.route);
+    }
+    if (onMessage) {
+      onMessage(msg);
     }
   });
   return () => { try { port.disconnect(); } catch {} };

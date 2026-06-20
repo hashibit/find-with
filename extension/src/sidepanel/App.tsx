@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { Onboarding } from './routes/Onboarding';
 import { JobAnalysis } from './routes/JobAnalysis';
@@ -6,20 +6,40 @@ import { Tailoring } from './routes/Tailoring';
 import { Radar } from './routes/Radar';
 import { Library } from './routes/Library';
 import { EasyApply } from './routes/EasyApply';
-import { runtimeNavBus } from '../lib/runtime';
+import { runtimeNavBus, type NavBusMessage } from '../lib/runtime';
 import { getToken } from '../lib/auth';
 import { API_V1 } from '../background/config';
 import { QuinnIcon, Icons } from './components/Quinn';
+import { useConversationStore } from './stores/conversation';
 import './quinn.css';
 
+// Global recall callback - set by NavBus when receiving RECALL_MATERIAL
+let recallCallback: ((content: string) => void) | null = null;
+
+export function setRecallCallback(cb: (content: string) => void) {
+  recallCallback = cb;
+}
+
 /**
- * Listens for NAVIGATE messages pushed by the background service worker.
+ * Listens for NAVIGATE and RECALL_MATERIAL messages from background/other contexts.
  * Must live inside <BrowserRouter> to access useNavigate.
  */
 function NavBus() {
   const navigate = useNavigate();
   useEffect(() => {
-    const cleanup = runtimeNavBus((route) => navigate(route));
+    const cleanup = runtimeNavBus(
+      (route) => navigate(route),
+      (msg: NavBusMessage) => {
+        if (msg.type === 'RECALL_MATERIAL') {
+          // Navigate to onboarding first
+          navigate('/onboarding');
+          // Trigger recall callback if set
+          if (recallCallback) {
+            recallCallback(msg.content);
+          }
+        }
+      },
+    );
     return cleanup;
   }, [navigate]);
   return null;
@@ -99,7 +119,7 @@ function useEntitlements() {
 const TAB_DEFS = [
   { key: 'chat',    label: '对话',  path: '/onboarding', fullscreen: false },
   { key: 'radar',   label: '雷达',  path: '/radar', fullscreen: false },
-  { key: 'profile', label: '档案',  path: '/library', fullscreen: true },
+  { key: 'profile', label: '档案',  path: '/library', fullscreen: true, activeWhenFullscreen: true },
 ] as const;
 
 type TabKey = typeof TAB_DEFS[number]['key'];
@@ -115,8 +135,9 @@ function AppShell() {
   const location = useLocation();
   const user = useAuthUser();
   const entitlements = useEntitlements(); // Fetch on mount, listen for push
+  const [fullscreenTabActive, setFullscreenTabActive] = useState<TabKey | null>(null);
 
-  const activeTab = pathToTab(location.pathname);
+  const activeTab = fullscreenTabActive || pathToTab(location.pathname);
 
   return (
     <div className="sp">
@@ -173,7 +194,9 @@ function AppShell() {
               if (tab.fullscreen) {
                 // Open fullscreen archive page in new tab
                 chrome.tabs.create({ url: chrome.runtime.getURL('src/fullscreen/index.html') });
+                setFullscreenTabActive(tab.key);
               } else {
+                setFullscreenTabActive(null);
                 navigate(tab.path);
               }
             }}

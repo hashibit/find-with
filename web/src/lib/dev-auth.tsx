@@ -1,6 +1,7 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useState, ReactNode, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 
 // Mock auth context for development - bypasses Clerk SDK entirely
 interface MockUser {
@@ -20,100 +21,146 @@ interface MockAuth {
   sessionId: string | null;
   getToken: () => Promise<string | null>;
   signOut: () => Promise<void>;
+  signIn: (email: string, password?: string) => Promise<void>;
+  signUp: (email: string, password?: string, firstName?: string, lastName?: string) => Promise<void>;
 }
 
 const MockAuthContext = createContext<MockAuth>({
-  isLoaded: false,
+  isLoaded: true,
   isSignedIn: false,
   user: null,
   userId: null,
   sessionId: null,
   getToken: async () => null,
   signOut: async () => {},
+  signIn: async () => {},
+  signUp: async () => {},
 });
 
-const MOCK_API = 'http://localhost:14611'; // mock-clerk host port (not container port 14803)
+const MOCK_API = 'http://localhost:14611';
+
+// LocalStorage keys for persistence across reloads
+const STORAGE_KEY_TOKEN = 'dev_auth_token';
+const STORAGE_KEY_USER = 'dev_auth_user';
+const STORAGE_KEY_SESSION = 'dev_auth_session';
+
+function loadFromStorage(): { user: MockUser | null; token: string | null; sessionId: string | null } {
+  try {
+    const token = localStorage.getItem(STORAGE_KEY_TOKEN);
+    const userJson = localStorage.getItem(STORAGE_KEY_USER);
+    const sessionId = localStorage.getItem(STORAGE_KEY_SESSION);
+    if (token && userJson) {
+      return { token, user: JSON.parse(userJson), sessionId };
+    }
+  } catch {}
+  return { user: null, token: null, sessionId: null };
+}
+
+function saveToStorage(user: MockUser | null, token: string | null, sessionId: string | null) {
+  try {
+    if (user && token) {
+      localStorage.setItem(STORAGE_KEY_TOKEN, token);
+      localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(user));
+      localStorage.setItem(STORAGE_KEY_SESSION, sessionId || '');
+    } else {
+      localStorage.removeItem(STORAGE_KEY_TOKEN);
+      localStorage.removeItem(STORAGE_KEY_USER);
+      localStorage.removeItem(STORAGE_KEY_SESSION);
+    }
+  } catch {}
+}
 
 export function DevAuthProvider({ children }: { children: ReactNode }) {
-  const [isLoaded, setIsLoaded] = useState(false);
-  const [user, setUser] = useState<MockUser | null>(null);
-  const [sessionId, setSessionId] = useState<string | null>(null);
-  const [token, setToken] = useState<string | null>(null);
+  const stored = loadFromStorage();
+  const [user, setUser] = useState<MockUser | null>(stored.user);
+  const [sessionId, setSessionId] = useState<string | null>(stored.sessionId);
+  const [token, setToken] = useState<string | null>(stored.token);
 
-  useEffect(() => {
-    loadMockAuth();
+  const signIn = useCallback(async (email: string, password?: string) => {
+    const resp = await fetch(`${MOCK_API}/v1/sign_ins`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identifier: email, password: password || 'dev123' }),
+    });
+    const data = await resp.json();
+    if (data.user && data.token) {
+      const u: MockUser = {
+        id: data.user.id,
+        email: data.user.email_addresses?.[0]?.email_address || email,
+        firstName: data.user.first_name,
+        lastName: data.user.last_name,
+        fullName: data.user.first_name && data.user.last_name
+          ? `${data.user.first_name} ${data.user.last_name}`
+          : null,
+        imageUrl: data.user.image_url,
+      };
+      setUser(u);
+      setSessionId(data.session?.id || data.created_session?.id);
+      setToken(data.token);
+      saveToStorage(u, data.token, data.session?.id || data.created_session?.id);
+    }
   }, []);
 
-  async function loadMockAuth() {
-    try {
-      const resp = await fetch(`${MOCK_API}/v1/client`);
-      const data = await resp.json();
-
-      if (data.response?.sessions?.[0]) {
-        const session = data.response.sessions[0];
-        const sessionUser = session.user;
-
-        setSessionId(session.id);
-        setUser({
-          id: sessionUser.id,
-          email: sessionUser.email_addresses?.[0]?.email_address || 'dev@findwith.local',
-          firstName: sessionUser.first_name,
-          lastName: sessionUser.last_name,
-          fullName: sessionUser.first_name && sessionUser.last_name
-            ? `${sessionUser.first_name} ${sessionUser.last_name}`
-            : null,
-          imageUrl: sessionUser.image_url,
-        });
-
-        // Get a signed JWT from mock-clerk
-        const signResp = await fetch(`${MOCK_API}/sign`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sub: sessionUser.id, email: sessionUser.email_addresses?.[0]?.email_address }),
-        });
-        const signData = await signResp.json();
-        setToken(signData.token);
-      }
-    } catch (e) {
-      console.error('[DEV AUTH] Load failed:', e);
-    } finally {
-      setIsLoaded(true);
+  const signUp = useCallback(async (email: string, password?: string, firstName?: string, lastName?: string) => {
+    const resp = await fetch(`${MOCK_API}/v1/sign_ups`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email_address: email, password: password || 'dev123', first_name: firstName, last_name: lastName }),
+    });
+    const data = await resp.json();
+    if (data.user && data.token) {
+      const u: MockUser = {
+        id: data.user.id,
+        email: data.user.email_addresses?.[0]?.email_address || email,
+        firstName: data.user.first_name,
+        lastName: data.user.last_name,
+        fullName: data.user.first_name && data.user.last_name
+          ? `${data.user.first_name} ${data.user.last_name}`
+          : null,
+        imageUrl: data.user.image_url,
+      };
+      setUser(u);
+      setSessionId(data.session?.id || data.created_session?.id);
+      setToken(data.token);
+      saveToStorage(u, data.token, data.session?.id || data.created_session?.id);
     }
-  }
+  }, []);
 
-  async function getToken(): Promise<string | null> {
+  const getToken = useCallback(async (): Promise<string | null> => {
     if (token) return token;
-
-    // Refresh token
     if (user) {
-      const signResp = await fetch(`${MOCK_API}/sign`, {
+      const resp = await fetch(`${MOCK_API}/sign`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sub: user.id, email: user.email }),
       });
-      const signData = await signResp.json();
-      setToken(signData.token);
-      return signData.token;
+      const data = await resp.json();
+      setToken(data.token);
+      saveToStorage(user, data.token, sessionId);
+      return data.token;
     }
     return null;
-  }
+  }, [token, user, sessionId]);
 
-  async function signOut() {
+  const signOut = useCallback(async () => {
     setUser(null);
     setSessionId(null);
     setToken(null);
+    saveToStorage(null, null, null);
     window.location.href = '/';
-  }
+  }, []);
 
   return (
     <MockAuthContext.Provider value={{
-      isLoaded,
+      isLoaded: true,
       isSignedIn: !!user,
       user,
       userId: user?.id,
       sessionId,
       getToken,
       signOut,
+      signIn,
+      signUp,
     }}>
       {children}
     </MockAuthContext.Provider>
@@ -138,20 +185,20 @@ export function useDevSession() {
 }
 
 export function useDevSignIn() {
-  const { isLoaded, user } = useDevAuth();
+  const { isLoaded, user, signIn } = useDevAuth();
   return {
     isLoaded,
     signIn: user ? { status: 'complete' } : null,
-    attemptFirstFactor: async () => window.location.reload(),
+    attemptFirstFactor: signIn,
   };
 }
 
 export function useDevSignUp() {
-  const { isLoaded, user } = useDevAuth();
+  const { isLoaded, user, signUp } = useDevAuth();
   return {
     isLoaded,
     signUp: user ? { status: 'complete' } : null,
-    create: async () => window.location.reload(),
+    create: signUp,
   };
 }
 
@@ -179,59 +226,87 @@ export function DevUserButton() {
   );
 }
 
-export function DevSignIn({ redirectUrl }: { redirectUrl?: string }) {
-  // Just render the form - redirect is handled by the page component
+export function DevSignIn({ redirectUrl, signUpUrl }: { redirectUrl?: string; signUpUrl?: string }) {
+  const { signIn } = useDevAuth();
+  const router = useRouter();
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const email = (form.email as HTMLInputElement).value;
+    const password = (form.password as HTMLInputElement).value;
+    await signIn(email, password);
+    router.push(redirectUrl || '/dashboard');
+  };
+
   return (
     <div className="w-full max-w-md mx-auto p-6 bg-white rounded-lg shadow">
       <h1 className="text-xl font-semibold mb-4 text-center">Sign in (Dev)</h1>
       <p className="text-sm text-gray-500 mb-4 text-center">Any credentials work</p>
-      <form onSubmit={(e) => { e.preventDefault(); window.location.reload(); }}>
+      <form onSubmit={handleSubmit}>
         <div className="mb-4">
           <label className="block text-sm font-medium mb-1">Email</label>
-          <input type="email" className="w-full px-3 py-2 border rounded-md" defaultValue="dev@findwith.local" />
+          <input name="email" type="email" className="w-full px-3 py-2 border rounded-md" defaultValue="dev@findwith.local" />
         </div>
         <div className="mb-4">
           <label className="block text-sm font-medium mb-1">Password</label>
-          <input type="password" className="w-full px-3 py-2 border rounded-md" defaultValue="dev123" />
+          <input name="password" type="password" className="w-full px-3 py-2 border rounded-md" defaultValue="dev123" />
         </div>
         <button type="submit" className="w-full py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">
           Sign in
         </button>
+        {signUpUrl && (
+          <p className="mt-4 text-center text-sm text-gray-500">
+            Don't have an account? <a href={signUpUrl} className="text-indigo-600 hover:underline">Sign up</a>
+          </p>
+        )}
       </form>
     </div>
   );
 }
 
-export function DevSignUp({ redirectUrl }: { redirectUrl?: string }) {
-  const { isSignedIn } = useDevAuth();
-  if (isSignedIn) {
-    window.location.href = redirectUrl || '/dashboard';
-    return null;
-  }
+export function DevSignUp({ redirectUrl, signInUrl }: { redirectUrl?: string; signInUrl?: string }) {
+  const { signUp } = useDevAuth();
+  const router = useRouter();
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const firstName = (form.firstName as HTMLInputElement).value;
+    const lastName = (form.lastName as HTMLInputElement).value;
+    const email = (form.email as HTMLInputElement).value;
+    const password = (form.password as HTMLInputElement).value;
+    await signUp(email, password, firstName, lastName);
+    router.push(redirectUrl || '/dashboard');
+  };
+
   return (
     <div className="w-full max-w-md mx-auto p-6 bg-white rounded-lg shadow">
       <h1 className="text-xl font-semibold mb-4 text-center">Sign up (Dev)</h1>
       <p className="text-sm text-gray-500 mb-4 text-center">Account auto-created</p>
-      <form onSubmit={(e) => { e.preventDefault(); window.location.reload(); }}>
+      <form onSubmit={handleSubmit}>
         <div className="mb-4">
           <label className="block text-sm font-medium mb-1">First name</label>
-          <input type="text" className="w-full px-3 py-2 border rounded-md" />
+          <input name="firstName" type="text" className="w-full px-3 py-2 border rounded-md" />
         </div>
         <div className="mb-4">
           <label className="block text-sm font-medium mb-1">Last name</label>
-          <input type="text" className="w-full px-3 py-2 border rounded-md" />
+          <input name="lastName" type="text" className="w-full px-3 py-2 border rounded-md" />
         </div>
         <div className="mb-4">
           <label className="block text-sm font-medium mb-1">Email</label>
-          <input type="email" className="w-full px-3 py-2 border rounded-md" />
+          <input name="email" type="email" className="w-full px-3 py-2 border rounded-md" />
         </div>
         <div className="mb-4">
           <label className="block text-sm font-medium mb-1">Password</label>
-          <input type="password" className="w-full px-3 py-2 border rounded-md" />
+          <input name="password" type="password" className="w-full px-3 py-2 border rounded-md" />
         </div>
         <button type="submit" className="w-full py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">
           Create account
         </button>
+        {signInUrl && (
+          <p className="mt-4 text-center text-sm text-gray-500">
+            Already have an account? <a href={signInUrl} className="text-indigo-600 hover:underline">Sign in</a>
+          </p>
+        )}
       </form>
     </div>
   );

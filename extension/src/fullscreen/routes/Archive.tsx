@@ -24,7 +24,7 @@ function AuthPrompt() {
       flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
       flexDirection: 'column', gap: 16, padding: 40,
     }}>
-      <QuinnIcon variant="circle" color="var(--accent)" size={48} />
+      <QuinnIcon style="circle" color="var(--accent)" size={48} />
       <h2 style={{ fontSize: 18, fontWeight: 600, color: 'var(--ink)', margin: 0 }}>请先登录</h2>
       <p style={{ fontSize: 13, color: 'var(--mute)', margin: 0, textAlign: 'center', maxWidth: 340 }}>
         你需要先通过网站登录，才能让档案页面读取你的数据。
@@ -743,15 +743,26 @@ function DetailDrawer({
           )}
         </div>
         <button
-          onClick={onClose}
-          style={{
-            width: 24, height: 24, display: 'grid', placeItems: 'center',
-            border: 'none', background: 'transparent', color: 'var(--mute)',
-            cursor: 'pointer', borderRadius: 6, marginLeft: 2,
+          onClick={(e) => {
+            e.stopPropagation();
+            onClose();
           }}
+          style={{
+            width: 28,
+            height: 28,
+            display: 'grid',
+            placeItems: 'center',
+            border: '1px solid var(--line)',
+            background: 'var(--bg)',
+            color: 'var(--mute)',
+            cursor: 'pointer',
+            borderRadius: 6,
+            marginLeft: 2,
+          }}
+          title="关闭"
         >
-          <svg width="12" height="12" viewBox="0 0 12 12">
-            <path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+          <svg width="14" height="14" viewBox="0 0 14 14">
+            <path d="M4 4l6 6M10 4l-6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
           </svg>
         </button>
       </div>
@@ -886,9 +897,33 @@ function DetailDrawer({
         }}
       >
         <QuinnIcon variant="circle" color="var(--accent)" size={16} />
-        <div>
-          这条素材可以补充更多细节——比如当时的具体挑战是什么？要我帮你回忆一下吗？
+        <div style={{ flex: 1 }}>
+          这条素材可以补充更多细节——比如当时的具体挑战是什么？
         </div>
+        <button
+          className="btn"
+          style={{ fontSize: 11, padding: '4px 10px', alignSelf: 'center' }}
+          onClick={() => {
+            // Open sidepanel first
+            chrome.runtime.sendMessage({
+              type: 'OPEN_SIDEPANEL',
+              payload: { route: '/onboarding' },
+            });
+            // Then send recall message via port (ensures delivery even if sidepanel already open)
+            setTimeout(() => {
+              const port = chrome.runtime.connect({ name: 'nav' });
+              port.postMessage({
+                type: 'RECALL_MATERIAL',
+                materialId: material.id,
+                content: material.content,
+                tags: material.tags,
+              });
+              port.disconnect();
+            }, 100);
+          }}
+        >
+          回忆一下
+        </button>
       </div>
     </div>
   );
@@ -908,6 +943,7 @@ export function Archive() {
   const [activeTab, setActiveTab] = useState('lib');
   const [hasToken, setHasToken] = useState<boolean | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [userClosedDrawer, setUserClosedDrawer] = useState(false);
 
   // Check auth on mount
   useEffect(() => {
@@ -937,12 +973,12 @@ export function Archive() {
 
   const selectedMaterial = selectedId ? materials.find(m => m.id === selectedId) : null;
 
-  // Auto-select first material when list changes
+  // Auto-select first material when list changes (not after user closes)
   useEffect(() => {
-    if (!selectedId && filteredMaterials.length > 0 && activeTab === 'lib') {
+    if (!selectedId && !userClosedDrawer && filteredMaterials.length > 0 && activeTab === 'lib') {
       setSelectedId(filteredMaterials[0].id);
     }
-  }, [filteredMaterials, selectedId, activeTab]);
+  }, [filteredMaterials, selectedId, activeTab, userClosedDrawer]);
 
   // Close more-dropdown on outside click
   useEffect(() => {
@@ -1009,13 +1045,13 @@ export function Archive() {
         ) : activeTab === 'base' && profile ? (
           <ProfileView profile={profile} />
         ) : (
-          <ArchiveTable materials={filteredMaterials} selectedId={selectedId} onSelect={setSelectedId} />
+          <ArchiveTable materials={filteredMaterials} selectedId={selectedId} onSelect={(id) => { setSelectedId(id); setUserClosedDrawer(false); }} />
         )}
 
         {selectedMaterial && activeTab === 'lib' && (
           <DetailDrawer
             material={selectedMaterial}
-            onClose={() => setSelectedId(null)}
+            onClose={() => { setSelectedId(null); setUserClosedDrawer(true); }}
             onEdit={handleEdit}
             onDelete={handleDelete}
             onAddTag={handleAddTag}

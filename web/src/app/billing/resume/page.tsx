@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useAuth } from '@/lib/dev-auth';
+import { useAuth } from '@/lib/auth';
 import Link from 'next/link';
 import { apiClient } from '@/lib/api';
 import { sendToExtension } from '@/lib/extension';

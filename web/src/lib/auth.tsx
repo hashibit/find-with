@@ -17,10 +17,6 @@ import {
 import {
   DevAuthProvider,
   useDevAuth,
-  useDevUser,
-  useDevSession,
-  useDevSignIn,
-  useDevSignUp,
   DevSignedIn,
   DevSignedOut,
   DevUserButton,
@@ -28,26 +24,49 @@ import {
   DevSignUp,
 } from './dev-auth';
 
-interface AuthConfig {
-  authMode: 'mock' | 'clerk';
-  jwksUrl: string;
+// Unified auth interface - both Clerk and Dev providers must satisfy this
+interface AuthContextValue {
+  isLoaded: boolean;
+  isSignedIn: boolean;
+  userId: string | null;
+  getToken: () => Promise<string | null>;
+  signOut: () => Promise<void>;
 }
+
+const AuthContext = createContext<AuthContextValue>({
+  isLoaded: false,
+  isSignedIn: false,
+  userId: null,
+  getToken: async () => null,
+  signOut: async () => {},
+});
 
 const AuthModeContext = createContext<'mock' | 'clerk' | null>(null);
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:14607';
+const AUTH_CONFIG_ENDPOINT = `${API_BASE}/api/v1/config/auth`;
 
-// AuthProvider fetches config from backend on mount
+// Bridge component: reads Clerk hooks and populates AuthContext
+function ClerkAuthBridge({ children }: { children: ReactNode }) {
+  const { isLoaded, isSignedIn, userId, getToken, signOut } = useClerkAuth();
+  return (
+    <AuthContext.Provider value={{ isLoaded, isSignedIn, userId, getToken, signOut }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+// AuthProvider fetches config from backend, then wraps with correct provider
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [config, setConfig] = useState<AuthConfig | null>(null);
+  const [config, setConfig] = useState<{ authMode: 'mock' | 'clerk' } | null>(null);
 
   useEffect(() => {
-    fetch(`${API_BASE}/config/auth`)
+    fetch(AUTH_CONFIG_ENDPOINT)
       .then((res) => {
         if (!res.ok) throw new Error(`Config endpoint returned ${res.status}`);
         return res.json();
       })
-      .then((data: AuthConfig) => {
+      .then((data) => {
         if (data.authMode === 'mock' || data.authMode === 'clerk') {
           setConfig(data);
         } else {
@@ -56,8 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })
       .catch((e) => {
         console.error('[AuthProvider] Failed to fetch auth config:', e);
-        // Fallback to mock in dev (backend may not have /config/auth endpoint)
-        setConfig({ authMode: 'mock', jwksUrl: 'http://localhost:14611/.well-known/jwks.json' });
+        setConfig({ authMode: 'clerk' }); // Fallback to clerk
       });
   }, []);
 
@@ -66,49 +84,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   if (config.authMode === 'mock') {
     return (
       <AuthModeContext.Provider value="mock">
-        <DevAuthProvider>{children}</DevAuthProvider>
+        <DevAuthProvider>
+          <DevAuthBridge>{children}</DevAuthBridge>
+        </DevAuthProvider>
       </AuthModeContext.Provider>
     );
   }
 
   return (
     <AuthModeContext.Provider value="clerk">
-      <ClerkProvider>{children}</ClerkProvider>
+      <ClerkProvider>
+        <ClerkAuthBridge>{children}</ClerkAuthBridge>
+      </ClerkProvider>
     </AuthModeContext.Provider>
   );
 }
 
-// Wrapper hooks - read authMode from context, call correct hook
+// Bridge for Dev: reads DevAuth context and populates unified AuthContext
+function DevAuthBridge({ children }: { children: ReactNode }) {
+  const { isLoaded, isSignedIn, userId, getToken, signOut } = useDevAuth();
+  return (
+    <AuthContext.Provider value={{ isLoaded, isSignedIn, userId, getToken, signOut }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+// Unified hook - reads from AuthContext (no conditional hook calls)
 export function useAuth() {
-  const authMode = useContext(AuthModeContext);
-  if (authMode === 'mock') return useDevAuth();
-  return useClerkAuth();
+  return useContext(AuthContext);
 }
 
-export function useUser() {
-  const authMode = useContext(AuthModeContext);
-  if (authMode === 'mock') return useDevUser();
-  return useClerkUser();
-}
-
-export function useSession() {
-  const authMode = useContext(AuthModeContext);
-  if (authMode === 'mock') return useDevSession();
-  return useClerkSession();
-}
-
-export function useSignIn() {
-  const authMode = useContext(AuthModeContext);
-  if (authMode === 'mock') return useDevSignIn();
-  return useClerkSignIn();
-}
-
-export function useSignUp() {
-  const authMode = useContext(AuthModeContext);
-  if (authMode === 'mock') return useDevSignUp();
-  return useClerkSignUp();
-}
-
+// Mode-specific components - still need authMode check (not hooks, just JSX)
 export function SignedIn({ children }: { children: ReactNode }) {
   const authMode = useContext(AuthModeContext);
   if (authMode === 'mock') return <DevSignedIn>{children}</DevSignedIn>;
@@ -138,3 +145,7 @@ export function SignUp(props: { redirectUrl?: string; signInUrl?: string; appear
   if (authMode === 'mock') return <DevSignUp {...props} />;
   return <ClerkSignUp {...props} />;
 }
+
+// Re-export Clerk's specific hooks for advanced use cases
+export { useClerkUser, useClerkSession, useClerkSignIn, useClerkSignUp };
+export { useDevUser, useDevSession, useDevSignIn, useDevSignUp } from './dev-auth';

@@ -3,6 +3,7 @@ import { getToken } from '../../lib/auth';
 import { API_V1 } from '../../background/config';
 import { useConversationStore } from '../stores/conversation';
 import { QMsg, SysLine, QCard, QCardBody, Icons } from '../components/Quinn';
+import { setRecallCallback } from '../App';
 
 interface BasicInfo {
   fullName?: string;
@@ -71,6 +72,17 @@ export function Onboarding() {
       }
     })();
   }, []);
+
+  // Register recall callback for RECALL_MATERIAL messages
+  useEffect(() => {
+    setRecallCallback((content: string) => {
+      sendMessage(
+        `我想回忆一下这条素材的更多细节：\n"${content}"\n\n当时的具体挑战是什么？有什么我没有意识到的重要点？`,
+        'MATERIAL_RECALL',
+      );
+    });
+    return () => setRecallCallback(() => {});
+  }, [sendMessage]);
 
   // Expose test hooks for Playwright e2e tests
   useEffect(() => {

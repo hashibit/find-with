@@ -10,5 +10,5 @@ v0.1-website-design.md
 
 开发计划： @docs/sprint
 
-Always use English in the whole project.
-Always respond in English, except user speak Chinese, in that case, respond in Chinese
+You MUST always use English in the whole project.
+You MUST always respond in English, except user speak Chinese, in that case, respond in Chinese

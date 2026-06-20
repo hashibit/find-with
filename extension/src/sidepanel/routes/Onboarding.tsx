@@ -168,7 +168,7 @@ export function Onboarding() {
         <QMsg>
           <div>嗨，我是 Quinn。</div>
           <div style={{ marginTop: 8, color: 'var(--ink-2)' }}>
-            我会陪你走完这段找工作的路——从浏览岗位，到拿到 offer 那天为止。找到了，我就退场。
+            我帮你找工作、改简历、投简历。
           </div>
         </QMsg>
 

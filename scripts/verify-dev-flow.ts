@@ -77,16 +77,44 @@ async function main() {
     }
     log(`IAM /me → ${meResp.status}`);
 
-    // ── 2. Open sidepanel ─────────────────────────────────────────────────────
+    // ── 2. Login flow: side panel updates without reload ──────────────────────
+    // Open side panel with NO token — simulates a fresh install.
+    // Then simulate the website posting AUTH_TOKEN (as if the login popup completed).
+    // The side panel must update the header on its own, no page reload allowed.
     const page = await context.newPage();
     await page.goto(SIDEPANEL);
     await page.waitForLoadState('domcontentloaded');
 
-    // Inject auth token before re-navigating to the canonical sidepanel URL
-    await page.evaluate(async (tok: string) => {
-      await chrome.storage.local.set({ token: tok });
-    }, token);
-    // Re-navigate to canonical URL (not the BrowserRouter-rewritten path)
+    log('Step 0a: Side panel opens unauthenticated');
+    await page.locator('a[href*="extension-callback"]').waitFor({ timeout: 8_000 });
+    await shot(page, '00-unauthenticated');
+
+    // Simulate AUTH_TOKEN arriving in storage (what the website does after login)
+    const sessionResp = await fetch(`${BACKEND}/api/v1/iam/auth/verify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clerkToken: token }),
+    });
+    if (!sessionResp.ok) throw new Error(`auth/verify failed: ${sessionResp.status}`);
+    const { token: sessionToken, expires_at, user_id } = await sessionResp.json() as {
+      token: string; expires_at: number; user_id: string;
+    };
+
+    await page.evaluate(
+      async ({ t, ea, uid }) => {
+        await chrome.storage.local.set({ token: t, expires_at: ea, user_id: uid });
+      },
+      { t: sessionToken, ea: expires_at, uid: user_id },
+    );
+
+    log('Step 0b: AUTH_TOKEN written to storage — waiting for side panel to update WITHOUT reload');
+    // The header "未登录 →" link must disappear and be replaced by the user name/email.
+    await page.locator('a[href*="extension-callback"]').waitFor({ state: 'hidden', timeout: 8_000 });
+    await shot(page, '00-authenticated-no-reload');
+    log('Step 0: Login flow ✓ (side panel updated without reload)');
+
+    // ── 3. Open sidepanel for main flow ───────────────────────────────────────
+    // Re-navigate to the canonical URL so BrowserRouter starts at root.
     await page.goto(SIDEPANEL);
     await page.waitForLoadState('domcontentloaded');
 

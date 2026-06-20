@@ -12,9 +12,13 @@ const EXT_ID = process.env.NEXT_PUBLIC_EXTENSION_ID || '';
 export default function ExtensionCallbackPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
   const [status, setStatus] = useState<'loading' | 'sent' | 'error' | 'unauthenticated'>('loading');
+  const [errorDetail, setErrorDetail] = useState<string>('');
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
     if (!isLoaded) return;
+    setStatus('loading');
+    setErrorDetail('');
 
     if (!isSignedIn) {
       setStatus('unauthenticated');
@@ -49,16 +53,22 @@ export default function ExtensionCallbackPage() {
 
         // Send token to extension
         if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage && EXT_ID) {
-          chrome.runtime.sendMessage(EXT_ID, { type: 'AUTH_TOKEN', token: data.token }, (response) => {
-            if (chrome.runtime.lastError) {
-              console.error('Extension messaging error:', chrome.runtime.lastError);
-              setStatus('error');
-            } else if (response?.ok) {
-              setStatus('sent');
-            } else {
-              setStatus('error');
-            }
-          });
+          chrome.runtime.sendMessage(
+            EXT_ID,
+            { type: 'AUTH_TOKEN', token: data.token, expires_at: data.expires_at, user_id: data.user_id },
+            (response) => {
+              if (chrome.runtime.lastError) {
+                const msg = chrome.runtime.lastError.message || 'Unknown error';
+                console.error('Extension messaging error:', msg);
+                setErrorDetail(msg);
+                setStatus('error');
+              } else if (response?.ok) {
+                setStatus('sent');
+              } else {
+                setStatus('error');
+              }
+            },
+          );
         } else {
           console.warn('chrome.runtime not available; token not delivered to extension');
           setStatus('sent');
@@ -70,7 +80,7 @@ export default function ExtensionCallbackPage() {
     }
 
     authenticateWithBackend();
-  }, [isLoaded, isSignedIn, getToken]);
+  }, [isLoaded, isSignedIn, getToken, retryCount]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -97,7 +107,7 @@ export default function ExtensionCallbackPage() {
             <h1 className="text-xl font-semibold mb-2">Not signed in</h1>
             <p className="text-gray-500 text-sm">
               Please{' '}
-              <a href="/login" className="text-brand-600 hover:underline">
+              <a href="/login?redirect_url=/auth/extension-callback" className="text-brand-600 hover:underline">
                 log in
               </a>{' '}
               first, then try again.
@@ -112,6 +122,15 @@ export default function ExtensionCallbackPage() {
               Could not deliver credentials to the extension. Make sure the FindWith extension is
               installed and try again.
             </p>
+            {errorDetail && (
+              <p className="text-xs text-gray-400 mt-2 font-mono break-all">{errorDetail}</p>
+            )}
+            <button
+              className="mt-4 text-sm text-blue-600 hover:underline"
+              onClick={() => setRetryCount((c) => c + 1)}
+            >
+              Try again
+            </button>
           </>
         )}
       </div>

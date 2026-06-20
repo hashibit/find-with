@@ -50,7 +50,8 @@ function useAuthUser() {
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+
+    async function fetchUser() {
       const token = await getToken();
       if (!token || cancelled) return;
       try {
@@ -64,8 +65,20 @@ function useAuthUser() {
           email: data?.basicInfo?.email,
         });
       } catch { /* ignore */ }
-    })();
-    return () => { cancelled = true; };
+    }
+
+    fetchUser();
+
+    // Re-fetch when token is written to storage (e.g. after login popup completes)
+    const onChanged = (changes: Record<string, chrome.storage.StorageChange>) => {
+      if (changes.token?.newValue) fetchUser();
+    };
+    chrome.storage.local.onChanged.addListener(onChanged);
+
+    return () => {
+      cancelled = true;
+      chrome.storage.local.onChanged.removeListener(onChanged);
+    };
   }, []);
 
   return user;

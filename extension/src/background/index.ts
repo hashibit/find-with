@@ -37,7 +37,12 @@ chrome.runtime.onMessageExternal.addListener((msg, sender, sendResponse) => {
   }
 
   if (msg.type === 'AUTH_TOKEN') {
-    handleAuthToken(msg.token, msg.expires_at, msg.user_id).then(sendResponse);
+    handleAuthToken(msg.token, msg.expires_at, msg.user_id).then((result) => {
+      if (result.ok) {
+        navPorts.forEach((p) => p.postMessage({ type: 'AUTH_SUCCESS' }));
+      }
+      sendResponse(result);
+    });
     return true;
   }
 

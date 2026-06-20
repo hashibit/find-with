@@ -1,6 +1,7 @@
 import React from 'react';
 import { useRadarStore } from '../stores/radar';
 import { QMsg, Icons } from '../components/Quinn';
+import { ConversationView } from '../components/ConversationView';
 
 const STATUS_MAP: Record<string, { label: string; tone: string }> = {
   saved:     { label: '已分析',   tone: 'soft' },
@@ -117,6 +118,7 @@ function RadarCard({ id, company, jobTitle, status, lastActivity, appliedAt }: R
           <div className="h between" style={{ marginTop: 8, gap: 6, alignItems: 'center' }}>
             <span
               data-testid="radar-status-badge"
+              data-status={status}
               className={`chip ${tone} dot`}
             >
               {label}
@@ -152,6 +154,7 @@ export function Radar() {
   const recentSubmitted = submittedItems[0];
 
   return (
+    <>
     <div className="sp-conv" data-testid="radar-view">
       {/* Quinn follow-up message if there are submitted items */}
       {recentSubmitted && (
@@ -188,6 +191,7 @@ export function Radar() {
           <div className="lab">求职雷达 · {radarItems.length}</div>
           <div className="h gap-4 muted">
             <button
+              data-testid="refresh-btn"
               className="iconbtn"
               onClick={handleRefresh}
               disabled={loading}
@@ -230,5 +234,7 @@ export function Radar() {
         </div>
       </div>
     </div>
+    <ConversationView />
+    </>
   );
 }

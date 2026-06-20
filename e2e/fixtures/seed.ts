@@ -21,6 +21,20 @@ export async function seed() {
   await client.connect();
 
   try {
+    // ── Clean up e2e-user-onboard from previous runs ──────────────────────────
+    // j01 (onboarding) uploads a real resume for this user; subsequent runs
+    // would see stale profile data and skip the upload card.
+    await client.query(`DELETE FROM conv_messages WHERE "conversationId" IN (SELECT id FROM conv_conversations WHERE "userId" = 'e2e-user-onboard')`);
+    await client.query(`DELETE FROM conv_conversations WHERE "userId" = 'e2e-user-onboard'`);
+    await client.query(`DELETE FROM profile_materials WHERE "userId" = 'e2e-user-onboard'`);
+    await client.query(`DELETE FROM profile_base_resumes WHERE "userId" = 'e2e-user-onboard'`);
+    await client.query(`DELETE FROM profile_skills WHERE "userId" = 'e2e-user-onboard'`);
+    await client.query(`DELETE FROM profile_projects WHERE "userId" = 'e2e-user-onboard'`);
+    await client.query(`DELETE FROM profile_work_experiences WHERE "userId" = 'e2e-user-onboard'`);
+    await client.query(`DELETE FROM profile_education WHERE "userId" = 'e2e-user-onboard'`);
+    await client.query(`DELETE FROM profile_resume_sources WHERE "userId" = 'e2e-user-onboard'`);
+    await client.query(`DELETE FROM profile_profiles WHERE "userId" = 'e2e-user-onboard'`);
+
     // ── IAM users ────────────────────────────────────────────────────────────
     await client.query(`
       INSERT INTO iam_users (id, "clerkUserId", email, "fullName", "isActive", "createdAt", "updatedAt")

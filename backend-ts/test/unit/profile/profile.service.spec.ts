@@ -8,6 +8,9 @@ import { ProfileProfile } from '../../../src/database/entities/profile/profile.e
 import { ProfileMaterial } from '../../../src/database/entities/profile/material.entity.js';
 import { ProfileBaseResume } from '../../../src/database/entities/profile/base-resume.entity.js';
 import { ProfileResumeSource } from '../../../src/database/entities/profile/resume-source.entity.js';
+import { ProfileWorkExperience } from '../../../src/database/entities/profile/work-experience.entity.js';
+import { ProfileEducation } from '../../../src/database/entities/profile/education.entity.js';
+import { ProfileSkill } from '../../../src/database/entities/profile/skill.entity.js';
 import { FIELD_CRYPTO } from '../../../src/common/crypto/crypto.interface.js';
 
 const makeMaterial = (override: Partial<ProfileMaterial> = {}): ProfileMaterial =>
@@ -65,6 +68,9 @@ describe('ProfileService', () => {
         { provide: getRepositoryToken(ProfileMaterial), useValue: materialRepo },
         { provide: getRepositoryToken(ProfileBaseResume), useValue: { find: vi.fn(), create: vi.fn(), save: vi.fn() } },
         { provide: getRepositoryToken(ProfileResumeSource), useValue: resumeSourceRepo },
+        { provide: getRepositoryToken(ProfileWorkExperience), useValue: { find: vi.fn(), findOne: vi.fn(), create: vi.fn(), save: vi.fn() } },
+        { provide: getRepositoryToken(ProfileEducation), useValue: { find: vi.fn(), findOne: vi.fn(), create: vi.fn(), save: vi.fn() } },
+        { provide: getRepositoryToken(ProfileSkill), useValue: { find: vi.fn(), findOne: vi.fn(), create: vi.fn(), save: vi.fn() } },
         { provide: FIELD_CRYPTO, useValue: crypto },
         { provide: getQueueToken(RESUME_PARSE_QUEUE), useValue: parseQueue },
       ],

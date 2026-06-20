@@ -1,5 +1,6 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger, Inject } from '@nestjs/common';
+import { parseLlmJsonArray } from '../../common/llm-json.js';
 import { Job } from 'bullmq';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -97,13 +98,7 @@ Rules:
       messages: [{ role: 'user', content: prompt, timestamp: Date.now() }],
     });
 
-    let sections: unknown[] = [];
-    try {
-      const m = raw.match(/\[[\s\S]*\]/);
-      if (m) sections = JSON.parse(m[0]) as unknown[];
-    } catch {
-      this.logger.warn('Failed to parse tailoring output');
-    }
+    const sections = parseLlmJsonArray(raw);
 
     // Validate and process sections with bullet-level validation
     const materialIds = new Set(relevantMaterials.map((m) => m.id));

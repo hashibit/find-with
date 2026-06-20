@@ -7,6 +7,7 @@ export type BgMsg =
   | { type: 'EMAIL_CAPTURE'; payload: EmailCapturePayload }
   | { type: 'EASY_APPLY_FORM'; payload: { fields: any[] } }
   | { type: 'EASY_APPLY_SUBMITTED' }
+  | { type: 'EASY_APPLY_START_FILL'; payload: { planId: string; fields: Array<{ label: string; value: string }> } }
   | { type: 'OPEN_SIDEPANEL'; payload: { route?: string } }
   | { type: 'SSE_EVENT'; payload: any }
   // Conversation
@@ -59,6 +60,9 @@ interface CreateMaterialPayload {
   provenanceKind: string;
 }
 
+// Track the tab ID where LinkedIn Easy Apply is open
+let easyApplyTabId: number | null = null;
+
 export async function handleMessage(
   msg: BgMsg,
   sender: chrome.runtime.MessageSender,
@@ -70,8 +74,24 @@ export async function handleMessage(
     case 'EMAIL_CAPTURE':
       return handleEmailCapture(msg.payload);
     case 'EASY_APPLY_FORM':
+      // Remember which tab has the Easy Apply modal open
+      if (sender.tab?.id) easyApplyTabId = sender.tab.id;
       return { received: true };
+    case 'EASY_APPLY_START_FILL':
+      // Forward fill instructions to the content script in the LinkedIn tab
+      if (easyApplyTabId !== null) {
+        try {
+          await chrome.tabs.sendMessage(easyApplyTabId, {
+            type: 'EASY_APPLY_FILL',
+            payload: msg.payload,
+          });
+        } catch (e) {
+          return { error: 'could not reach content script: ' + String(e) };
+        }
+      }
+      return { sent: true };
     case 'EASY_APPLY_SUBMITTED':
+      easyApplyTabId = null;
       navPorts.forEach((port) =>
         port.postMessage({ type: 'EASY_APPLY_SUBMITTED' }),
       );

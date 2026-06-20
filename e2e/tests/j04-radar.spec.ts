@@ -43,23 +43,21 @@ test.describe('J-04: Radar Status Progression', () => {
     await expect(seededItem).toBeVisible();
     const badge = seededItem.locator('[data-testid="radar-status-badge"]');
     await expect(badge).toBeVisible();
-    const badgeText = await badge.textContent();
-    // The seeded item has status APPLIED — label maps to "Applied" in the component
-    expect(badgeText?.toLowerCase()).toContain('appl');
+    // Use data-status attribute for language-independent assertions
+    await expect(badge).toHaveAttribute('data-status', 'applied');
 
     // Step 7: PATCH status to INTERVIEWING via API
     const patchRes = await apiCall('PATCH', '/jobs/job-1/radar', { status: 'INTERVIEWING' });
     expect(patchRes.status).toBe(200);
 
     // Refresh radar
-    await sidepanel.locator('button:has-text("Refresh")').click();
+    await sidepanel.locator('[data-testid="refresh-btn"]').click();
     await waitForElement(sidepanel, '[data-testid="radar-item"]', 10_000);
 
     // Step 8: Badge updates to INTERVIEWING
     const updatedItem = sidepanel.locator('[data-testid="radar-item"][data-item-id="job-1"]');
     const updatedBadge = updatedItem.locator('[data-testid="radar-status-badge"]');
-    const updatedText = await updatedBadge.textContent();
-    expect(updatedText?.toLowerCase()).toContain('interview');
+    await expect(updatedBadge).toHaveAttribute('data-status', 'interview');
 
     // Step 9-10: Mark as rejected via API
     const rejectRes = await apiCall('PATCH', '/jobs/job-1/radar', { status: 'REJECTED' });
@@ -70,9 +68,8 @@ test.describe('J-04: Radar Status Progression', () => {
     expect(dbItem?.status).toBe('REJECTED');
 
     // Step 12: Refresh UI and verify rejected state
-    await sidepanel.locator('button:has-text("Refresh")').click();
-    // Wait for the badge text to update to "rejected" (not just for the element to be visible)
+    await sidepanel.locator('[data-testid="refresh-btn"]').click();
     const rejectedBadge2 = sidepanel.locator('[data-testid="radar-item"][data-item-id="job-1"] [data-testid="radar-status-badge"]');
-    await expect(rejectedBadge2).toContainText(/rejected/i, { timeout: 15_000 });
+    await expect(rejectedBadge2).toHaveAttribute('data-status', 'rejected', { timeout: 15_000 });
   });
 });

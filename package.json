@@ -25,8 +25,8 @@
     "e2e:seed": "cd backend-ts && set -a && . .env.e2e && set +a && pnpm exec tsx ../e2e/fixtures/seed.ts",
     "build:backend": "pnpm --filter @findwith/backend run build",
     "build:extension:e2e": "bash e2e/scripts/build-extension-e2e.sh",
-    "e2e": "NODE_OPTIONS=--no-strip-types playwright test",
-    "e2e:record": "LLM_RECORD=true NODE_OPTIONS=--no-strip-types playwright test"
+    "e2e": "NO_PROXY=localhost,127.0.0.1 no_proxy=localhost,127.0.0.1 playwright test",
+    "e2e:record": "LLM_RECORD=true NO_PROXY=localhost,127.0.0.1 no_proxy=localhost,127.0.0.1 playwright test"
   },
   "devDependencies": {
     "@playwright/test": "^1.44.0",

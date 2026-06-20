@@ -5,7 +5,9 @@ import { ApplyFillPlan } from '../../database/entities/apply/fill-plan.entity.js
 import { ApplyApplication } from '../../database/entities/apply/application.entity.js';
 import { JobRadarItem } from '../../database/entities/jobs/radar-item.entity.js';
 import { JobParsedJd } from '../../database/entities/jobs/parsed-jd.entity.js';
+import { ProfileProfile } from '../../database/entities/profile/profile.entity.js';
 import { LlmService } from '../../llm/llm.service.js';
+import { parseLlmJsonArray } from '../../common/llm-json.js';
 import { ulid } from 'ulid';
 
 @Injectable()
@@ -15,6 +17,7 @@ export class ApplyService {
     @InjectRepository(ApplyApplication) private readonly appRepo: Repository<ApplyApplication>,
     @InjectRepository(JobRadarItem) private readonly radarRepo: Repository<JobRadarItem>,
     @InjectRepository(JobParsedJd) private readonly jdRepo: Repository<JobParsedJd>,
+    @InjectRepository(ProfileProfile) private readonly profileRepo: Repository<ProfileProfile>,
     private readonly llm: LlmService,
   ) {}
 
@@ -27,26 +30,33 @@ export class ApplyService {
       ? await this.jdRepo.findOne({ where: { id: radarItem.parsedJdId } })
       : null;
 
+    const profile = await this.profileRepo.findOne({ where: { userId } });
+    const info = (profile?.basicInfo ?? {}) as Record<string, string>;
+
     // Generate field plan via LLM
     const raw = await this.llm.completeContext({
       systemPrompt:
-        'You generate LinkedIn Easy Apply field plans. Output JSON array of field objects.',
+        'You generate LinkedIn Easy Apply field plans. Use the candidate info exactly as provided — do NOT modify names, emails, or phone numbers.',
       messages: [
         {
           role: 'user',
-          content: `Generate a fill plan for this job:\nTitle: ${parsedJd?.title ?? 'Unknown'}\nCompany: ${parsedJd?.company ?? 'Unknown'}\n\nReturn JSON: [{ "fieldName": string, "fieldType": string, "value": string, "source": string }]`,
+          content: `Generate a fill plan for this job application.
+
+Job: ${parsedJd?.title ?? 'Unknown'} at ${parsedJd?.company ?? 'Unknown'}
+
+Candidate info (use exactly as-is, do not invent or modify):
+- Full name: ${info['fullName'] ?? ''}
+- Email: ${info['email'] ?? ''}
+- Phone: ${info['phone'] ?? ''}
+- Location: ${info['location'] ?? ''}
+
+Return JSON array only: [{ "fieldName": string, "fieldType": string, "value": string, "source": string }]`,
           timestamp: Date.now(),
         },
       ],
     });
 
-    let fields: unknown[] = [];
-    try {
-      const m = raw.match(/\[[\s\S]*\]/);
-      if (m) fields = JSON.parse(m[0]) as unknown[];
-    } catch {
-      /* ignore */
-    }
+    const fields = parseLlmJsonArray(raw);
 
     const plan = this.planRepo.create({
       id: ulid(),

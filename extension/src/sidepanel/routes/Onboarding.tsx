@@ -114,8 +114,14 @@ export function Onboarding() {
       if (!token) throw new Error('Not authenticated');
       await uploadResume(token, file);
       setUploadDone(true);
+      // Poll until basicInfo is populated by the async BullMQ parse job (max 60s)
       try {
-        const updated = await fetchProfile(token);
+        const deadline = Date.now() + 60_000;
+        let updated = await fetchProfile(token);
+        while (!updated?.basicInfo && Date.now() < deadline) {
+          await new Promise((r) => setTimeout(r, 1500));
+          updated = await fetchProfile(token);
+        }
         setProfile(updated);
         if (updated?.basicInfo) {
           void sendMessage(
@@ -171,6 +177,7 @@ export function Onboarding() {
             <div>开始之前，先把你的简历给我。我读完之后，再聊 5 分钟把它聊"立体"。</div>
             <QCard style={{ marginTop: 10 }}>
               <QCardBody
+                data-testid="upload-resume-btn"
                 style={{ padding: 14, textAlign: 'center', cursor: uploading ? 'not-allowed' : 'pointer' }}
                 onClick={() => !uploading && fileInputRef.current?.click()}
               >
@@ -207,7 +214,7 @@ export function Onboarding() {
         )}
 
         {uploadDone && !uploadError && (
-          <SysLine>解析中…</SysLine>
+          <SysLine data-testid="upload-success">解析中…</SysLine>
         )}
 
         {hasResume && profile?.basicInfo && (

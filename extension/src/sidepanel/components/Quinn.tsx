@@ -234,10 +234,11 @@ export function UMsg({ children }: UMsgProps) {
 
 interface SysLineProps {
   children: React.ReactNode;
+  'data-testid'?: string;
 }
 
-export function SysLine({ children }: SysLineProps) {
-  return <div className="sys-line">{children}</div>;
+export function SysLine({ children, 'data-testid': testId }: SysLineProps) {
+  return <div className="sys-line" data-testid={testId}>{children}</div>;
 }
 
 // ---------- Card components ----------

@@ -15,7 +15,12 @@ const chromeMock = {
   },
   storage: {
     local: {
-      get: vi.fn().mockResolvedValue({}),
+      // Support both callback form (getToken uses this) and promise form
+      get: vi.fn().mockImplementation((_keys: string[], cb?: (res: object) => void) => {
+        const result = { token: 'test-token' };
+        if (typeof cb === 'function') cb(result);
+        return Promise.resolve(result);
+      }),
       set: vi.fn().mockResolvedValue(undefined),
       remove: vi.fn().mockResolvedValue(undefined),
       clear: vi.fn().mockResolvedValue(undefined),
@@ -47,6 +52,14 @@ const chromeMock = {
 
 // Assign to global
 (globalThis as any).chrome = chromeMock;
+
+// Mock global fetch so store tests don't make real network calls
+(globalThis as any).fetch = vi.fn().mockResolvedValue({
+  ok: true,
+  status: 200,
+  json: () => Promise.resolve({}),
+  text: () => Promise.resolve(''),
+});
 
 // Re-export for test files to use for custom mock setups
 export { chromeMock };

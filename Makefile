@@ -1,8 +1,17 @@
-.PHONY: dev ci test lint proto clean e2e-up e2e-down e2e-migrate e2e-seed e2e e2e-record
+.PHONY: dev dev-seed ci test lint proto clean e2e-up e2e-down e2e-migrate e2e-seed e2e e2e-record
 
-# Dev
-dev: up
+# Dev — full one-command start: infra + migrate + seed + backend
+dev: up dev-migrate dev-seed
 	cd backend-ts && pnpm run start:dev
+
+# Run migrations against the dev DB
+dev-migrate:
+	cd backend-ts && pnpm run migration:run
+
+# Seed dev fixtures (idempotent) — runs from e2e/ which has the pg package
+dev-seed:
+	NO_PROXY=localhost,127.0.0.1 no_proxy=localhost,127.0.0.1 \
+	  pnpm --filter @findwith/e2e exec tsx ../scripts/seed-dev.ts
 
 # CI — one command runs all stacks
 ci: lint test

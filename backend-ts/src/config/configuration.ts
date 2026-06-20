@@ -39,6 +39,15 @@ const envSchema = z.object({
   CRYPTO_DEK_CIPHERTEXT: z.string().min(1),
   CORS_ORIGINS: z.string().default('http://localhost:14606'),
   ADMIN_SECRET: z.string().min(32),
+  // SMTP (optional — skip email dispatch if unset)
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.coerce.number().optional().default(587),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASS: z.string().optional(),
+  SMTP_FROM: z.string().default('quinn@findwith.com'),
+  SMTP_SECURE: z.coerce.boolean().default(false),
+  // Base URL used for generating email tracking links. Must be set in production.
+  API_BASE_URL: z.string().url().default('http://localhost:14607'),
 });
 
 type Env = z.infer<typeof envSchema>;
@@ -70,6 +79,15 @@ export interface AppConfig {
   crypto: { kek: string; dekCiphertext: string };
   cors: { origins: string[] };
   admin: { secret: string };
+  smtp: {
+    host?: string;
+    port: number;
+    user?: string;
+    pass?: string;
+    from: string;
+    secure: boolean;
+  };
+  apiBaseUrl: string;
 }
 
 export function validateEnv(raw: Record<string, unknown>): Env {
@@ -133,8 +151,15 @@ export const configuration = (): AppConfig => {
     cors: {
       origins: env.CORS_ORIGINS.split(','),
     },
-    admin: {
-      secret: env.ADMIN_SECRET,
+    admin: { secret: env.ADMIN_SECRET },
+    smtp: {
+      host: env.SMTP_HOST,
+      port: env.SMTP_PORT,
+      user: env.SMTP_USER,
+      pass: env.SMTP_PASS,
+      from: env.SMTP_FROM,
+      secure: env.SMTP_SECURE,
     },
+    apiBaseUrl: env.API_BASE_URL,
   };
 };

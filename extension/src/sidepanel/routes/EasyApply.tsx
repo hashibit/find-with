@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { getToken } from '../../lib/auth';
 import { API_V1 as API_BASE } from '../../background/config';
+import { runtimeCall } from '../../lib/runtime';
 
 interface FillPlan {
   id: string;
@@ -28,6 +29,7 @@ export function EasyApply() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [approved, setApproved] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
 
   useEffect(() => {
     if (!radarItemId) return;
@@ -56,6 +58,16 @@ export function EasyApply() {
     })();
   }, [radarItemId]);
 
+  // Listen for EASY_APPLY_SUBMITTED from background (user clicked Submit on LinkedIn)
+  // Must be before any early returns to satisfy React Rules of Hooks
+  useEffect(() => {
+    const port = chrome.runtime.connect({ name: 'nav' });
+    port.onMessage.addListener((msg: { type: string }) => {
+      if (msg.type === 'EASY_APPLY_SUBMITTED') setSubmitted(true);
+    });
+    return () => { try { port.disconnect(); } catch {} };
+  }, []);
+
   if (!radarItemId) {
     return (
       <div style={{ padding: '24px 16px', color: '#6b7280', fontSize: 14 }}>
@@ -83,35 +95,38 @@ export function EasyApply() {
   if (!plan) return null;
 
   const handleApprove = async () => {
+    if (!plan) return;
     try {
       const token = await getToken();
       const resp = await fetch(`${API_BASE}/apply/plan/${plan.id}/approve`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       });
       if (!resp.ok) throw new Error('Failed to approve');
       setApproved(true);
+      // Send fill instructions to content script via background
+      await runtimeCall({
+        type: 'EASY_APPLY_START_FILL',
+        payload: {
+          planId: plan.id,
+          fields: plan.fields.map((f) => ({ label: f.label, value: f.value })),
+        },
+      });
     } catch (e) {
       console.error('Failed to approve plan', e);
     }
   };
 
   const handleRecordSubmission = async () => {
+    if (!plan) return;
     try {
       const token = await getToken();
       const resp = await fetch(`${API_BASE}/apply/submit`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify({ radarItemId }),
       });
       if (!resp.ok) throw new Error('Failed to record');
-      alert('Application recorded!');
     } catch (e) {
       console.error('Failed to record submission', e);
     }
@@ -262,35 +277,23 @@ export function EasyApply() {
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
-            {!approved ? (
+            {!approved && (
               <button
                 onClick={handleApprove}
-                style={{
-                  padding: '10px 20px',
-                  background: '#22c55e',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: 8,
-                  cursor: 'pointer',
-                  fontSize: 14,
-                  fontWeight: 600,
-                }}
+                style={{ padding: '10px 20px', background: '#22c55e', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14, fontWeight: 600 }}
               >
-                Approve
+                Approve & Fill
               </button>
-            ) : (
+            )}
+            {approved && !submitted && (
+              <div style={{ fontSize: 13, color: '#6b7280', padding: '10px 0' }}>
+                ✓ Quinn filled the form — click <strong>Submit</strong> on LinkedIn
+              </div>
+            )}
+            {submitted && (
               <button
                 onClick={handleRecordSubmission}
-                style={{
-                  padding: '10px 20px',
-                  background: '#4f46e5',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: 8,
-                  cursor: 'pointer',
-                  fontSize: 14,
-                  fontWeight: 600,
-                }}
+                style={{ padding: '10px 20px', background: '#4f46e5', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14, fontWeight: 600 }}
               >
                 Record Submission
               </button>
@@ -321,7 +324,7 @@ function transformFillPlan(data: any): FillPlan {
     jobTitle: data.radarItem?.jobTitle || data.jobTitle || 'Unknown',
     company: data.radarItem?.company || data.company || 'Unknown',
     fields: (data.fields || []).map((f: any) => ({
-      label: f.label || f.key || 'Field',
+      label: f.label || f.fieldName || f.key || 'Field',
       value: f.value || '',
       preset: f.preset || f.source === 'profile',
     })),

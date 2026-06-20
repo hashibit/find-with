@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite build --mode development --watch",
-    "build": "tsc && vite build",
+    "build": "vite build && pnpm run build:cs",
+    "build:cs": "for entry in src/content-scripts/linkedin/job-detail.ts:dist/cs-linkedin-job.js src/content-scripts/linkedin/easy-apply.ts:dist/cs-linkedin-apply.js src/content-scripts/gmail/email-reader.ts:dist/cs-gmail.js; do input=${entry%%:*}; output=${entry##*:}; esbuild \"$input\" --bundle --format=iife --platform=browser --target=chrome120 --outfile=\"$output\"; done",
+    "typecheck": "tsc --noEmit",
     "format": "prettier --write \"src/**/*.{ts,tsx}\"",
     "lint": "eslint src --fix",
     "test": "vitest run",
@@ -21,8 +23,8 @@
   "devDependencies": {
     "@types/chrome": "^0.0.268",
     "@types/dompurify": "^3.0.0",
-    "@types/react": "^18.3.0",
-    "@types/react-dom": "^18.3.0",
+    "@types/react": "^18.2.79",
+    "@types/react-dom": "^18.2.25",
     "@typescript-eslint/eslint-plugin": "^7.16.0",
     "@typescript-eslint/parser": "^7.16.0",
     "@vitejs/plugin-react": "^4.3.0",
@@ -32,7 +34,7 @@
     "hot-reload-extension-vite": "^1.1.0",
     "jsdom": "^29.1.1",
     "prettier": "^3.3.3",
-    "typescript": "^5.4.0",
+    "typescript": "^5.5.4",
     "vite": "^5.4.0",
     "vitest": "^1.6.0"
   }

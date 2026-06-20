@@ -23,9 +23,12 @@ export class FollowupService {
       bodyText?: string;
       radarItemId?: string;
       receivedAt?: Date;
+      source?: string;
     },
   ): Promise<FollowupEmail> {
     const encryptedBody = data.bodyText ? await this.crypto.encrypt(data.bodyText) : null;
+    const knownSources = new Set(['gmail-web', 'gmail-api', 'outlook-web', 'other']);
+    const source = data.source ? (knownSources.has(data.source) ? data.source : 'other') : undefined;
     const email = this.emailRepo.create({
       id: ulid(),
       userId,
@@ -34,6 +37,7 @@ export class FollowupService {
       bodyText: encryptedBody,
       radarItemId: data.radarItemId ?? null,
       receivedAt: data.receivedAt ?? null,
+      ...(source !== undefined && { source }),
     });
     return this.emailRepo.save(email);
   }

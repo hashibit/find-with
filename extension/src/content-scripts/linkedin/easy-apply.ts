@@ -99,3 +99,76 @@ function observeEasyApplyModal() {
 }
 
 observeEasyApplyModal();
+
+// ── Fill handler ────────────────────────────────────────────────────────────
+// Receives EASY_APPLY_FILL from the background service worker and fills form
+// fields in the LinkedIn Easy Apply modal.
+
+interface FillInstruction {
+  label: string;
+  value: string;
+}
+
+function fillField(el: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement, value: string): void {
+  // React-compatible value setter
+  const nativeInputSetter = Object.getOwnPropertyDescriptor(
+    el.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype,
+    'value',
+  )?.set;
+
+  if (el.tagName === 'SELECT') {
+    const select = el as HTMLSelectElement;
+    const opt = Array.from(select.options).find(
+      (o) => o.text.toLowerCase().includes(value.toLowerCase()),
+    );
+    if (opt) {
+      select.value = opt.value;
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    return;
+  }
+
+  if (nativeInputSetter) {
+    nativeInputSetter.call(el, value);
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  } else {
+    el.value = value;
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+}
+
+function applyFillInstructions(fields: FillInstruction[]): void {
+  const modal = document.querySelector('.jobs-easy-apply-modal') as HTMLElement | null;
+  if (!modal) {
+    console.warn('[FindWith] Easy Apply modal not found for fill');
+    return;
+  }
+
+  const inputs = Array.from(
+    modal.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>(
+      'input:not([type="hidden"]):not([type="submit"]):not([type="button"]), textarea, select',
+    ),
+  );
+
+  for (const instruction of fields) {
+    // Match by label text (case-insensitive partial match)
+    const labelLower = instruction.label.toLowerCase();
+    const target = inputs.find((el) => {
+      const labelEl = el.labels?.[0] ?? modal.querySelector(`label[for="${el.id}"]`);
+      const text = (labelEl?.textContent ?? el.placeholder ?? el.name ?? '').toLowerCase();
+      return text.includes(labelLower) || labelLower.includes(text);
+    });
+
+    if (target) {
+      fillField(target, instruction.value);
+    }
+  }
+}
+
+// Listen for fill instructions from background
+chrome.runtime.onMessage.addListener((msg) => {
+  if (msg?.type === 'EASY_APPLY_FILL') {
+    applyFillInstructions((msg.payload?.fields ?? []) as FillInstruction[]);
+  }
+});

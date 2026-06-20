@@ -11,6 +11,7 @@ class CaptureEmailDto extends createZodDto(
     fromAddr: z.string().optional(),
     bodyText: z.string().optional(),
     radarItemId: z.string().optional(),
+    source: z.string().optional(),
   }),
 ) {}
 
@@ -23,7 +24,7 @@ export class FollowupController {
   @Post('emails')
   @ApiOperation({ summary: 'Capture an email from content script' })
   async captureEmail(@CurrentUser() user: AuthenticatedUser, @Body() dto: CaptureEmailDto) {
-    return this.service.captureEmail(user.userId, dto);
+    return this.service.captureEmail(user.userId, { ...dto });
   }
 
   @Get('emails')

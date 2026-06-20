@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { getToken } from '../../lib/auth';
 import { API_V1 } from '../../background/config';
 import { useConversationStore } from '../stores/conversation';
+import { ConversationView } from '../components/ConversationView';
 
 interface MatchResult {
   surfaceScore: number;
@@ -169,6 +170,7 @@ export function JobAnalysis() {
   const isPending = !parsedJd || !matchResult;
 
   return (
+    <>
     <div data-testid="job-analysis-view" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* Header */}
       <div>
@@ -272,5 +274,7 @@ export function JobAnalysis() {
         </div>
       )}
     </div>
+    <ConversationView />
+    </>
   );
 }

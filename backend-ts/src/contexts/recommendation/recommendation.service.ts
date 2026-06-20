@@ -93,16 +93,16 @@ export class RecommendationService {
    * Generate a tracking URL for a recommendation click.
    * The trackingId is HMAC(secret, userId+recoId+dayBucket) to prevent forgery.
    */
-  buildTrackingId(userId: string, recoId: string): string {
+  buildTrackingId(userId: string, recoId: string, itemIndex: number): string {
     const day = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
     return createHmac('sha256', this.hmacSecret)
-      .update(`${userId}:${recoId}:${day}`)
+      .update(`${userId}:${recoId}:${itemIndex}:${day}`)
       .digest('hex')
       .slice(0, 32); // 128-bit prefix is sufficient
   }
 
-  verifyTrackingId(userId: string, recoId: string, trackingId: string): boolean {
-    const expected = this.buildTrackingId(userId, recoId);
+  verifyTrackingId(userId: string, recoId: string, itemIndex: number, trackingId: string): boolean {
+    const expected = this.buildTrackingId(userId, recoId, itemIndex);
     // Constant-time compare
     if (expected.length !== trackingId.length) return false;
     let diff = 0;

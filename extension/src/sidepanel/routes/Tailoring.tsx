@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { getToken as getAuthToken } from '../../lib/auth';
 import { API_V1 } from '../../background/config';
 import { useConversationStore } from '../stores/conversation';
+import { ConversationView } from '../components/ConversationView';
 
 interface BulletState {
   id: string;
@@ -177,20 +178,31 @@ export function Tailoring() {
   const handleExport = async (fmt: string = 'pdf') => {
     try {
       const token = await getToken();
-      const resp = await fetch(`${API_V1}/tailoring/${tailoringId}/export`, {
+      const resp = await fetch(`${API_V1}/tailoring/${tailoringId}/exports?fmt=${fmt}`, {
+        method: 'POST',
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
-      if (!resp.ok) throw new Error('Failed to export');
-      const data = await resp.json();
-      // Copy text to clipboard
-      await navigator.clipboard.writeText(data.text);
-      alert('Resume text copied to clipboard!');
+      if (!resp.ok) throw new Error(`Export failed: ${resp.status}`);
+
+      if (fmt === 'pdf') {
+        const blob = await resp.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'resume.pdf';
+        a.click();
+        URL.revokeObjectURL(url);
+      } else {
+        const text = await resp.text();
+        await navigator.clipboard.writeText(text);
+      }
     } catch (e) {
       console.error('Failed to export', e);
     }
   };
 
   return (
+    <>
     <div data-testid="tailoring-view" style={{ padding: '24px 16px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <h2 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>Tailoring</h2>
@@ -340,6 +352,8 @@ export function Tailoring() {
         </button>
       </div>
     </div>
+    <ConversationView />
+    </>
   );
 }
 

@@ -1,5 +1,6 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger, Inject } from '@nestjs/common';
+import { parseLlmJson } from '../../common/llm-json.js';
 import { Job } from 'bullmq';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -67,13 +68,7 @@ Return JSON:
         messages: [{ role: 'user', content: jdPrompt, timestamp: Date.now() }],
       });
 
-      let jdParsed: Record<string, unknown> = {};
-      try {
-        const m = jdRaw.match(/\{[\s\S]*\}/);
-        if (m) jdParsed = JSON.parse(m[0]) as Record<string, unknown>;
-      } catch {
-        this.logger.warn('JD parse failed, using empty object');
-      }
+      const jdParsed = parseLlmJson(jdRaw);
 
       parsedJd = this.jdRepo.create({
         id: ulid(),

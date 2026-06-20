@@ -73,6 +73,8 @@ services:
       PORT: '14608'
     ports:
       - '14608:14608'
+    volumes:
+      - ./mocks/dom/fixtures:/app/fixtures:ro
     healthcheck:
       test: ['CMD', 'wget', '-qO-', 'http://localhost:14608/health']
       interval: 5s

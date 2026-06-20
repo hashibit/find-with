@@ -55,14 +55,14 @@ function useAuthUser() {
       const token = await getToken();
       if (!token || cancelled) return;
       try {
-        const resp = await fetch(`${API_V1}/profile`, {
+        const resp = await fetch(`${API_V1}/iam/me`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (!resp.ok || cancelled) return;
         const data = await resp.json();
         if (!cancelled) setUser({
-          name: data?.basicInfo?.fullName,
-          email: data?.basicInfo?.email,
+          name: data?.fullName,
+          email: data?.email,
         });
       } catch { /* ignore */ }
     }

@@ -27,14 +27,19 @@ export default function ExtensionCallbackPage() {
 
     async function authenticateWithBackend() {
       try {
+        console.log('[ext-callback] EXT_ID:', EXT_ID);
+        console.log('[ext-callback] chrome.runtime available:', typeof chrome !== 'undefined' && !!chrome.runtime?.sendMessage);
+
         const clerkToken = await getToken();
+        console.log('[ext-callback] clerkToken:', clerkToken ? 'ok (length=' + clerkToken.length + ')' : 'NULL');
         if (!clerkToken) {
+          setErrorDetail('No clerk token — not signed in?');
           setStatus('error');
           return;
         }
 
-        // Call backend to verify Clerk JWT and get extension session token
         const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:14607';
+        console.log('[ext-callback] calling backend verify at:', baseUrl);
 
         const resp = await fetch(`${baseUrl}/api/v1/iam/auth/verify`, {
           method: 'POST',
@@ -43,38 +48,45 @@ export default function ExtensionCallbackPage() {
         });
 
         if (!resp.ok) {
-          console.error('Backend auth verify failed:', await resp.text());
+          const text = await resp.text();
+          console.error('[ext-callback] backend verify failed:', resp.status, text);
+          setErrorDetail(`Backend ${resp.status}: ${text}`);
           setStatus('error');
           return;
         }
 
         const data = await resp.json();
-        // data contains: { token, expires_at, user_id }
+        console.log('[ext-callback] backend session token:', data.token ? 'ok' : 'MISSING', '| user_id:', data.user_id, '| expires_at:', data.expires_at);
 
-        // Send token to extension
         if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage && EXT_ID) {
+          console.log('[ext-callback] sending AUTH_TOKEN to extension', EXT_ID);
           chrome.runtime.sendMessage(
             EXT_ID,
             { type: 'AUTH_TOKEN', token: data.token, expires_at: data.expires_at, user_id: data.user_id },
             (response) => {
               if (chrome.runtime.lastError) {
                 const msg = chrome.runtime.lastError.message || 'Unknown error';
-                console.error('Extension messaging error:', msg);
+                console.error('[ext-callback] chrome.runtime.lastError:', msg);
                 setErrorDetail(msg);
                 setStatus('error');
-              } else if (response?.ok) {
-                setStatus('sent');
               } else {
-                setStatus('error');
+                console.log('[ext-callback] extension response:', response);
+                if (response?.ok) {
+                  setStatus('sent');
+                } else {
+                  setErrorDetail('Extension returned: ' + JSON.stringify(response));
+                  setStatus('error');
+                }
               }
             },
           );
         } else {
-          console.warn('chrome.runtime not available; token not delivered to extension');
+          console.warn('[ext-callback] chrome.runtime not available or EXT_ID empty — EXT_ID:', JSON.stringify(EXT_ID));
           setStatus('sent');
         }
       } catch (err) {
-        console.error('Failed to authenticate:', err);
+        console.error('[ext-callback] unexpected error:', err);
+        setErrorDetail(String(err));
         setStatus('error');
       }
     }

@@ -94,10 +94,18 @@ export function DevAuthProvider({ children }: { children: ReactNode }) {
           : null,
         imageUrl: data.user.image_url,
       };
+      const sid = data.session?.id || data.created_session?.id;
+      // /v1/sign_ins returns a 60s session token; call /sign for a 24h JWT instead
+      const signResp = await fetch(`${MOCK_API}/sign`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sub: u.id, email: u.email }),
+      });
+      const signData = await signResp.json();
       setUser(u);
-      setSessionId(data.session?.id || data.created_session?.id);
-      setToken(data.token);
-      saveToStorage(u, data.token, data.session?.id || data.created_session?.id);
+      setSessionId(sid);
+      setToken(signData.token);
+      saveToStorage(u, signData.token, sid);
     }
   }, []);
 
@@ -119,15 +127,29 @@ export function DevAuthProvider({ children }: { children: ReactNode }) {
           : null,
         imageUrl: data.user.image_url,
       };
+      const sid = data.session?.id || data.created_session?.id;
+      // /v1/sign_ups returns a 60s session token; call /sign for a 24h JWT instead
+      const signResp = await fetch(`${MOCK_API}/sign`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sub: u.id, email: u.email }),
+      });
+      const signData = await signResp.json();
       setUser(u);
-      setSessionId(data.session?.id || data.created_session?.id);
-      setToken(data.token);
-      saveToStorage(u, data.token, data.session?.id || data.created_session?.id);
+      setSessionId(sid);
+      setToken(signData.token);
+      saveToStorage(u, signData.token, sid);
     }
   }, []);
 
   const getToken = useCallback(async (): Promise<string | null> => {
-    if (token) return token;
+    // Refresh if no token, or if token is expired/expiring within 60s
+    if (token) {
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        if (payload.exp && payload.exp - 60 > Date.now() / 1000) return token;
+      } catch { /* malformed — fall through to refresh */ }
+    }
     if (user) {
       const resp = await fetch(`${MOCK_API}/sign`, {
         method: 'POST',

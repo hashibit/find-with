@@ -80,3 +80,4 @@ backend/.claude/
 .understand-anything
 .e2e-backend.pid
 test-results
+out

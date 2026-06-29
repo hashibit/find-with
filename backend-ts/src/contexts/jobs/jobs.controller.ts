@@ -66,4 +66,11 @@ export class JobsController {
   ) {
     return this.service.updateRadarStatus(user.userId, id, dto.status, dto.note);
   }
+
+  @Post(':captureId/analyze')
+  @ApiOperation({ summary: 'Trigger LLM deep analysis on demand' })
+  async analyze(@CurrentUser() user: AuthenticatedUser, @Param('captureId') captureId: string) {
+    await this.service.enqueueAnalysis(user.userId, captureId);
+    return { queued: true };
+  }
 }

@@ -105,7 +105,8 @@ export function runtimeStream(
 
 export type NavBusMessage =
   | { type: 'NAVIGATE'; route: string }
-  | { type: 'RECALL_MATERIAL'; materialId: string; content: string; tags?: string[] };
+  | { type: 'RECALL_MATERIAL'; materialId: string; content: string; tags?: string[] }
+  | { type: 'QUINN_AMBIENT_MESSAGE'; text: string; captureId?: string };
 
 /**
  * Receives navigation commands and other events from background/content scripts.

@@ -15,23 +15,28 @@ export interface ConversationMessage {
   role: 'user' | 'assistant';
   text: string;
   timestamp: number;
+  captureId?: string;
 }
 
 interface ConversationState {
   messages: ConversationMessage[];
   isStreaming: boolean;
   currentConversationId: string | null;
+  pendingCaptureId: string | null;
   sendMessage: (text: string, conversationKind?: string) => Promise<void>;
   setStreaming: (streaming: boolean) => void;
   appendAssistantChunk: (chunk: string) => void;
   startNewConversation: () => void;
   loadConversation: (id: string) => Promise<void>;
+  injectLocalQuinnMessage: (text: string, captureId?: string) => void;
+  clearPendingCapture: () => void;
 }
 
 export const useConversationStore = create<ConversationState>((set, get) => ({
   messages: [],
   isStreaming: false,
   currentConversationId: null,
+  pendingCaptureId: null,
 
   sendMessage: async (text: string, conversationKind = 'FREE_CHAT') => {
     const userMsg: ConversationMessage = { role: 'user', text, timestamp: Date.now() };
@@ -157,8 +162,21 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
       messages: [],
       isStreaming: false,
       currentConversationId: null,
+      pendingCaptureId: null,
     });
   },
+
+  injectLocalQuinnMessage: (text: string, captureId?: string) => {
+    set((state) => ({
+      messages: [
+        ...state.messages,
+        { role: 'assistant', text, timestamp: Date.now(), captureId },
+      ],
+      pendingCaptureId: captureId ?? state.pendingCaptureId,
+    }));
+  },
+
+  clearPendingCapture: () => set({ pendingCaptureId: null }),
 
   loadConversation: async (id: string) => {
     set({ isStreaming: true });

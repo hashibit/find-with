@@ -90,6 +90,8 @@ services:
       PORT: '14609'
     ports:
       - '14609:14609'
+    volumes:
+      - ./e2e/fixtures/llm:/app/fixtures:ro
     healthcheck:
       test: ['CMD', 'wget', '-qO-', 'http://localhost:14609/health']
       interval: 5s

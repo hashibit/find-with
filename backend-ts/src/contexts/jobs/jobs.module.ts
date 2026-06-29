@@ -10,6 +10,7 @@ import { JobParsedJd } from '../../database/entities/jobs/parsed-jd.entity.js';
 import { JobCompanyBrief } from '../../database/entities/jobs/company-brief.entity.js';
 import { JobMatchResult } from '../../database/entities/jobs/match-result.entity.js';
 import { JobRadarItem } from '../../database/entities/jobs/radar-item.entity.js';
+import { ProfileSkill } from '../../database/entities/profile/skill.entity.js';
 import { ProfileModule } from '../profile/profile.module.js';
 
 @Module({
@@ -20,6 +21,7 @@ import { ProfileModule } from '../profile/profile.module.js';
       JobCompanyBrief,
       JobMatchResult,
       JobRadarItem,
+      ProfileSkill,
     ]),
     BullModule.registerQueue({ name: JOB_ANALYZE_QUEUE }),
     ProfileModule,

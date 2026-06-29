@@ -34,7 +34,9 @@ export type BgMsg =
   // Apply
   | { type: 'APPLY_PLAN'; payload: { radarItemId: string } }
   | { type: 'APPLY_APPROVE'; payload: { planId: string } }
-  | { type: 'APPLY_RECORD'; payload: { radarItemId: string; resumeSnapshotId?: string } };
+  | { type: 'APPLY_RECORD'; payload: { radarItemId: string; resumeSnapshotId?: string } }
+  // Deep analysis on demand
+  | { type: 'JOB_ANALYZE'; payload: { captureId: string } };
 
 interface JobCapturePayload {
   source: string;
@@ -69,8 +71,23 @@ export async function handleMessage(
   navPorts: Set<chrome.runtime.Port>,
 ): Promise<any> {
   switch (msg.type) {
-    case 'JOB_CAPTURE':
-      return handleJobCapture(msg.payload);
+    case 'JOB_CAPTURE': {
+      const captureResult = await handleJobCapture(msg.payload);
+      if (!captureResult.error && captureResult.quickMatch) {
+        const ambientText = formatAmbientMessage(
+          captureResult.capture?.capturedText ?? '',
+          captureResult.quickMatch,
+        );
+        navPorts.forEach((port) =>
+          port.postMessage({
+            type: 'QUINN_AMBIENT_MESSAGE',
+            text: ambientText,
+            captureId: captureResult.capture?.id,
+          }),
+        );
+      }
+      return captureResult;
+    }
     case 'EMAIL_CAPTURE':
       return handleEmailCapture(msg.payload);
     case 'EASY_APPLY_FORM':
@@ -185,4 +202,32 @@ async function digestMessage(message: string): Promise<string> {
   const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+interface QuickMatch {
+  score: number;
+  matchedSkills: string[];
+  missingKeywords: string[];
+}
+
+function formatAmbientMessage(capturedText: string, qm: QuickMatch): string {
+  // capturedText format: "Title — Company\n\nDescription..."
+  const firstLine = capturedText.split('\n')[0] ?? '';
+  const dashIdx = firstLine.indexOf(' — ');
+  const title = dashIdx >= 0 ? firstLine.slice(0, dashIdx).trim() : firstLine.trim();
+  const company = dashIdx >= 0 ? firstLine.slice(dashIdx + 3).trim() : '';
+
+  const jobLabel = [title, company].filter(Boolean).join(' @ ') || '这个岗位';
+
+  let text = `看到你在看 ${jobLabel}。`;
+  text += `\n\n粗略扫了一眼 JD，和你背景大概有 ${qm.score}% 的关键词重叠`;
+  if (qm.matchedSkills.length) {
+    text += `——${qm.matchedSkills.join('、')} 都能对上`;
+  }
+  text += '。';
+  if (qm.missingKeywords.length) {
+    text += ` JD 里提到了 ${qm.missingKeywords.join('、')}，你档案里没有这几个词。`;
+  }
+  text += '\n\n要我做深度分析吗？（完整解析 JD、研究公司背景、算三层匹配度）';
+  return text;
 }

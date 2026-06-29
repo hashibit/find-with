@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { getToken } from '../../lib/auth';
 import { API_V1 } from '../../background/config';
 import { useConversationStore } from '../stores/conversation';
@@ -47,10 +48,12 @@ async function uploadResume(token: string, file: File): Promise<void> {
 }
 
 export function Onboarding() {
+  const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const { messages, isStreaming, sendMessage, loadConversation } = useConversationStore();
+  const { messages, isStreaming, sendMessage, loadConversation, pendingCaptureId, clearPendingCapture } = useConversationStore();
   const [input, setInput] = useState('');
+  const [analyzing, setAnalyzing] = useState(false);
 
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -146,6 +149,25 @@ export function Onboarding() {
     if (!input.trim() || isStreaming) return;
     sendMessage(input.trim());
     setInput('');
+  };
+
+  const handleDeepAnalyze = async () => {
+    if (!pendingCaptureId || analyzing) return;
+    setAnalyzing(true);
+    try {
+      const token = await getToken();
+      if (!token) return;
+      await fetch(`${API_V1}/jobs/${pendingCaptureId}/analyze`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      clearPendingCapture();
+      navigate(`/job-analysis?id=${pendingCaptureId}`);
+    } catch {
+      // ignore — user can retry
+    } finally {
+      setAnalyzing(false);
+    }
   };
 
   if (loading) {
@@ -296,7 +318,20 @@ export function Onboarding() {
                 </svg>
               </div>
             )}
-            <div className="bubble">{msg.text}</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0, flex: 1 }}>
+              <div className="bubble">{msg.text}</div>
+              {msg.captureId && msg.captureId === pendingCaptureId && (
+                <button
+                  data-testid="deep-analyze-btn"
+                  className="btn primary"
+                  style={{ alignSelf: 'flex-start' }}
+                  disabled={analyzing}
+                  onClick={() => void handleDeepAnalyze()}
+                >
+                  {analyzing ? '分析中…' : '深度分析这个岗位 →'}
+                </button>
+              )}
+            </div>
           </div>
         ))}
 

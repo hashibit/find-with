@@ -9,6 +9,7 @@ import { JobParsedJd } from '../../../src/database/entities/jobs/parsed-jd.entit
 import { JobCompanyBrief } from '../../../src/database/entities/jobs/company-brief.entity.js';
 import { JobMatchResult } from '../../../src/database/entities/jobs/match-result.entity.js';
 import { JobRadarItem } from '../../../src/database/entities/jobs/radar-item.entity.js';
+import { ProfileSkill } from '../../../src/database/entities/profile/skill.entity.js';
 
 const makeCapture = (override: Partial<JobCapture> = {}): JobCapture =>
   ({
@@ -46,6 +47,7 @@ describe('JobsService', () => {
   let jdRepo: { findOne: ReturnType<typeof vi.fn> };
   let companyRepo: { findOne: ReturnType<typeof vi.fn> };
   let matchRepo: { findOne: ReturnType<typeof vi.fn> };
+  let skillRepo: { find: ReturnType<typeof vi.fn> };
   let analyzeQueue: { add: ReturnType<typeof vi.fn> };
 
   beforeEach(async () => {
@@ -63,6 +65,7 @@ describe('JobsService', () => {
     jdRepo = { findOne: vi.fn().mockResolvedValue(null) };
     companyRepo = { findOne: vi.fn().mockResolvedValue(null) };
     matchRepo = { findOne: vi.fn().mockResolvedValue(null) };
+    skillRepo = { find: vi.fn().mockResolvedValue([]) };
     analyzeQueue = { add: vi.fn().mockResolvedValue(undefined) };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -73,6 +76,7 @@ describe('JobsService', () => {
         { provide: getRepositoryToken(JobCompanyBrief), useValue: companyRepo },
         { provide: getRepositoryToken(JobMatchResult), useValue: matchRepo },
         { provide: getRepositoryToken(JobRadarItem), useValue: radarRepo },
+        { provide: getRepositoryToken(ProfileSkill), useValue: skillRepo },
         { provide: getQueueToken(JOB_ANALYZE_QUEUE), useValue: analyzeQueue },
       ],
     }).compile();
@@ -81,18 +85,18 @@ describe('JobsService', () => {
   });
 
   describe('captureJob', () => {
-    it('creates capture and radar item, enqueues analyze job', async () => {
-      const { capture, radarItem } = await service.captureJob('user_01', {
+    it('creates capture and radar item with heuristic quickMatch (no LLM queue)', async () => {
+      const { capture, radarItem, quickMatch } = await service.captureJob('user_01', {
         source: 'linkedin',
         sourceUrl: 'https://linkedin.com/jobs/123',
+        capturedText: 'Senior PM at Stripe\n\nWe are looking for a Senior PM.',
       });
       expect(captureRepo.save).toHaveBeenCalled();
       expect(radarRepo.save).toHaveBeenCalled();
-      expect(analyzeQueue.add).toHaveBeenCalledWith('analyze', {
-        captureId: capture.id,
-        userId: 'user_01',
-      });
+      // LLM analysis is NOT auto-queued — enqueueAnalysis must be called explicitly
+      expect(analyzeQueue.add).not.toHaveBeenCalled();
       expect(radarItem.status).toBe('BROWSED');
+      expect(quickMatch).toMatchObject({ score: expect.any(Number), matchedSkills: [], missingKeywords: [] });
     });
 
     it('sets radar item status to BROWSED on creation', async () => {

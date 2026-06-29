@@ -8,9 +8,25 @@ import { JobParsedJd } from '../../database/entities/jobs/parsed-jd.entity.js';
 import { JobCompanyBrief } from '../../database/entities/jobs/company-brief.entity.js';
 import { JobMatchResult } from '../../database/entities/jobs/match-result.entity.js';
 import { JobRadarItem } from '../../database/entities/jobs/radar-item.entity.js';
+import { ProfileSkill } from '../../database/entities/profile/skill.entity.js';
 import { ulid } from 'ulid';
 
+const STOPWORDS = new Set([
+  'and', 'the', 'for', 'with', 'you', 'our', 'are', 'this', 'that', 'will',
+  'have', 'from', 'your', 'they', 'who', 'what', 'when', 'where', 'which',
+  'how', 'but', 'not', 'all', 'can', 'has', 'had', 'was', 'were', 'been',
+  'about', 'also', 'their', 'than', 'into', 'over', 'each', 'work', 'role',
+  'team', 'across', 'strong', 'ability', 'experience', 'skills', 'years',
+  'looking', 'seeking', 'join', 'help', 'build', 'using', 'help', 'drive',
+]);
+
 export const JOB_ANALYZE_QUEUE = 'JOB_ANALYZE';
+
+export interface QuickMatchResult {
+  score: number;
+  matchedSkills: string[];
+  missingKeywords: string[];
+}
 
 const VALID_RADAR_TRANSITIONS: Record<string, string[]> = {
   BROWSED: ['ANALYZED', 'DECIDED_NO'],
@@ -34,6 +50,8 @@ export class JobsService {
     private readonly matchRepo: Repository<JobMatchResult>,
     @InjectRepository(JobRadarItem)
     private readonly radarRepo: Repository<JobRadarItem>,
+    @InjectRepository(ProfileSkill)
+    private readonly skillRepo: Repository<ProfileSkill>,
     @InjectQueue(JOB_ANALYZE_QUEUE) private readonly analyzeQueue: Queue,
   ) {}
 
@@ -47,7 +65,7 @@ export class JobsService {
       capturedText?: string;
       meta?: Record<string, unknown>;
     },
-  ): Promise<{ capture: JobCapture; radarItem: JobRadarItem }> {
+  ): Promise<{ capture: JobCapture; radarItem: JobRadarItem; quickMatch: QuickMatchResult }> {
     const capture = this.captureRepo.create({ id: ulid(), userId, ...data });
     await this.captureRepo.save(capture);
 
@@ -60,9 +78,53 @@ export class JobsService {
     });
     await this.radarRepo.save(radarItem);
 
-    await this.analyzeQueue.add('analyze', { captureId: capture.id, userId });
+    // Heuristic match — no LLM, runs synchronously from the user's skills
+    const quickMatch = await this.quickHeuristicMatch(data.capturedText ?? '', userId);
 
-    return { capture, radarItem };
+    return { capture, radarItem, quickMatch };
+  }
+
+  async enqueueAnalysis(userId: string, captureId: string): Promise<void> {
+    const capture = await this.captureRepo.findOne({ where: { id: captureId } });
+    if (!capture) throw new NotFoundException('Job not found');
+    if (capture.userId !== userId) throw new ForbiddenException();
+    await this.analyzeQueue.add('analyze', { captureId, userId });
+  }
+
+  private async quickHeuristicMatch(jdText: string, userId: string): Promise<QuickMatchResult> {
+    const skills = await this.skillRepo.find({ where: { userId } });
+    if (!skills.length) return { score: 0, matchedSkills: [], missingKeywords: [] };
+
+    const jdLower = jdText.toLowerCase();
+
+    // Which of the user's known skills appear verbatim in the JD?
+    const matched = skills.filter((s) => jdLower.includes(s.name.toLowerCase()));
+
+    // Extract capitalised "tech-looking" tokens from JD as candidate keywords
+    const jdKeywords = [
+      ...new Set(
+        (jdText.match(/\b[A-Z][a-zA-Z0-9+#.]{2,}\b/g) ?? []).filter(
+          (w) => !STOPWORDS.has(w.toLowerCase()),
+        ),
+      ),
+    ];
+
+    // Missing = JD keywords not covered by any user skill name
+    const userSkillSet = new Set(skills.map((s) => s.name.toLowerCase()));
+    const missingKeywords = jdKeywords
+      .filter((w) => !userSkillSet.has(w.toLowerCase()))
+      .slice(0, 4);
+
+    // Score: ratio of matched skills to the larger of (user skills, JD keywords), soft-capped
+    const denominator = Math.max(skills.length, jdKeywords.length, 1);
+    const raw = (matched.length / denominator) * 100;
+    const score = Math.min(95, Math.max(5, Math.round(raw)));
+
+    return {
+      score,
+      matchedSkills: matched.slice(0, 5).map((s) => s.name),
+      missingKeywords,
+    };
   }
 
   async getJob(userId: string, captureId: string) {
@@ -149,6 +211,7 @@ export class JobsService {
         status: item.status,
         lastActivity: item.lastStatusAt,
         captureId: item.captureId,
+        parsedJdId: jd?.id ?? item.parsedJdId ?? null,
         jobTitle: jd?.title ?? null,
         companyName: jd?.company ?? null,
         sourceUrl: capture?.sourceUrl ?? null,

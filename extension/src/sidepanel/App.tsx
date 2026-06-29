@@ -26,22 +26,26 @@ export function setRecallCallback(cb: (content: string) => void) {
  */
 function NavBus() {
   const navigate = useNavigate();
+  const { injectLocalQuinnMessage } = useConversationStore();
   useEffect(() => {
     const cleanup = runtimeNavBus(
       (route) => navigate(route),
       (msg: NavBusMessage) => {
         if (msg.type === 'RECALL_MATERIAL') {
-          // Navigate to onboarding first
           navigate('/onboarding');
-          // Trigger recall callback if set
           if (recallCallback) {
             recallCallback(msg.content);
           }
         }
+        if (msg.type === 'QUINN_AMBIENT_MESSAGE') {
+          // Navigate to chat tab so the message is visible, but don't force-open the panel
+          navigate('/onboarding');
+          injectLocalQuinnMessage(msg.text, msg.captureId);
+        }
       },
     );
     return cleanup;
-  }, [navigate]);
+  }, [navigate, injectLocalQuinnMessage]);
   return null;
 }
 

@@ -63,6 +63,10 @@ export function bgMsgToRequest(msg: BgMsg): ApiRequest | null {
     case 'APPLY_RECORD':
       return { path: 'apply/submit', method: 'POST', body: msg.payload };
 
+    // Jobs
+    case 'JOB_ANALYZE':
+      return { path: `jobs/${msg.payload.captureId}/analyze`, method: 'POST' };
+
     // Special-cased in bus.ts / not applicable from sidepanel
     default:
       return null;

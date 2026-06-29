@@ -1,10 +1,14 @@
 /// <reference types="chrome" />
-import { queryOne, queryText } from '../shared/dom';
+import { queryText } from '../shared/dom';
 import { sanitizeText } from '../shared/sanitize';
 
 /**
- * LinkedIn job detail content script.
- * Injects "Ask Quinn" button into the job header and captures JD on click.
+ * LinkedIn job detail content script — ambient companion mode.
+ *
+ * No button injected. After the user dwells on a job page for 3 seconds,
+ * Quinn silently captures and analyzes the JD in the background.
+ * If the side panel is already open it navigates to the analysis view;
+ * if it's closed nothing happens — Quinn is ready whenever the user looks.
  */
 
 function scrapeJobDetail(): Record<string, string> {
@@ -20,7 +24,6 @@ function scrapeJobDetail(): Record<string, string> {
   const description = sanitizeText(
     queryText(['.jobs-description__content', '.jobs-box__html-content', '#job-details']),
   );
-  // Backend CaptureJobDto expects camelCase: source, sourceUrl, capturedText
   const header = [title, company].filter(Boolean).join(' — ');
   return {
     source: 'linkedin',
@@ -29,69 +32,67 @@ function scrapeJobDetail(): Record<string, string> {
   };
 }
 
-function injectAskQuinnButton() {
-  if (document.getElementById('findwith-ask-quinn')) return;
+// ── Auto-capture logic ────────────────────────────────────────────────────────
 
-  const anchor = queryOne([
-    '.job-details-jobs-unified-top-card__primary-description-container',
-    '.jobs-unified-top-card__content--two-pane',
-    '.jobs-apply-button--top-card',
-  ]);
+let dwellTimer: ReturnType<typeof setTimeout> | null = null;
 
-  if (!anchor) return;
+// Track URLs captured this session to avoid re-sending on every scroll
+const capturedUrls = new Set<string>();
 
-  const btn = document.createElement('button');
-  btn.id = 'findwith-ask-quinn';
-  btn.textContent = 'Ask Quinn';
-  btn.style.cssText = [
-    'display:inline-flex',
-    'align-items:center',
-    'gap:6px',
-    'margin-left:8px',
-    'padding:8px 16px',
-    'background:#4f46e5',
-    'color:#fff',
-    'border:none',
-    'border-radius:24px',
-    'font-size:14px',
-    'font-weight:600',
-    'cursor:pointer',
-    'white-space:nowrap',
-  ].join(';');
-
-  btn.addEventListener('click', async () => {
-    const payload = scrapeJobDetail();
-    btn.textContent = 'Capturing...';
-    btn.disabled = true;
-
-    try {
-      const result = await chrome.runtime.sendMessage({ type: 'JOB_CAPTURE', payload });
-      if (result?.error) {
-        btn.textContent = 'Error — retry';
-      } else {
-        btn.textContent = 'Sent to Quinn';
-        // Pass the capture ID so the sidepanel can navigate to /job-analysis?id=...
-        const jobId: string | undefined = result?.capture?.id ?? result?.radarItem?.id;
-        await chrome.runtime.sendMessage({
-          type: 'OPEN_SIDEPANEL',
-          payload: { route: jobId ? `/job-analysis?id=${jobId}` : '/job-analysis' },
-        });
-      }
-    } catch (e) {
-      btn.textContent = 'Ask Quinn';
-    } finally {
-      btn.disabled = false;
-    }
-  });
-
-  anchor.appendChild(btn);
+function isJobPage(): boolean {
+  const url = window.location.href;
+  return (
+    /linkedin\.com\/jobs\/(view|collections)\//.test(url) ||
+    url.includes('localhost:14608/linkedin-job.html')
+  );
 }
 
-// Run on page load and observe DOM changes (LinkedIn is SPA)
-injectAskQuinnButton();
+function scheduleCapture() {
+  if (dwellTimer) {
+    clearTimeout(dwellTimer);
+    dwellTimer = null;
+  }
+
+  if (!isJobPage()) return;
+
+  const url = window.location.href;
+  if (capturedUrls.has(url)) return;
+
+  dwellTimer = setTimeout(async () => {
+    // Re-check URL hasn't changed during the dwell wait
+    if (window.location.href !== url) return;
+    if (capturedUrls.has(url)) return;
+
+    const payload = scrapeJobDetail();
+    if (!payload.capturedText) return; // page not loaded yet — will retry on next mutation
+
+    capturedUrls.add(url);
+
+    try {
+      await chrome.runtime.sendMessage({ type: 'JOB_CAPTURE', payload });
+      // Background handles the ambient Quinn message to the side panel
+    } catch {
+      // Extension context may be invalidated (e.g., reload) — ignore
+      capturedUrls.delete(url);
+    }
+  }, 3_000);
+}
+
+// ── SPA navigation observer ───────────────────────────────────────────────────
+
+let lastUrl = window.location.href;
 
 const observer = new MutationObserver(() => {
-  injectAskQuinnButton();
+  if (window.location.href !== lastUrl) {
+    lastUrl = window.location.href;
+    scheduleCapture();
+  } else if (dwellTimer === null && !capturedUrls.has(lastUrl)) {
+    // Same URL but DOM changed — job content may have just rendered
+    scheduleCapture();
+  }
 });
 
 observer.observe(document.body, { childList: true, subtree: true });
+
+// Initial check
+scheduleCapture();

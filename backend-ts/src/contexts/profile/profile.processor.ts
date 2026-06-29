@@ -10,6 +10,7 @@ import { ProfileProfile } from '../../database/entities/profile/profile.entity.j
 import { ProfileEducation } from '../../database/entities/profile/education.entity.js';
 import { ProfileWorkExperience } from '../../database/entities/profile/work-experience.entity.js';
 import { ProfileSkill } from '../../database/entities/profile/skill.entity.js';
+import { ProfileBaseResume } from '../../database/entities/profile/base-resume.entity.js';
 import { STORAGE, type Storage } from '../../adapters/storage/storage.interface.js';
 import { LLM_PROVIDER, type LlmProvider } from '../../llm/llm-provider.interface.js';
 import { RESUME_PARSE_QUEUE } from './profile.service.js';
@@ -57,6 +58,8 @@ export class ProfileProcessor extends WorkerHost {
     private readonly expRepo: Repository<ProfileWorkExperience>,
     @InjectRepository(ProfileSkill)
     private readonly skillRepo: Repository<ProfileSkill>,
+    @InjectRepository(ProfileBaseResume)
+    private readonly baseResumeRepo: Repository<ProfileBaseResume>,
     @Inject(STORAGE) private readonly storage: Storage,
     @Inject(LLM_PROVIDER) private readonly llm: LlmProvider,
   ) {
@@ -137,6 +140,14 @@ Return JSON matching this schema:
           this.skillRepo.create({ id: ulid(), userId, ...s }),
         );
         await this.skillRepo.save(skills);
+      }
+
+      // Auto-create a default base resume if none exists yet
+      const existingBase = await this.baseResumeRepo.findOne({ where: { userId } });
+      if (!existingBase) {
+        await this.baseResumeRepo.save(
+          this.baseResumeRepo.create({ id: ulid(), userId, name: 'Default', isDefault: true }),
+        );
       }
 
       source.parseStatus = 'DONE';

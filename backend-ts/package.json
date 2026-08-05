@@ -18,9 +18,13 @@
     "test:http": "vitest run --config test/vitest.http.config.ts",
     "test:int:migrate": "dotenv -e .env.test -- pnpm run typeorm migration:run -d src/database/data-source.ts",
     "typeorm": "tsx ./node_modules/typeorm/cli.js",
-    "migration:generate": "sh -c 'tsx ./node_modules/typeorm/cli.js migration:generate -d src/database/data-source.ts \"$1\" && sed -i \"\" \"s/import { MigrationInterface, QueryRunner }/import { type MigrationInterface, type QueryRunner }/\" src/database/migrations/*.ts' --",
+    "migration:generate": "sh -c 'tsx ./node_modules/typeorm/cli.js migration:generate -d src/database/data-source.ts \"$1\" && for f in src/database/migrations/*.ts; do sed -i \"\" \"s/import { MigrationInterface, QueryRunner } from \\\"typeorm\\\"/import { type MigrationInterface, type QueryRunner } from \\\"typeorm\\\"/\" \"$f\"; done' --",
     "migration:run": "pnpm run typeorm migration:run -d src/database/data-source.ts",
-    "migration:revert": "pnpm run typeorm migration:revert -d src/database/data-source.ts"
+    "migration:revert": "pnpm run typeorm migration:revert -d src/database/data-source.ts",
+    "eval": "tsx test/eval/eval-harness.ts",
+    "eval:dim": "tsx test/eval/eval-harness.ts --dimension",
+    "eval:phase": "tsx test/eval/eval-harness.ts --phase",
+    "eval:baseline": "tsx test/eval/eval-harness.ts --baseline ./eval-baseline.json"
   },
   "dependencies": {
     "@adminjs/express": "^6.1.1",
@@ -70,6 +74,7 @@
     "rxjs": "^7.8.1",
     "stripe": "^16.2.0",
     "svix": "^1.30.0",
+    "tiktoken": "^1.0.22",
     "typeorm": "^0.3.20",
     "ulid": "^2.3.0",
     "unpdf": "^0.11.0",

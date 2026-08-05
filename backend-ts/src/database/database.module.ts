@@ -41,6 +41,9 @@ import { TelemetryEvent } from './entities/telemetry/telemetry-event.entity.js';
 import { OutboxEvent } from './entities/outbox/outbox-event.entity.js';
 import { IdempotencyKey } from './entities/idempotency/idempotency-key.entity.js';
 import { AuditLog } from './entities/admin/audit-log.entity.js';
+import { ParseFailureLog } from './entities/agent/parse-failure-log.entity.js';
+import { TokenUsageLog } from './entities/telemetry/token-usage-log.entity.js';
+import { GuardrailLog } from '../common/guardrails/guardrail-log.entity.js';
 
 export const ALL_ENTITIES = [
   IamUser,
@@ -81,6 +84,9 @@ export const ALL_ENTITIES = [
   OutboxEvent,
   IdempotencyKey,
   AuditLog,
+  ParseFailureLog,
+  TokenUsageLog,
+  GuardrailLog,
 ];
 
 @Module({

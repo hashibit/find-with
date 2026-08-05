@@ -38,6 +38,9 @@ import { EnvelopeCryptoService } from '../common/crypto/envelope-crypto.service.
 import { EphemeralCryptoService } from '../common/crypto/ephemeral-crypto.service.js';
 import { ConfigService } from '@nestjs/config';
 import { type AppConfig } from '../config/configuration.js';
+import { ValidatedJsonAgent } from './json-validator.service.js';
+import { HybridRetrieverService } from './hybrid-retriever.service.js';
+import { ParseFailureLog } from '../database/entities/agent/parse-failure-log.entity.js';
 
 @Module({
   imports: [
@@ -57,6 +60,7 @@ import { type AppConfig } from '../config/configuration.js';
       UserGoalMemory,
       PendingToolResult,
       TelemetryEvent,
+      ParseFailureLog,
     ]),
   ],
   providers: [
@@ -78,6 +82,8 @@ import { type AppConfig } from '../config/configuration.js';
     },
     ConvMessageRepository,
     AgentService,
+    ValidatedJsonAgent,
+    HybridRetrieverService,
     ContextBuilderService,
     SemanticMaterialLoaderService,
     SearchCompanyTool,

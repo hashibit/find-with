@@ -23,6 +23,8 @@ import { InfraModule } from './contexts/infra/infra.module.js';
 import { MemoryModule } from './contexts/memory/memory.module.js';
 import { OutboxModule } from './contexts/outbox/outbox.module.js';
 import { AdminModule } from './admin/admin.module.js';
+import { GuardrailModule } from './common/guardrails/guardrail.module.js';
+import { TracingModule } from './common/tracing/tracing.module.js';
 import { type AppConfig } from './config/configuration.js';
 
 @Module({
@@ -61,6 +63,8 @@ import { type AppConfig } from './config/configuration.js';
     MemoryModule,
     OutboxModule,
     AdminModule,
+    GuardrailModule,
+    TracingModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: UserAuthGuard }],
 })

@@ -1,4 +1,4 @@
-import { stream, type Context, type Model, type Api } from '@earendil-works/pi-ai';
+import { stream, type Context, type Model, type Api } from '@earendil-works/pi-ai/compat';
 
 export const LLM_PROVIDER = Symbol('LLM_PROVIDER');
 

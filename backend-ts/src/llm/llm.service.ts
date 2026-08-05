@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { stream, complete, type Context, type Model, type Api } from '@earendil-works/pi-ai';
+import { stream, complete, type Context, type Model, type Api } from '@earendil-works/pi-ai/compat';
 import OpenAI from 'openai';
 import { type LlmProvider } from './llm-provider.interface.js';
 import { type AppConfig } from '../config/configuration.js';

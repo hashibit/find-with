@@ -1,11 +1,10 @@
 # Quinn
 
-**An AI agent here to help you finding a job.**
-
+**An AI companion that helps you understand what you're actually good at.**
 
 <img src="https://raw.githubusercontent.com/hashibit/find-with/refs/heads/main/docs/logo/quinn.png" width="128" height="128" valign="middle">
 
-Your AI partner (Quinn) an opinionated, always-present collaborator that helps you think, tailor, and track — while keeping every final decision in your hands.
+Quinn is an opinionated, always-present collaborator that helps you surface your strengths, articulate your experience, and connect the dots across everything you've done — while keeping every final decision in your hands.
 
 ---
 
@@ -13,31 +12,31 @@ Your AI partner (Quinn) an opinionated, always-present collaborator that helps y
 
 ### Quinn has a personality and opinions
 
-Quinn pushes back when a job is a bad fit, gives concrete recommendations instead of hedge answers, and tells you when it doesn't know something. Built against the PRD's character spec — not a feature wrapper in a trench coat.
+Quinn pushes back, gives concrete recommendations instead of hedge answers, and tells you when it doesn't know something. Built against a character spec — not a feature wrapper in a trench coat.
 
 ### The material library
 
-Every conversation mines for "shining moments" — achievements you didn't know were valuable. These get tagged, stored, and reused across every future application. Your resume becomes a filtered view of a richer corpus, not a static document.
+Every conversation mines for "shining moments" — achievements you didn't know were valuable. These get tagged, stored, and become a living corpus of who you are professionally. Your resume is just a filtered view of this richer self-portrait.
 
-### Three-layer match analysis
+### Understanding your depth, not just your surface
 
-Not a keyword overlap percentage. Three distinct signals:
+Most tools scan for keyword overlap. Quinn sees three layers:
 
-1. **Surface match** — what ATS sees (keywords in your resume vs. JD)
-2. **Deep match** — what your material library covers that your resume doesn't
-3. **Gap analysis** — what's in the JD that neither your resume nor your library addresses, with targeted conversation prompts to fill it
+1. **Surface** — what a keyword scan picks up
+2. **Deep** — what your material library reveals that isn't on paper yet
+3. **Gaps** — what's missing from both, with targeted questions to help you fill it in
 
-### Traceable resume bullets
+### Everything is traceable
 
-Every generated bullet traces back to something you actually said. Unverified bullets are flagged. Quinn cannot fabricate experience.
+Every claim traces back to something you actually said. Unverified claims are flagged. Quinn cannot fabricate experience.
 
-### Companion density controls
+### You control the pace
 
-Three modes (Engaged / Balanced / Quiet) users can switch mid-conversation. Quinn honors them without needing to be reminded.
+Three modes (Engaged / Balanced / Quiet) you can switch mid-conversation. Quinn honors them without needing to be reminded.
 
-### Graceful exit
+### Built to end
 
-When a user accepts an offer, Quinn archives the journey and pauses the subscription. The product's job is done. This is intentional.
+When you've accomplished what you set out to do, Quinn archives the journey and steps back. The product's job is done. This is intentional.
 
 ---
 
@@ -78,7 +77,7 @@ contexts/
 ├── apply/         # LinkedIn Easy Apply automation
 ├── followup/      # Email classification, reply drafting, follow-up timing
 ├── quota/         # Export-gated consumption, idempotent log
-├── recommendation/# Daily job recommendations, feedback loop
+├── recommendation/# Daily recommendations, feedback loop
 └── infra/         # Webhooks, health, telemetry
 ```
 
@@ -86,14 +85,14 @@ contexts/
 
 The `AgentService` drives a tool-use loop over SSE. Six registered tools, each scoped to specific conversation scenes:
 
-| Tool                       | Scene                  |
-| -------------------------- | ---------------------- |
-| `search_company`           | Job analysis           |
-| `mine_shining_point`       | Onboarding, gap mining |
-| `draft_motivation`         | Form fill              |
-| `classify_email`           | Email follow-up        |
-| `draft_reply`              | Email follow-up        |
-| `set_conversation_density` | All                    |
+| Tool                       | Scene                       |
+| -------------------------- | --------------------------- |
+| `search_company`           | Company / JD analysis       |
+| `mine_shining_point`       | Onboarding, gap mining      |
+| `draft_motivation`         | Form fill                   |
+| `classify_email`           | Email follow-up             |
+| `draft_reply`              | Email follow-up             |
+| `set_conversation_density` | All                         |
 
 Resume generation, bullet editing, and match recomputation run as BullMQ processors in the `TAILORING` queue — not as agent tools — because they need async progress reporting.
 

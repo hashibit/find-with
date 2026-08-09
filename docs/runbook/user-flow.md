@@ -16,14 +16,17 @@
   │
   ├─ 点击 "Log in" → /login
   │    └─ Dev 模式：DevSignIn 表单（预填 dev@findwith.local / dev123）
-  │        → POST mock-clerk:14611 /v1/sign_ins（任意密码接受）
-  │        → POST /sign 签发 24h JWT
-  │        → 写入 localStorage → 跳转 /dashboard
+  │        → POST /__clerk/v1/sign_ins（middleware 代理 → mock-clerk:14611）
+  │        → mock-clerk 签发 httpOnly cookie：__session=<id>; HttpOnly; SameSite=Lax
+  │        → cookie 存在 web 域（localhost:14606），跟生产 Clerk 行为一致
+  │        → 跳转 /dashboard
   │
   └─ /dashboard：Stats 卡片 + "Install the FindWith extension" 提示
 ```
 
 **Auth 模式切换**：`AuthProvider`（`web/src/lib/auth.tsx`）启动时调用 `GET /api/v1/config/auth`，后端返回 `{authMode: 'mock' | 'clerk'}`。Dev 环境返回 `mock`，页面包装 `DevAuthProvider`；生产返回 `clerk`，包装 `ClerkProvider`。统一 `useAuth()` 接口使页面代码不分支。
+
+**Token 存储**：httpOnly cookie。Dev 模式下 mock-clerk 签发 `__session` cookie，生产下 Clerk 签发 `__client`/`__session` cookie。`dev-auth.tsx` 不再碰 localStorage，cookie 由浏览器自动管理，刷新页面后通过 `GET /__clerk/v1/client`（读 cookie）自动恢复登录态。
 
 ### 登录页面逻辑
 
@@ -44,7 +47,9 @@
   │
   ├─ 点击 "未登录 →"
   │    └─ 打开 web/auth/extension-callback 页面
-  │       ├─ 已登录 → getToken() → POST /api/v1/iam/auth/verify {clerkToken}
+  │       ├─ 已登录 → getToken() → POST /__clerk/v1/sign（cookie 自动带上）
+  │       │    → mock-clerk 读 __session cookie → 签发 24h JWT 到 JS 内存
+  │       ├─ 拿 JWT → POST /api/v1/iam/auth/verify {clerkToken}
   │       ├─ 后端验证 Clerk JWT → upsert user → 签发 CSPRNG session token
   │       ├─ 存 Redis：session:<token> → userId（TTL 24h）
   │       └─ 返回 {token, expires_at, user_id}
@@ -59,16 +64,23 @@
      └─ 页面显示 "You're connected! You can close this tab."
 ```
 
-**关键设计**：Web 端拥有身份（Clerk/mock-Clerk），扩展只持有后端签发的 opaque session token。扩展自己不做登录，只做 token 消费。
+**关键设计**：Web 端拥有身份（Clerk JWT，prod 下 httpOnly cookie，dev 下 mock-clerk 的同域 httpOnly cookie），扩展只持有后端签发的 opaque session token（存在 `chrome.storage.local`）。两个客户端各自持有各自的 token，互不感知。
 
-### 备选路径：Nonce 交换
+**Token 全景**：
 
+| Token | 存储位置 | 谁签发 | 用途 |
+|---|---|---|---|
+| Clerk JWT | Web 端 httpOnly cookie（持久化）+ JS 内存（API 调用时） | Clerk / mock-clerk | 证明"我是谁"给 FindWith Backend |
+| Session Token | Extension `chrome.storage.local` + Backend Redis | FindWith Backend | 证明"我是谁"给 FindWith Backend |
+
+**Web ↔ Extension 桥接**（`extension-callback` 页面）：
 ```
-Extension → POST /api/v1/iam/auth/exchange {nonce}
-  └─ 后端 NonceStore（Redis）校验 → 签发 token
+Web:  Clerk JWT ──→ POST /auth/verify ──→ 后端签发 session token
+                                         ← {token, expires_at, user_id}
+Web:  chrome.runtime.sendMessage(EXT_ID, {type: AUTH_TOKEN, token, ...})
+                                         ↓
+Ext:  chrome.storage.local['token'] = token
 ```
-
-当前 callback 页面用的是 JWT-verify 路径（`AUTH_TOKEN`），nonce 路径是 PRD 规划的 OAuth 流程预留。
 
 ---
 
@@ -278,7 +290,6 @@ POST /api/v1/apply/plan {radarItemId}
 
 1. **"Ask Quinn" 按钮不存在**：PRD 描述用户在 LinkedIn 岗位页点击按钮触发分析，但当前实现是 3 秒 dwell 静默自动抓取。UI 文案多处仍引用按钮，代码尚未实现。
 2. **侧面板 "未登录 →" 链接 hardcode `localhost:14606`**，非生产就绪。
-3. **中间件仅覆盖 `/__clerk/(.*)`**，不 guard 任何业务页面。Auth 模式切换完全依赖后端 config 端点。
-4. **定时 Follow-up 提醒未实现**：cron job 基础设施存在但未连线，当前只支持手动状态更新。
-5. **Offer 告别 UI 流程未实现**：FarewellTool 存在但 UI 侧断开。
-6. **CircuitBreaker / Guardrail 未接入 Agent loop**：模块存在但 AgentService 不调用它们。
+3. **定时 Follow-up 提醒未实现**：cron job 基础设施存在但未连线，当前只支持手动状态更新。
+4. **Offer 告别 UI 流程未实现**：FarewellTool 存在但 UI 侧断开。
+5. **CircuitBreaker / Guardrail 未接入 Agent loop**：模块存在但 AgentService 不调用它们。

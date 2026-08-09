@@ -140,8 +140,14 @@ function readBody(req) {
   });
 }
 
-function sendJson(res, status, data) {
-  res.writeHead(status, { 'Content-Type': 'application/json' });
+function sendJson(res, status, data, cookies) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (cookies) {
+    headers['Set-Cookie'] = Array.isArray(cookies)
+      ? cookies
+      : Object.entries(cookies).map(([k, v]) => `${k}=${v}`);
+  }
+  res.writeHead(status, headers);
   res.end(JSON.stringify(data));
 }
 
@@ -150,6 +156,25 @@ function parsePath(url) {
   const parts = path.split('/').filter(Boolean);
   return { path, parts };
 }
+
+function parseCookies(req) {
+  const header = req.headers.cookie || '';
+  const out = {};
+  for (const part of header.split(';')) {
+    const idx = part.indexOf('=');
+    if (idx > 0) out[part.slice(0, idx).trim()] = part.slice(idx + 1).trim();
+  }
+  return out;
+}
+
+function getSessionFromCookie(req) {
+  const cookies = parseCookies(req);
+  const sid = cookies.__session;
+  if (!sid) return null;
+  return sessions.get(sid) || null;
+}
+
+const COOKIE_OPTS = 'HttpOnly; SameSite=Lax; Path=/';
 
 // Create session token for a session
 function createSessionToken(sessionId, userId) {
@@ -192,14 +217,30 @@ const server = createServer(async (req, res) => {
     return sendJson(res, 200, jwks);
   }
 
-  // Dev-only: sign arbitrary JWT (for backend tests)
+  // Dev-only: sign arbitrary JWT — cookie-authenticated or explicit sub
   if (path === '/sign' && method === 'POST') {
     let body;
     try { body = JSON.parse(await readBody(req)); }
-    catch { return sendJson(res, 400, { error: 'bad json' }); }
+    catch { body = {}; }
 
+    // Prefer cookie-based session
+    const session = getSessionFromCookie(req);
+    if (session) {
+      const user = users.get(session.user_id);
+      const now = Math.floor(Date.now() / 1000);
+      const token = signJwt({
+        sub: session.user_id,
+        email: user?.email_addresses?.[0]?.email_address || `${session.user_id}@findwith.test`,
+        iat: now,
+        exp: now + 86400,
+        iss: ISSUER,
+      });
+      return sendJson(res, 200, { token });
+    }
+
+    // Fallback: explicit sub (for backend tests calling mock-clerk directly)
     const { sub, email } = body;
-    if (!sub) { return sendJson(res, 400, { error: 'sub required' }); }
+    if (!sub) { return sendJson(res, 400, { error: 'sub required when no session cookie' }); }
 
     const now = Math.floor(Date.now() / 1000);
     const token = signJwt({
@@ -218,37 +259,37 @@ const server = createServer(async (req, res) => {
     const clientToken = req.headers['__client'] || req.headers['authorization']?.replace('Bearer ', '');
 
     if (method === 'GET') {
-      // Return default dev client for now
-      // In real Clerk, this would decode the __client JWT and return associated sessions
+      // Read __session cookie to find the active session
+      const session = getSessionFromCookie(req);
       const client = clients.get(DEV_CLIENT_ID);
-      const session = sessions.get(DEV_SESSION_ID);
-      const user = users.get(DEV_USER_ID);
 
-      // Refresh session token
-      const newToken = createSessionToken(DEV_SESSION_ID, DEV_USER_ID);
+      if (session) {
+        const user = users.get(session.user_id);
+        const newToken = createSessionToken(session.id, session.user_id);
 
+        return sendJson(res, 200, {
+          response: {
+            ...client,
+            sessions: [{ ...session, user, token: newToken }],
+          },
+          client: {
+            ...client,
+            sessions: [{ ...session, user }],
+          },
+          session: { ...session, user },
+          user,
+          token: newToken,
+          publishable_key: 'pk_test_mock_001',
+        });
+      }
+
+      // No cookie — return client with no sessions (unauthenticated)
       return sendJson(res, 200, {
-        response: {
-          ...client,
-          sessions: [{
-            ...session,
-            user: user,
-            token: newToken,
-          }],
-        },
-        client: {
-          ...client,
-          sessions: [{
-            ...session,
-            user: user,
-          }],
-        },
-        session: {
-          ...session,
-          user: user,
-        },
-        user: user,
-        token: newToken,
+        response: { ...client, sessions: [] },
+        client: { ...client, sessions: [] },
+        session: null,
+        user: null,
+        token: null,
         publishable_key: 'pk_test_mock_001',
       });
     }
@@ -321,7 +362,8 @@ const server = createServer(async (req, res) => {
         client.sessions = client.sessions.filter(s => s.id !== sessionId);
         client.last_active_session_id = null;
       }
-      return sendJson(res, 200, { response: { object: 'session', id: sessionId, deleted: true } });
+      return sendJson(res, 200, { response: { object: 'session', id: sessionId, deleted: true } },
+        { '__session': `; Max-Age=0; ${COOKIE_OPTS}` });
     }
 
     // POST /v1/sessions/:id/tokens - Create token
@@ -527,7 +569,7 @@ const server = createServer(async (req, res) => {
       },
       user: user,
       token: token,
-    });
+    }, { '__session': `${sessionId}; ${COOKIE_OPTS}` });
   }
 
   // /v1/sign_ins/:id/* - Sign in factor handling
@@ -603,7 +645,7 @@ const server = createServer(async (req, res) => {
         },
         user: user,
         token: token,
-      });
+      }, { '__session': `${sessionId}; ${COOKIE_OPTS}` });
     }
   }
 
@@ -709,7 +751,7 @@ const server = createServer(async (req, res) => {
         user: user,
       },
       token: token,
-    });
+    }, { '__session': `${sessionId}; ${COOKIE_OPTS}` });
   }
 
   // /v1/me - Current user (from session token)

@@ -1,9 +1,12 @@
 'use client';
 
-import { createContext, useContext, useState, ReactNode, useCallback } from 'react';
+import { createContext, useContext, useState, ReactNode, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
-// Mock auth context for development - bypasses Clerk SDK entirely
+// Mock auth context for development — uses httpOnly cookies via middleware proxy.
+// Same model as production Clerk: session persistence via httpOnly cookie,
+// short-lived JWT returned by getToken() for API calls.
+
 interface MockUser {
   id: string;
   email: string;
@@ -26,7 +29,7 @@ interface MockAuth {
 }
 
 const MockAuthContext = createContext<MockAuth>({
-  isLoaded: true,
+  isLoaded: false,
   isSignedIn: false,
   user: null,
   userId: null,
@@ -37,144 +40,102 @@ const MockAuthContext = createContext<MockAuth>({
   signUp: async () => {},
 });
 
-const MOCK_API = 'http://localhost:14611';
+// Through middleware proxy so cookies are same-origin
+const MOCK_API = '/__clerk/v1';
 
-// LocalStorage keys for persistence across reloads
-const STORAGE_KEY_TOKEN = 'dev_auth_token';
-const STORAGE_KEY_USER = 'dev_auth_user';
-const STORAGE_KEY_SESSION = 'dev_auth_session';
-
-function loadFromStorage(): { user: MockUser | null; token: string | null; sessionId: string | null } {
-  try {
-    const token = localStorage.getItem(STORAGE_KEY_TOKEN);
-    const userJson = localStorage.getItem(STORAGE_KEY_USER);
-    const sessionId = localStorage.getItem(STORAGE_KEY_SESSION);
-    if (token && userJson) {
-      return { token, user: JSON.parse(userJson), sessionId };
-    }
-  } catch {}
-  return { user: null, token: null, sessionId: null };
-}
-
-function saveToStorage(user: MockUser | null, token: string | null, sessionId: string | null) {
-  try {
-    if (user && token) {
-      localStorage.setItem(STORAGE_KEY_TOKEN, token);
-      localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(user));
-      localStorage.setItem(STORAGE_KEY_SESSION, sessionId || '');
-    } else {
-      localStorage.removeItem(STORAGE_KEY_TOKEN);
-      localStorage.removeItem(STORAGE_KEY_USER);
-      localStorage.removeItem(STORAGE_KEY_SESSION);
-    }
-  } catch {}
+function userFromPayload(data: any): MockUser {
+  const u = data.user || data;
+  return {
+    id: u.id,
+    email: u.email_addresses?.[0]?.email_address || u.email || '',
+    firstName: u.first_name || null,
+    lastName: u.last_name || null,
+    fullName: u.first_name && u.last_name
+      ? `${u.first_name} ${u.last_name}`
+      : null,
+    imageUrl: u.image_url || '',
+  };
 }
 
 export function DevAuthProvider({ children }: { children: ReactNode }) {
-  const stored = loadFromStorage();
-  const [user, setUser] = useState<MockUser | null>(stored.user);
-  const [sessionId, setSessionId] = useState<string | null>(stored.sessionId);
-  const [token, setToken] = useState<string | null>(stored.token);
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [user, setUser] = useState<MockUser | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+
+  // On mount: restore session from httpOnly cookie via /v1/client
+  useEffect(() => {
+    fetch(`${MOCK_API}/client`, { credentials: 'include' })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.session && data.user) {
+          setUser(userFromPayload(data.user));
+          setSessionId(data.session.id);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setIsLoaded(true));
+  }, []);
 
   const signIn = useCallback(async (email: string, password?: string) => {
-    const resp = await fetch(`${MOCK_API}/v1/sign_ins`, {
+    const resp = await fetch(`${MOCK_API}/sign_ins`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify({ identifier: email, password: password || 'dev123' }),
     });
     const data = await resp.json();
     if (data.user && data.token) {
-      const u: MockUser = {
-        id: data.user.id,
-        email: data.user.email_addresses?.[0]?.email_address || email,
-        firstName: data.user.first_name,
-        lastName: data.user.last_name,
-        fullName: data.user.first_name && data.user.last_name
-          ? `${data.user.first_name} ${data.user.last_name}`
-          : null,
-        imageUrl: data.user.image_url,
-      };
-      const sid = data.session?.id || data.created_session?.id;
-      // /v1/sign_ins returns a 60s session token; call /sign for a 24h JWT instead
-      const signResp = await fetch(`${MOCK_API}/sign`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sub: u.id, email: u.email }),
-      });
-      const signData = await signResp.json();
-      setUser(u);
-      setSessionId(sid);
-      setToken(signData.token);
-      saveToStorage(u, signData.token, sid);
+      setUser(userFromPayload(data));
+      setSessionId(data.session?.id || data.created_session?.id || null);
     }
   }, []);
 
   const signUp = useCallback(async (email: string, password?: string, firstName?: string, lastName?: string) => {
-    const resp = await fetch(`${MOCK_API}/v1/sign_ups`, {
+    const resp = await fetch(`${MOCK_API}/sign_ups`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email_address: email, password: password || 'dev123', first_name: firstName, last_name: lastName }),
+      credentials: 'include',
+      body: JSON.stringify({
+        email_address: email,
+        password: password || 'dev123',
+        first_name: firstName,
+        last_name: lastName,
+      }),
     });
     const data = await resp.json();
     if (data.user && data.token) {
-      const u: MockUser = {
-        id: data.user.id,
-        email: data.user.email_addresses?.[0]?.email_address || email,
-        firstName: data.user.first_name,
-        lastName: data.user.last_name,
-        fullName: data.user.first_name && data.user.last_name
-          ? `${data.user.first_name} ${data.user.last_name}`
-          : null,
-        imageUrl: data.user.image_url,
-      };
-      const sid = data.session?.id || data.created_session?.id;
-      // /v1/sign_ups returns a 60s session token; call /sign for a 24h JWT instead
-      const signResp = await fetch(`${MOCK_API}/sign`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sub: u.id, email: u.email }),
-      });
-      const signData = await signResp.json();
-      setUser(u);
-      setSessionId(sid);
-      setToken(signData.token);
-      saveToStorage(u, signData.token, sid);
+      setUser(userFromPayload(data));
+      setSessionId(data.session?.id || data.created_session?.id || null);
     }
   }, []);
 
   const getToken = useCallback(async (): Promise<string | null> => {
-    // Refresh if no token, or if token is expired/expiring within 60s
-    if (token) {
-      try {
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        if (payload.exp && payload.exp - 60 > Date.now() / 1000) return token;
-      } catch { /* malformed — fall through to refresh */ }
-    }
-    if (user) {
-      const resp = await fetch(`${MOCK_API}/sign`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sub: user.id, email: user.email }),
-      });
-      const data = await resp.json();
-      setToken(data.token);
-      saveToStorage(user, data.token, sessionId);
-      return data.token;
-    }
-    return null;
-  }, [token, user, sessionId]);
+    if (!user) return null;
+    const resp = await fetch(`/__clerk/sign`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+    });
+    const data = await resp.json();
+    return data.token || null;
+  }, [user]);
 
   const signOut = useCallback(async () => {
+    if (sessionId) {
+      // Delete session on server (also clears cookie via Set-Cookie)
+      await fetch(`${MOCK_API}/sessions/${sessionId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      }).catch(() => {});
+    }
     setUser(null);
     setSessionId(null);
-    setToken(null);
-    saveToStorage(null, null, null);
     window.location.href = '/';
-  }, []);
+  }, [sessionId]);
 
   return (
     <MockAuthContext.Provider value={{
-      isLoaded: true,
+      isLoaded,
       isSignedIn: !!user,
       user,
       userId: user?.id ?? null,
@@ -249,8 +210,15 @@ export function DevUserButton() {
 }
 
 export function DevSignIn({ redirectUrl, signUpUrl }: { redirectUrl?: string; signUpUrl?: string }) {
-  const { signIn } = useDevAuth();
+  const { signIn, isLoaded, isSignedIn } = useDevAuth();
   const router = useRouter();
+
+  useEffect(() => {
+    if (isLoaded && isSignedIn && redirectUrl) {
+      router.push(redirectUrl);
+    }
+  }, [isLoaded, isSignedIn, redirectUrl, router]);
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const form = e.currentTarget;
@@ -259,6 +227,8 @@ export function DevSignIn({ redirectUrl, signUpUrl }: { redirectUrl?: string; si
     await signIn(email, password);
     router.push(redirectUrl || '/dashboard');
   };
+
+  if (!isLoaded) return null;
 
   return (
     <div className="w-full max-w-md mx-auto p-6 bg-white rounded-lg shadow">

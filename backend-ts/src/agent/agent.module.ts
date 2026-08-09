@@ -6,7 +6,7 @@ import { AgentService } from './agent.service.js';
 import { ContextBuilderService } from './context-builder.service.js';
 import { ConvMessageRepository } from './conv-message.repository.js';
 import { SemanticMaterialLoaderService } from './semantic-material-loader.service.js';
-import { ToolRegistry, TOOL_EXECUTORS } from './tool-registry.js';
+import { ToolRegistry, TOOL_EXECUTORS, type ToolExecutor } from './tool-registry.js';
 import { SearchCompanyTool } from './tools/search-company.tool.js';
 import { MineShiningPointTool } from './tools/mine-shining-point.tool.js';
 import { DraftMotivationTool } from './tools/draft-motivation.tool.js';
@@ -42,6 +42,17 @@ import { ValidatedJsonAgent } from './json-validator.service.js';
 import { HybridRetrieverService } from './hybrid-retriever.service.js';
 import { ParseFailureLog } from '../database/entities/agent/parse-failure-log.entity.js';
 
+const TOOL_EXECUTORS_LIST = [
+  SearchCompanyTool,
+  MineShiningPointTool,
+  DraftMotivationTool,
+  ClassifyEmailTool,
+  DraftReplyTool,
+  SetConversationDensityTool,
+  FarewellTool,
+  RecomputeMatchTool,
+];
+
 @Module({
   imports: [
     BullModule.registerQueue({ name: MEMORY_QUEUE }),
@@ -69,9 +80,8 @@ import { ParseFailureLog } from '../database/entities/agent/parse-failure-log.en
       inject: [ConfigService],
       useFactory: async (config: ConfigService<AppConfig>) => {
         const env = config.get('env', { infer: true });
-        const service = env === 'production'
-          ? new EnvelopeCryptoService(config)
-          : new EphemeralCryptoService();
+        const service =
+          env === 'production' ? new EnvelopeCryptoService(config) : new EphemeralCryptoService();
         await service.verify();
         return service;
       },
@@ -86,37 +96,14 @@ import { ParseFailureLog } from '../database/entities/agent/parse-failure-log.en
     HybridRetrieverService,
     ContextBuilderService,
     SemanticMaterialLoaderService,
-    SearchCompanyTool,
-    MineShiningPointTool,
-    DraftMotivationTool,
-    ClassifyEmailTool,
-    DraftReplyTool,
-    SetConversationDensityTool,
-    FarewellTool,
-    RecomputeMatchTool,
+
+    ...TOOL_EXECUTORS_LIST,
     {
       provide: TOOL_EXECUTORS,
-      useFactory: (
-        searchCompany: SearchCompanyTool,
-        mineShiningPoint: MineShiningPointTool,
-        draftMotivation: DraftMotivationTool,
-        classifyEmail: ClassifyEmailTool,
-        draftReply: DraftReplyTool,
-        setDensity: SetConversationDensityTool,
-        farewell: FarewellTool,
-        recomputeMatch: RecomputeMatchTool,
-      ) => [searchCompany, mineShiningPoint, draftMotivation, classifyEmail, draftReply, setDensity, farewell, recomputeMatch],
-      inject: [
-        SearchCompanyTool,
-        MineShiningPointTool,
-        DraftMotivationTool,
-        ClassifyEmailTool,
-        DraftReplyTool,
-        SetConversationDensityTool,
-        FarewellTool,
-        RecomputeMatchTool,
-      ],
+      useFactory: (...tools: ToolExecutor[]) => tools,
+      inject: TOOL_EXECUTORS_LIST,
     },
+
     ToolRegistry,
   ],
   exports: [AgentService, ContextBuilderService],

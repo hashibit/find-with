@@ -5,10 +5,11 @@ import { Type } from '@sinclair/typebox';
 import { JobParsedJd } from '../../database/entities/jobs/parsed-jd.entity.js';
 import { LLM_PROVIDER, type LlmProvider } from '../../llm/llm-provider.interface.js';
 
+import type { ToolExecutor } from '../tool-registry.js';
 export const DRAFT_MOTIVATION_TOOL_NAME = 'draft_motivation';
 
 @Injectable()
-export class DraftMotivationTool {
+export class DraftMotivationTool implements ToolExecutor {
   constructor(
     @InjectRepository(JobParsedJd)
     private readonly jdRepo: Repository<JobParsedJd>,

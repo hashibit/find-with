@@ -24,6 +24,8 @@ import { PendingToolResult } from '../database/entities/agent/pending-tool-resul
 import { TelemetryEvent } from '../database/entities/telemetry/telemetry-event.entity.js';
 import { type AppConfig } from '../config/configuration.js';
 
+import { doWithTimeout } from '../common/timeout.js';
+
 export interface AgentSseEvent {
   data: string;
   type?: string;
@@ -58,7 +60,8 @@ export class AgentService {
 
   constructor(
     @InjectRepository(ConvConversation) private readonly convRepo: Repository<ConvConversation>,
-    @InjectRepository(PendingToolResult) private readonly pendingToolRepo: Repository<PendingToolResult>,
+    @InjectRepository(PendingToolResult)
+    private readonly pendingToolRepo: Repository<PendingToolResult>,
     @InjectRepository(TelemetryEvent) private readonly telemetryRepo: Repository<TelemetryEvent>,
     @Inject(LLM_PROVIDER) private readonly llm: LlmProvider,
     @InjectQueue(MEMORY_QUEUE) private readonly memoryQueue: Queue<MemoryJobData>,
@@ -71,14 +74,17 @@ export class AgentService {
     const llmConfig = this.configService.get('llm', { infer: true });
     this.writeModel = this.buildModel(llmConfig, 'write');
     this.parseModel = this.buildModel(llmConfig, 'parse');
-    this.fallbackModel = llmConfig.fallbackProvider !== 'none'
-      ? this.buildFallbackModel(llmConfig)
-      : undefined;
+    this.fallbackModel =
+      llmConfig.fallbackProvider !== 'none' ? this.buildFallbackModel(llmConfig) : undefined;
     this.embeddingModel = llmConfig.embeddingModel;
 
-    this.logger.log(`LLM configured: provider=${llmConfig.provider}, model=${this.writeModel.id}, baseUrl=${this.writeModel.baseUrl}`);
+    this.logger.log(
+      `LLM configured: provider=${llmConfig.provider}, model=${this.writeModel.id}, baseUrl=${this.writeModel.baseUrl}`,
+    );
     if (this.fallbackModel) {
-      this.logger.log(`Fallback: provider=${llmConfig.fallbackProvider}, model=${this.fallbackModel.id}`);
+      this.logger.log(
+        `Fallback: provider=${llmConfig.fallbackProvider}, model=${this.fallbackModel.id}`,
+      );
     }
   }
 
@@ -197,9 +203,8 @@ export class AgentService {
       let iteration = 0;
       while (iteration++ < MAX_ITERATION) {
         // 3. Stream LLM turn - use fallback model if error threshold exceeded
-        const model = this.shouldFailover() && this.fallbackModel
-          ? this.fallbackModel
-          : this.writeModel;
+        const model =
+          this.shouldFailover() && this.fallbackModel ? this.fallbackModel : this.writeModel;
 
         const s = this.llm.streamContextWithModel(model, context);
 
@@ -280,7 +285,14 @@ export class AgentService {
         }
       }
 
-      await this.finalizeLoop(subject, conversationId, userId, iteration, promptTokens, completionTokens);
+      await this.finalizeLoop(
+        subject,
+        conversationId,
+        userId,
+        iteration,
+        promptTokens,
+        completionTokens,
+      );
     } catch (err) {
       this.logger.error('Agent loop error', err instanceof Error ? err.stack : String(err));
       subject.next({ data: JSON.stringify({ kind: 'error', message: 'Internal agent error' }) });
@@ -300,7 +312,10 @@ export class AgentService {
     await this.convMessages.saveAssistant(conversationId, finalMessage, fullText);
   }
 
-  private async saveToolResult(conversationId: string, toolResultMsg: ToolResultMessage): Promise<void> {
+  private async saveToolResult(
+    conversationId: string,
+    toolResultMsg: ToolResultMessage,
+  ): Promise<void> {
     await this.convMessages.saveToolResult(conversationId, toolResultMsg);
   }
 
@@ -347,12 +362,13 @@ export class AgentService {
 
     try {
       // Execute with 90s timeout
-      const result = await Promise.race([
-        executor.execute(callId, args, ctx),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('Tool timeout exceeded (90s)')), TOOL_TIMEOUT_MS),
-        ),
-      ]);
+      const result = await doWithTimeout(executor.execute(callId, args, ctx), 90_000, toolName);
+      // const result = await Promise.race([
+      //   executor.execute(callId, args, ctx),
+      //   new Promise<never>((_, reject) =>
+      //     setTimeout(() => reject(new Error('Tool timeout exceeded (90s)')), TOOL_TIMEOUT_MS),
+      //   ),
+      // ]);
       const text = result.content.map((c) => c.text).join('\n');
       const successResult = { ok: true, data: { text, ...result.details }, error: '' };
 
@@ -413,9 +429,7 @@ export class AgentService {
   } {
     const llmConfig = this.configService.get('llm', { infer: true })!;
     return {
-      activeProvider: this.shouldFailover()
-        ? llmConfig.fallbackProvider
-        : llmConfig.provider,
+      activeProvider: this.shouldFailover() ? llmConfig.fallbackProvider : llmConfig.provider,
       fallbackProvider: llmConfig.fallbackProvider,
       errorCount: this.errorCount,
       inFailover: this.shouldFailover(),

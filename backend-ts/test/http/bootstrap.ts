@@ -38,7 +38,6 @@ import { AUTH_VERIFIER } from '../../src/adapters/auth/auth.interface.js';
 import { PAYMENT_GATEWAY } from '../../src/adapters/payment/payment.interface.js';
 import { STORAGE } from '../../src/adapters/storage/storage.interface.js';
 import { LLM_PROVIDER } from '../../src/llm/llm-provider.interface.js';
-import { LlmService } from '../../src/llm/llm.service.js';
 import { RedisService } from '../../src/redis/redis.module.js';
 import { IamService } from '../../src/contexts/iam/iam.service.js';
 
@@ -119,7 +118,6 @@ export async function getApp(): Promise<INestApplication> {
       .overrideProvider(AUTH_VERIFIER).useValue(mockAuthVerifier)
       .overrideProvider(PAYMENT_GATEWAY).useValue(mockPayment)
       .overrideProvider(STORAGE).useValue(mockStorage)
-      .overrideProvider(LlmService).useValue(mockLlm)
       .overrideProvider(LLM_PROVIDER).useValue(mockLlm)
       // Replace the real UserAuthGuard (which needs ConfigService) with
       // TestSessionGuard (which only needs RedisService).

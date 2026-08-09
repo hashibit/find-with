@@ -10,10 +10,12 @@ import { FIELD_CRYPTO, type FieldCrypto } from '../../common/crypto/crypto.inter
 import { MEMORY_QUEUE, type MemoryJobData } from '../../contexts/memory/memory.constants.js';
 import { ulid } from 'ulid';
 
+import type { ToolExecutor } from '../tool-registry.js';
+
 export const MINE_SHINING_POINT_TOOL_NAME = 'mine_shining_point';
 
 @Injectable()
-export class MineShiningPointTool {
+export class MineShiningPointTool implements ToolExecutor {
   constructor(
     @InjectRepository(ProfileMaterial)
     private readonly repo: Repository<ProfileMaterial>,

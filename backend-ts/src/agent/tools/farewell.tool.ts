@@ -7,10 +7,11 @@ import { ProfileMaterial } from '../../database/entities/profile/material.entity
 import { LLM_PROVIDER, type LlmProvider } from '../../llm/llm-provider.interface.js';
 import { PROMPTS } from '../prompt-registry.js';
 
+import type { ToolExecutor } from '../tool-registry.js';
 export const FAREWELL_TOOL_NAME = 'farewell_recap';
 
 @Injectable()
-export class FarewellTool {
+export class FarewellTool implements ToolExecutor {
   constructor(
     @InjectRepository(JobRadarItem)
     private readonly radarRepo: Repository<JobRadarItem>,

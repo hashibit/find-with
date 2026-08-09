@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { Type, type Static } from '@sinclair/typebox';
 import { ConvConversation } from '../../database/entities/conversation/conversation.entity.js';
 
+import type { ToolExecutor } from '../tool-registry.js';
 export const SET_CONVERSATION_DENSITY_TOOL_NAME = 'set_conversation_density';
 
 const DensityEnum = Type.Union([
@@ -13,7 +14,7 @@ const DensityEnum = Type.Union([
 ]);
 
 @Injectable()
-export class SetConversationDensityTool {
+export class SetConversationDensityTool implements ToolExecutor {
   constructor(
     @InjectRepository(ConvConversation)
     private readonly repo: Repository<ConvConversation>,

@@ -5,11 +5,7 @@ import {
 } from './prompts/quinn-prompt.provider.js';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import {
-  type AssistantMessage,
-  type Context,
-  type ToolResultMessage,
-} from '@earendil-works/pi-ai';
+import { type AssistantMessage, type Context, type ToolResultMessage } from '@earendil-works/pi-ai';
 import { ConvMessageRepository } from './conv-message.repository.js';
 
 import { ConvMessage } from '../database/entities/conversation/message.entity.js';
@@ -27,7 +23,6 @@ import nunjucks from 'nunjucks';
 
 import { PinoLogger, InjectPinoLogger } from 'nestjs-pino';
 import { convertTools } from 'node_modules/@earendil-works/pi-ai/dist/providers/google-shared.js';
-
 
 const QUINN_SYSTEM_PROMPT_TEMPLATE = `{{ basePrompt }}
 {% if goalMemory %}
@@ -247,11 +242,11 @@ export class ContextBuilderService {
     if (goals.targetIndustries.length)
       parts.push(`Target industries: ${goals.targetIndustries.join(', ')}`);
     if (goals.locationPrefs.length) parts.push(`Location: ${goals.locationPrefs.join(', ')}`);
-    if (goals.dealBreakers.length)
-      parts.push(`Deal breakers: ${goals.dealBreakers.join(', ')}`);
+    if (goals.dealBreakers.length) parts.push(`Deal breakers: ${goals.dealBreakers.join(', ')}`);
     if (goals.preferredStages.length)
       parts.push(`Preferred stages: ${goals.preferredStages.join(', ')}`);
-    if (goals.salaryFloorUsd) parts.push(`Minimum salary: $${goals.salaryFloorUsd.toLocaleString()}`);
+    if (goals.salaryFloorUsd)
+      parts.push(`Minimum salary: $${goals.salaryFloorUsd.toLocaleString()}`);
     if (goals.shortTermGoal) parts.push(`Short-term goal: ${goals.shortTermGoal}`);
 
     if (!parts.length) return '';
@@ -368,4 +363,3 @@ export class ContextBuilderService {
     };
   }
 }
-

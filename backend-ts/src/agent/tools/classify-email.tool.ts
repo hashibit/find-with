@@ -6,10 +6,11 @@ import { FollowupEmail } from '../../database/entities/followup/followup-email.e
 import { LLM_PROVIDER, type LlmProvider } from '../../llm/llm-provider.interface.js';
 import { FIELD_CRYPTO, type FieldCrypto } from '../../common/crypto/crypto.interface.js';
 
+import type { ToolExecutor } from '../tool-registry.js';
 export const CLASSIFY_EMAIL_TOOL_NAME = 'classify_email';
 
 @Injectable()
-export class ClassifyEmailTool {
+export class ClassifyEmailTool implements ToolExecutor {
   constructor(
     @InjectRepository(FollowupEmail)
     private readonly repo: Repository<FollowupEmail>,

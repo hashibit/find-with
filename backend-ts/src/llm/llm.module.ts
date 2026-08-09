@@ -5,11 +5,7 @@ import { LLM_PROVIDER } from './llm-provider.interface.js';
 
 @Global()
 @Module({
-  providers: [
-    LlmService,
-    TokenCostService,
-    { provide: LLM_PROVIDER, useExisting: LlmService },
-  ],
-  exports: [LlmService, TokenCostService, LLM_PROVIDER],
+  providers: [TokenCostService, { provide: LLM_PROVIDER, useClass: LlmService }],
+  exports: [TokenCostService, LLM_PROVIDER],
 })
 export class LlmModule {}

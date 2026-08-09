@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ApplyFillPlan } from '../../database/entities/apply/fill-plan.entity.js';
@@ -6,9 +6,9 @@ import { ApplyApplication } from '../../database/entities/apply/application.enti
 import { JobRadarItem } from '../../database/entities/jobs/radar-item.entity.js';
 import { JobParsedJd } from '../../database/entities/jobs/parsed-jd.entity.js';
 import { ProfileProfile } from '../../database/entities/profile/profile.entity.js';
-import { LlmService } from '../../llm/llm.service.js';
 import { parseLlmJsonArray } from '../../common/llm-json.js';
 import { ulid } from 'ulid';
+import { LLM_PROVIDER, type LlmProvider } from '@/llm/llm-provider.interface.js';
 
 @Injectable()
 export class ApplyService {
@@ -18,7 +18,7 @@ export class ApplyService {
     @InjectRepository(JobRadarItem) private readonly radarRepo: Repository<JobRadarItem>,
     @InjectRepository(JobParsedJd) private readonly jdRepo: Repository<JobParsedJd>,
     @InjectRepository(ProfileProfile) private readonly profileRepo: Repository<ProfileProfile>,
-    private readonly llm: LlmService,
+    @Inject(LLM_PROVIDER) private readonly llm: LlmProvider,
   ) {}
 
   async generateFillPlan(userId: string, radarItemId: string): Promise<ApplyFillPlan> {

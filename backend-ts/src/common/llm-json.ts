@@ -13,7 +13,8 @@ function extractBalanced(raw: string, open: string, close: string): string | nul
     if (ch === '"') { inString = !inString; continue; }
     if (inString) continue;
     if (ch === open) depth++;
-    else if (ch === close && --depth === 0) return raw.slice(start, i + 1);
+    if (ch === close) depth--;
+    if (depth === 0) return raw.slice(start, i + 1);
   }
   return null;
 }

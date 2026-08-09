@@ -57,19 +57,15 @@ export class ToolRegistry {
       }));
   }
 
-  private assertValidTool(tool: unknown): void {
-    const t = tool as Record<string, unknown>;
-    if (typeof t['name'] !== 'string' || !t['name']) {
+  private assertValidTool(t: ToolExecutor): void {
+    if (!t.name) {
       throw new Error(`Tool registration error: missing string 'name' field`);
     }
-    if (!Array.isArray(t['scenes']) || (t['scenes'] as unknown[]).length === 0) {
-      throw new Error(`Tool registration error: '${t['name']}' missing non-empty 'scenes' array`);
-    }
-    if (typeof t['execute'] !== 'function') {
-      throw new Error(`Tool registration error: '${t['name']}' missing 'execute' method`);
+    if (t.scenes.length === 0) {
+      throw new Error(`Tool registration error: '${t.name}' missing non-empty 'scenes' array`);
     }
     if (t['parameters'] === undefined || t['parameters'] === null) {
-      throw new Error(`Tool registration error: '${t['name']}' missing 'parameters' schema`);
+      throw new Error(`Tool registration error: '${t.name}' missing 'parameters' schema`);
     }
   }
 }

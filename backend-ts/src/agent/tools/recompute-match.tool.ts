@@ -7,10 +7,11 @@ import { JobRadarItem } from '../../database/entities/jobs/radar-item.entity.js'
 import { JobParsedJd } from '../../database/entities/jobs/parsed-jd.entity.js';
 import { SemanticMaterialLoaderService } from '../semantic-material-loader.service.js';
 
+import type { ToolExecutor } from '../tool-registry.js';
 export const RECOMPUTE_MATCH_TOOL_NAME = 'recompute_match';
 
 @Injectable()
-export class RecomputeMatchTool {
+export class RecomputeMatchTool implements ToolExecutor {
   constructor(
     @InjectRepository(JobRadarItem)
     private readonly radarRepo: Repository<JobRadarItem>,

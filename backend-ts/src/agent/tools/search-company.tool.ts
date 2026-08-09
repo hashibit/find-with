@@ -6,10 +6,11 @@ import { JobCompanyBrief } from '../../database/entities/jobs/company-brief.enti
 import { LLM_PROVIDER, type LlmProvider } from '../../llm/llm-provider.interface.js';
 import { ulid } from 'ulid';
 
+import type { ToolExecutor } from '../tool-registry.js';
 export const SEARCH_COMPANY_TOOL_NAME = 'search_company';
 
 @Injectable()
-export class SearchCompanyTool {
+export class SearchCompanyTool implements ToolExecutor {
   constructor(
     @InjectRepository(JobCompanyBrief)
     private readonly repo: Repository<JobCompanyBrief>,

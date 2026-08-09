@@ -8,6 +8,7 @@ import { LLM_PROVIDER, type LlmProvider } from '../../llm/llm-provider.interface
 import { FIELD_CRYPTO, type FieldCrypto } from '../../common/crypto/crypto.interface.js';
 import { ulid } from 'ulid';
 
+import type { ToolExecutor } from '../tool-registry.js';
 export const DRAFT_REPLY_TOOL_NAME = 'draft_reply';
 
 const IntentEnum = Type.Union([
@@ -20,7 +21,7 @@ const IntentEnum = Type.Union([
 ]);
 
 @Injectable()
-export class DraftReplyTool {
+export class DraftReplyTool implements ToolExecutor {
   constructor(
     @InjectRepository(FollowupEmail)
     private readonly emailRepo: Repository<FollowupEmail>,

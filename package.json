@@ -34,7 +34,9 @@
   },
   "pnpm": {
     "overrides": {
-      "@tiptap/extension-horizontal-rule": "2.1.13"
+      "@tiptap/extension-horizontal-rule": "2.1.13",
+      "@types/react": "18.3.29",
+      "@types/react-dom": "18.3.7"
     },
     "patchedDependencies": {
       "@adminjs/nestjs@7.0.0": "patches/@adminjs__nestjs@7.0.0.patch"

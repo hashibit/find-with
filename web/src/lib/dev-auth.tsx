@@ -177,7 +177,7 @@ export function DevAuthProvider({ children }: { children: ReactNode }) {
       isLoaded: true,
       isSignedIn: !!user,
       user,
-      userId: user?.id,
+      userId: user?.id ?? null,
       sessionId,
       getToken,
       signOut,

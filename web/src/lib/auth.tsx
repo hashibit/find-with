@@ -41,17 +41,47 @@ const AuthContext = createContext<AuthContextValue>({
   signOut: async () => {},
 });
 
+interface UserContextValue {
+  user: {
+    id?: string;
+    email?: string;
+    firstName?: string | null;
+    lastName?: string | null;
+    fullName?: string | null;
+    imageUrl?: string;
+  } | null;
+  isLoaded: boolean;
+}
+
+const UserContext = createContext<UserContextValue>({
+  user: null,
+  isLoaded: false,
+});
+
 const AuthModeContext = createContext<'mock' | 'clerk' | null>(null);
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:14607';
 const AUTH_CONFIG_ENDPOINT = `${API_BASE}/api/v1/config/auth`;
 
-// Bridge component: reads Clerk hooks and populates AuthContext
+// Bridge component: reads Clerk hooks and populates AuthContext + UserContext
 function ClerkAuthBridge({ children }: { children: ReactNode }) {
   const { isLoaded, isSignedIn, userId, getToken, signOut } = useClerkAuth();
+  const { user, isLoaded: userLoaded } = useClerkUser();
   return (
-    <AuthContext.Provider value={{ isLoaded, isSignedIn, userId, getToken, signOut }}>
-      {children}
+    <AuthContext.Provider value={{ isLoaded: isLoaded ?? false, isSignedIn: isSignedIn ?? false, userId: userId ?? null, getToken, signOut }}>
+      <UserContext.Provider value={{
+        user: user ? {
+          id: user.id,
+          email: user.emailAddresses?.[0]?.emailAddress,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          fullName: user.fullName,
+          imageUrl: user.imageUrl,
+        } : null,
+        isLoaded: userLoaded,
+      }}>
+        {children}
+      </UserContext.Provider>
     </AuthContext.Provider>
   );
 }
@@ -100,12 +130,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 }
 
-// Bridge for Dev: reads DevAuth context and populates unified AuthContext
+// Bridge for Dev: reads DevAuth context and populates unified AuthContext + UserContext
 function DevAuthBridge({ children }: { children: ReactNode }) {
-  const { isLoaded, isSignedIn, userId, getToken, signOut } = useDevAuth();
+  const { isLoaded, isSignedIn, userId, getToken, signOut, user } = useDevAuth();
   return (
     <AuthContext.Provider value={{ isLoaded, isSignedIn, userId, getToken, signOut }}>
-      {children}
+      <UserContext.Provider value={{
+        user: user ? {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          fullName: user.fullName,
+          imageUrl: user.imageUrl,
+        } : null,
+        isLoaded,
+      }}>
+        {children}
+      </UserContext.Provider>
     </AuthContext.Provider>
   );
 }
@@ -113,6 +155,11 @@ function DevAuthBridge({ children }: { children: ReactNode }) {
 // Unified hook - reads from AuthContext (no conditional hook calls)
 export function useAuth() {
   return useContext(AuthContext);
+}
+
+// Unified user hook - reads from UserContext (no conditional hook calls)
+export function useUser() {
+  return useContext(UserContext);
 }
 
 // Mode-specific components - still need authMode check (not hooks, just JSX)

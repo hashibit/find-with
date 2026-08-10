@@ -294,3 +294,4 @@ POST /api/v1/apply/plan {radarItemId}
 3. **定时 Follow-up 提醒未实现**：cron job 基础设施存在但未连线，当前只支持手动状态更新。
 4. **Offer 告别 UI 流程未实现**：FarewellTool 存在但 UI 侧断开。
 5. **CircuitBreaker / Guardrail 未接入 Agent loop**：模块存在但 AgentService 不调用它们。
+6. **Session token 无法主动 revoke**：扩展 session token 只有 24h TTL 兜底，无 logout 端点即时删除 Redis key。web 端 logout 只清除 Clerk cookie，扩展 token 仍有效。需 `POST /auth/logout` + 扩展监听 401 清 storage。

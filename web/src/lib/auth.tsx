@@ -15,13 +15,13 @@ import {
   SignUp as ClerkSignUp,
 } from '@clerk/nextjs';
 import {
-  DevAuthProvider,
-  useDevAuth,
-  DevSignedIn,
-  DevSignedOut,
-  DevUserButton,
-  DevSignIn,
-  DevSignUp,
+  LocalAuthProvider,
+  LocalSignedIn,
+  LocalSignedOut,
+  LocalUserButton,
+  LocalSignIn,
+  LocalSignUp,
+  LocalAuthContext,
 } from './dev-auth';
 
 // Unified auth interface - both Clerk and Dev providers must satisfy this
@@ -58,8 +58,6 @@ const UserContext = createContext<UserContextValue>({
   isLoaded: false,
 });
 
-const AuthModeContext = createContext<'mock' | 'clerk' | null>(null);
-
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:14607';
 const AUTH_CONFIG_ENDPOINT = `${API_BASE}/api/v1/config/auth`;
 
@@ -68,18 +66,30 @@ function ClerkAuthBridge({ children }: { children: ReactNode }) {
   const { isLoaded, isSignedIn, userId, getToken, signOut } = useClerkAuth();
   const { user, isLoaded: userLoaded } = useClerkUser();
   return (
-    <AuthContext.Provider value={{ isLoaded: isLoaded ?? false, isSignedIn: isSignedIn ?? false, userId: userId ?? null, getToken, signOut }}>
-      <UserContext.Provider value={{
-        user: user ? {
-          id: user.id,
-          email: user.emailAddresses?.[0]?.emailAddress,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          fullName: user.fullName,
-          imageUrl: user.imageUrl,
-        } : null,
-        isLoaded: userLoaded,
-      }}>
+    <AuthContext.Provider
+      value={{
+        isLoaded: isLoaded ?? false,
+        isSignedIn: isSignedIn ?? false,
+        userId: userId ?? null,
+        getToken,
+        signOut,
+      }}
+    >
+      <UserContext.Provider
+        value={{
+          user: user
+            ? {
+                id: user.id,
+                email: user.emailAddresses?.[0]?.emailAddress,
+                firstName: user.firstName,
+                lastName: user.lastName,
+                fullName: user.fullName,
+                imageUrl: user.imageUrl,
+              }
+            : null,
+          isLoaded: userLoaded,
+        }}
+      >
         {children}
       </UserContext.Provider>
     </AuthContext.Provider>
@@ -113,39 +123,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   if (config.authMode === 'mock') {
     return (
-      <AuthModeContext.Provider value="mock">
-        <DevAuthProvider>
-          <DevAuthBridge>{children}</DevAuthBridge>
-        </DevAuthProvider>
-      </AuthModeContext.Provider>
+      <LocalAuthProvider>
+        <LocalAuthBridge>{children}</LocalAuthBridge>
+      </LocalAuthProvider>
     );
   }
 
   return (
-    <AuthModeContext.Provider value="clerk">
-      <ClerkProvider>
-        <ClerkAuthBridge>{children}</ClerkAuthBridge>
-      </ClerkProvider>
-    </AuthModeContext.Provider>
+    <ClerkProvider>
+      <ClerkAuthBridge>{children}</ClerkAuthBridge>
+    </ClerkProvider>
   );
 }
 
 // Bridge for Dev: reads DevAuth context and populates unified AuthContext + UserContext
-function DevAuthBridge({ children }: { children: ReactNode }) {
-  const { isLoaded, isSignedIn, userId, getToken, signOut, user } = useDevAuth();
+function LocalAuthBridge({ children }: { children: ReactNode }) {
+  const { isLoaded, isSignedIn, userId, getToken, signOut, user } = useContext(LocalAuthContext);
   return (
     <AuthContext.Provider value={{ isLoaded, isSignedIn, userId, getToken, signOut }}>
-      <UserContext.Provider value={{
-        user: user ? {
-          id: user.id,
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          fullName: user.fullName,
-          imageUrl: user.imageUrl,
-        } : null,
-        isLoaded,
-      }}>
+      <UserContext.Provider
+        value={{
+          user: user
+            ? {
+                id: user.id,
+                email: user.email,
+                firstName: user.firstName,
+                lastName: user.lastName,
+                fullName: user.fullName,
+                imageUrl: user.imageUrl,
+              }
+            : null,
+          isLoaded,
+        }}
+      >
         {children}
       </UserContext.Provider>
     </AuthContext.Provider>
@@ -164,35 +174,35 @@ export function useUser() {
 
 // Mode-specific components - still need authMode check (not hooks, just JSX)
 export function SignedIn({ children }: { children: ReactNode }) {
-  const authMode = useContext(AuthModeContext);
-  if (authMode === 'mock') return <DevSignedIn>{children}</DevSignedIn>;
+  const authCtx = useContext(LocalAuthContext);
+  if (authCtx.isMock === true) return <LocalSignedIn>{children}</LocalSignedIn>;
   return <ClerkSignedIn>{children}</ClerkSignedIn>;
 }
 
 export function SignedOut({ children }: { children: ReactNode }) {
-  const authMode = useContext(AuthModeContext);
-  if (authMode === 'mock') return <DevSignedOut>{children}</DevSignedOut>;
+  const authMode = useContext(LocalAuthContext);
+  if (authMode.isMock === true) return <LocalSignedOut>{children}</LocalSignedOut>;
   return <ClerkSignedOut>{children}</ClerkSignedOut>;
 }
 
 export function UserButton() {
-  const authMode = useContext(AuthModeContext);
-  if (authMode === 'mock') return <DevUserButton />;
+  const authMode = useContext(LocalAuthContext);
+  if (authMode.isMock === true) return <LocalUserButton />;
   return <ClerkUserButton />;
 }
 
 export function SignIn(props: { redirectUrl?: string; signUpUrl?: string; appearance?: any }) {
-  const authMode = useContext(AuthModeContext);
-  if (authMode === 'mock') return <DevSignIn {...props} />;
+  const authMode = useContext(LocalAuthContext);
+  if (authMode.isMock === true) return <LocalSignIn {...props} />;
   return <ClerkSignIn {...props} />;
 }
 
 export function SignUp(props: { redirectUrl?: string; signInUrl?: string; appearance?: any }) {
-  const authMode = useContext(AuthModeContext);
-  if (authMode === 'mock') return <DevSignUp {...props} />;
+  const authMode = useContext(LocalAuthContext);
+  if (authMode.isMock === true) return <LocalSignUp {...props} />;
   return <ClerkSignUp {...props} />;
 }
 
 // Re-export Clerk's specific hooks for advanced use cases
 export { useClerkUser, useClerkSession, useClerkSignIn, useClerkSignUp };
-export { useDevUser, useDevSession, useDevSignIn, useDevSignUp } from './dev-auth';
+export { useLocalUser, useLocalSession, useLocalSignIn, useLocalSignUp } from './dev-auth';

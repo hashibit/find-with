@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 // Same model as production Clerk: session persistence via httpOnly cookie,
 // short-lived JWT returned by getToken() for API calls.
 
-interface MockUser {
+interface LocalUser {
   id: string;
   email: string;
   firstName: string | null;
@@ -16,19 +16,26 @@ interface MockUser {
   imageUrl: string;
 }
 
-interface MockAuth {
+interface LocalAuth {
+  isMock: boolean;
   isLoaded: boolean;
   isSignedIn: boolean;
-  user: MockUser | null;
+  user: LocalUser | null;
   userId: string | null;
   sessionId: string | null;
   getToken: () => Promise<string | null>;
   signOut: () => Promise<void>;
   signIn: (email: string, password?: string) => Promise<void>;
-  signUp: (email: string, password?: string, firstName?: string, lastName?: string) => Promise<void>;
+  signUp: (
+    email: string,
+    password?: string,
+    firstName?: string,
+    lastName?: string,
+  ) => Promise<void>;
 }
 
-const MockAuthContext = createContext<MockAuth>({
+export const LocalAuthContext = createContext<LocalAuth>({
+  isMock: false,
   isLoaded: false,
   isSignedIn: false,
   user: null,
@@ -43,23 +50,21 @@ const MockAuthContext = createContext<MockAuth>({
 // Through middleware proxy so cookies are same-origin
 const MOCK_API = '/__clerk/v1';
 
-function userFromPayload(data: any): MockUser {
+function userFromPayload(data: any): LocalUser {
   const u = data.user || data;
   return {
     id: u.id,
     email: u.email_addresses?.[0]?.email_address || u.email || '',
     firstName: u.first_name || null,
     lastName: u.last_name || null,
-    fullName: u.first_name && u.last_name
-      ? `${u.first_name} ${u.last_name}`
-      : null,
+    fullName: u.first_name && u.last_name ? `${u.first_name} ${u.last_name}` : null,
     imageUrl: u.image_url || '',
   };
 }
 
-export function DevAuthProvider({ children }: { children: ReactNode }) {
+export function LocalAuthProvider({ children }: { children: ReactNode }) {
   const [isLoaded, setIsLoaded] = useState(false);
-  const [user, setUser] = useState<MockUser | null>(null);
+  const [user, setUser] = useState<LocalUser | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
 
   // On mount: restore session from httpOnly cookie via /v1/client
@@ -90,24 +95,27 @@ export function DevAuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const signUp = useCallback(async (email: string, password?: string, firstName?: string, lastName?: string) => {
-    const resp = await fetch(`${MOCK_API}/sign_ups`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({
-        email_address: email,
-        password: password || 'dev123',
-        first_name: firstName,
-        last_name: lastName,
-      }),
-    });
-    const data = await resp.json();
-    if (data.user && data.token) {
-      setUser(userFromPayload(data));
-      setSessionId(data.session?.id || data.created_session?.id || null);
-    }
-  }, []);
+  const signUp = useCallback(
+    async (email: string, password?: string, firstName?: string, lastName?: string) => {
+      const resp = await fetch(`${MOCK_API}/sign_ups`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          email_address: email,
+          password: password || 'dev123',
+          first_name: firstName,
+          last_name: lastName,
+        }),
+      });
+      const data = await resp.json();
+      if (data.user && data.token) {
+        setUser(userFromPayload(data));
+        setSessionId(data.session?.id || data.created_session?.id || null);
+      }
+    },
+    [],
+  );
 
   const getToken = useCallback(async (): Promise<string | null> => {
     if (!user) return null;
@@ -134,41 +142,40 @@ export function DevAuthProvider({ children }: { children: ReactNode }) {
   }, [sessionId]);
 
   return (
-    <MockAuthContext.Provider value={{
-      isLoaded,
-      isSignedIn: !!user,
-      user,
-      userId: user?.id ?? null,
-      sessionId,
-      getToken,
-      signOut,
-      signIn,
-      signUp,
-    }}>
+    <LocalAuthContext.Provider
+      value={{
+        isMock: true,
+        isLoaded,
+        isSignedIn: !!user,
+        user,
+        userId: user?.id ?? null,
+        sessionId,
+        getToken,
+        signOut,
+        signIn,
+        signUp,
+      }}
+    >
       {children}
-    </MockAuthContext.Provider>
+    </LocalAuthContext.Provider>
   );
 }
 
-export function useDevAuth() {
-  return useContext(MockAuthContext);
-}
-
-export function useDevUser() {
-  const { user, isLoaded } = useDevAuth();
+export function useLocalUser() {
+  const { user, isLoaded } = useContext(LocalAuthContext);
   return { user, isLoaded };
 }
 
-export function useDevSession() {
-  const { sessionId, user, isLoaded } = useDevAuth();
+export function useLocalSession() {
+  const { sessionId, user, isLoaded } = useContext(LocalAuthContext);
   return {
     session: sessionId ? { id: sessionId, user } : null,
     isLoaded,
   };
 }
 
-export function useDevSignIn() {
-  const { isLoaded, user, signIn } = useDevAuth();
+export function useLocalSignIn() {
+  const { isLoaded, user, signIn } = useContext(LocalAuthContext);
   return {
     isLoaded,
     signIn: user ? { status: 'complete' } : null,
@@ -176,8 +183,8 @@ export function useDevSignIn() {
   };
 }
 
-export function useDevSignUp() {
-  const { isLoaded, user, signUp } = useDevAuth();
+export function useLocalSignUp() {
+  const { isLoaded, user, signUp } = useContext(LocalAuthContext);
   return {
     isLoaded,
     signUp: user ? { status: 'complete' } : null,
@@ -185,18 +192,18 @@ export function useDevSignUp() {
   };
 }
 
-export function DevSignedIn({ children }: { children: ReactNode }) {
-  const { isSignedIn } = useDevAuth();
+export function LocalSignedIn({ children }: { children: ReactNode }) {
+  const { isSignedIn } = useContext(LocalAuthContext);
   return isSignedIn ? <>{children}</> : null;
 }
 
-export function DevSignedOut({ children }: { children: ReactNode }) {
-  const { isSignedIn } = useDevAuth();
+export function LocalSignedOut({ children }: { children: ReactNode }) {
+  const { isSignedIn } = useContext(LocalAuthContext);
   return isSignedIn ? null : <>{children}</>;
 }
 
-export function DevUserButton() {
-  const { user, signOut } = useDevAuth();
+export function LocalUserButton() {
+  const { user, signOut } = useContext(LocalAuthContext);
   if (!user) return null;
   return (
     <div className="flex items-center gap-2">
@@ -209,8 +216,14 @@ export function DevUserButton() {
   );
 }
 
-export function DevSignIn({ redirectUrl, signUpUrl }: { redirectUrl?: string; signUpUrl?: string }) {
-  const { signIn, isLoaded, isSignedIn } = useDevAuth();
+export function LocalSignIn({
+  redirectUrl,
+  signUpUrl,
+}: {
+  redirectUrl?: string;
+  signUpUrl?: string;
+}) {
+  const { signIn, isLoaded, isSignedIn } = useContext(LocalAuthContext);
   const router = useRouter();
 
   useEffect(() => {
@@ -237,18 +250,34 @@ export function DevSignIn({ redirectUrl, signUpUrl }: { redirectUrl?: string; si
       <form onSubmit={handleSubmit}>
         <div className="mb-4">
           <label className="block text-sm font-medium mb-1">Email</label>
-          <input name="email" type="email" className="w-full px-3 py-2 border rounded-md" defaultValue="dev@findwith.local" />
+          <input
+            name="email"
+            type="email"
+            className="w-full px-3 py-2 border rounded-md"
+            defaultValue="dev@findwith.local"
+          />
         </div>
         <div className="mb-4">
           <label className="block text-sm font-medium mb-1">Password</label>
-          <input name="password" type="password" className="w-full px-3 py-2 border rounded-md" defaultValue="dev123" />
+          <input
+            name="password"
+            type="password"
+            className="w-full px-3 py-2 border rounded-md"
+            defaultValue="dev123"
+          />
         </div>
-        <button type="submit" className="w-full py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">
+        <button
+          type="submit"
+          className="w-full py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+        >
           Sign in
         </button>
         {signUpUrl && (
           <p className="mt-4 text-center text-sm text-gray-500">
-            Don't have an account? <a href={signUpUrl} className="text-indigo-600 hover:underline">Sign up</a>
+            Don't have an account?{' '}
+            <a href={signUpUrl} className="text-indigo-600 hover:underline">
+              Sign up
+            </a>
           </p>
         )}
       </form>
@@ -256,8 +285,14 @@ export function DevSignIn({ redirectUrl, signUpUrl }: { redirectUrl?: string; si
   );
 }
 
-export function DevSignUp({ redirectUrl, signInUrl }: { redirectUrl?: string; signInUrl?: string }) {
-  const { signUp } = useDevAuth();
+export function LocalSignUp({
+  redirectUrl,
+  signInUrl,
+}: {
+  redirectUrl?: string;
+  signInUrl?: string;
+}) {
+  const { signUp } = useContext(LocalAuthContext);
   const router = useRouter();
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -291,12 +326,18 @@ export function DevSignUp({ redirectUrl, signInUrl }: { redirectUrl?: string; si
           <label className="block text-sm font-medium mb-1">Password</label>
           <input name="password" type="password" className="w-full px-3 py-2 border rounded-md" />
         </div>
-        <button type="submit" className="w-full py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">
+        <button
+          type="submit"
+          className="w-full py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+        >
           Create account
         </button>
         {signInUrl && (
           <p className="mt-4 text-center text-sm text-gray-500">
-            Already have an account? <a href={signInUrl} className="text-indigo-600 hover:underline">Sign in</a>
+            Already have an account?{' '}
+            <a href={signInUrl} className="text-indigo-600 hover:underline">
+              Sign in
+            </a>
           </p>
         )}
       </form>

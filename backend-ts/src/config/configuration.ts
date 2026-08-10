@@ -46,6 +46,8 @@ const envSchema = z.object({
   SMTP_PASS: z.string().optional(),
   SMTP_FROM: z.string().default('quinn@findwith.com'),
   SMTP_SECURE: z.coerce.boolean().default(false),
+  // Brave Search API key for web search (optional — falls back to LLM training data)
+  BRAVE_API_KEY: z.string().optional(),
   // Base URL used for generating email tracking links. Must be set in production.
   API_BASE_URL: z.string().url().default('http://localhost:14607'),
 });
@@ -87,6 +89,7 @@ export interface AppConfig {
     from: string;
     secure: boolean;
   };
+  brave: { apiKey?: string };
   apiBaseUrl: string;
 }
 
@@ -160,6 +163,7 @@ export const configuration = (): AppConfig => {
       from: env.SMTP_FROM,
       secure: env.SMTP_SECURE,
     },
+    brave: { apiKey: env.BRAVE_API_KEY },
     apiBaseUrl: env.API_BASE_URL,
   };
 };

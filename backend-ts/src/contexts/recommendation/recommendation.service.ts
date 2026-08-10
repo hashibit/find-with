@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { createHmac } from 'crypto';
+import { Type } from '@sinclair/typebox';
 import { RecoRecommendation } from '../../database/entities/recommendation/recommendation.entity.js';
 import { ProfileMaterial } from '../../database/entities/profile/material.entity.js';
 import { LLM_PROVIDER, type LlmProvider } from '../../llm/llm-provider.interface.js';
@@ -189,17 +190,17 @@ ${jobs.map((j, i) => `${i}. [${j.id}] ${j.title} at ${j.company} (${j.location})
 Return the top ranked job IDs.`;
 
     try {
-      const raw = await this.llm.completeContext({
-        systemPrompt: 'You are a job recommendation ranker. Respond only with valid JSON.',
-        messages: [{ role: 'user', content: prompt, timestamp: Date.now() }],
+      const RankedJobsSchema = Type.Object({
+        ranked: Type.Array(Type.Object({ jobId: Type.String() })),
       });
 
-      const jsonMatch = raw.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) return jobs;
-
-      const parsed = JSON.parse(jsonMatch[0]) as {
-        ranked?: Array<{ jobId: string }>;
-      };
+      const parsed = await this.llm.structuredComplete(
+        {
+          systemPrompt: 'You are a job recommendation ranker.',
+          messages: [{ role: 'user', content: prompt, timestamp: Date.now() }],
+        },
+        RankedJobsSchema,
+      );
 
       const rankedIds = (parsed.ranked ?? []).map((r) => r.jobId);
       const rankedJobs = rankedIds

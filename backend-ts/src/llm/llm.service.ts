@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { stream, complete, type Context, type Model, type Api } from '@earendil-works/pi-ai/compat';
+import { stream, complete, type Context, type Model, type Api, type Tool } from '@earendil-works/pi-ai/compat';
+import type { TSchema, StaticDecode } from '@sinclair/typebox';
 import OpenAI from 'openai';
 import { type LlmProvider } from './llm-provider.interface.js';
 import { type AppConfig } from '../config/configuration.js';
@@ -116,6 +117,48 @@ export class LlmService implements LlmProvider {
     const msg = await complete(model, context, options);
     const block = msg.content.find((b) => b.type === 'text');
     return block?.type === 'text' ? block.text : '';
+  }
+
+  async structuredComplete<T extends TSchema>(context: Context, outputSchema: T): Promise<StaticDecode<T>> {
+    const llmConfig = this.configService.get('llm', { infer: true });
+    const provider = llmConfig.provider;
+    const providerConfig = llmConfig[provider];
+
+    const api: Api = provider === 'anthropic' ? 'anthropic-messages' : 'openai-completions';
+    const modelId = providerConfig.model || 'gpt-4.1-mini';
+    const baseUrl = providerConfig.baseUrl || 'https://api.openai.com/v1';
+
+    const model: Model<Api> = {
+      id: modelId,
+      name: modelId,
+      api,
+      provider,
+      baseUrl,
+      reasoning: false,
+      input: ['text'],
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+      contextWindow: 128000,
+      maxTokens: 4096,
+    };
+
+    const options: Record<string, unknown> = {};
+    if (provider === 'openai' && this.openaiApiKey) options.apiKey = this.openaiApiKey;
+    else if (provider === 'anthropic' && this.anthropicApiKey) options.apiKey = this.anthropicApiKey;
+    else if (provider === 'openrouter' && this.openrouterApiKey) options.apiKey = this.openrouterApiKey;
+
+    const tool: Tool = {
+      name: 'respond',
+      description: 'Return the structured result',
+      parameters: outputSchema,
+      constrainedSampling: { type: 'json_schema', strict: 'require' },
+    };
+
+    const msg = await complete(model, { ...context, tools: [tool] }, options);
+    const toolBlock = msg.content.find((b) => b.type === 'toolCall');
+    if (toolBlock && toolBlock.type === 'toolCall') {
+      return toolBlock.arguments as StaticDecode<T>;
+    }
+    throw new Error('LLM did not produce structured output');
   }
 
   async embed(text: string): Promise<number[]> {

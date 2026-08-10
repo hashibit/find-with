@@ -4,6 +4,7 @@ import { Job } from 'bullmq';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Between, IsNull, Repository } from 'typeorm';
 import { ulid } from 'ulid';
+import { Type } from '@sinclair/typebox';
 
 import { ConvMessage } from '../../database/entities/conversation/message.entity.js';
 import { ConvRollingSummary } from '../../database/entities/conversation/rolling-summary.entity.js';
@@ -13,19 +14,18 @@ import { LLM_PROVIDER, type LlmProvider } from '../../llm/llm-provider.interface
 import { ContextBuilderService } from '../../agent/context-builder.service.js';
 import { MEMORY_QUEUE, type MemoryJobData } from './memory.constants.js';
 
-const GOAL_EXTRACTION_SYSTEM_PROMPT = `Given the conversation transcript and the user's existing preferences, extract or update job search preferences.
+const GoalExtractionSchema = Type.Object({
+  targetRoles: Type.Array(Type.String()),
+  targetIndustries: Type.Array(Type.String()),
+  locationPrefs: Type.Array(Type.String()),
+  dealBreakers: Type.Array(Type.String()),
+  preferredStages: Type.Array(Type.String()),
+  salaryFloorUsd: Type.Union([Type.Number(), Type.Null()]),
+  shortTermGoal: Type.String(),
+  rawStatements: Type.Array(Type.String()),
+});
 
-Return JSON only:
-{
-  "targetRoles": ["..."],
-  "targetIndustries": ["..."],
-  "locationPrefs": ["..."],
-  "dealBreakers": ["..."],
-  "preferredStages": ["..."],
-  "salaryFloorUsd": null,
-  "shortTermGoal": "...",
-  "rawStatements": ["direct quotes from user"]
-}
+const GOAL_EXTRACTION_SYSTEM_PROMPT = `Given the conversation transcript and the user's existing preferences, extract or update job search preferences.
 
 Rules:
 - Only include fields where there is clear evidence in this conversation
@@ -130,25 +130,19 @@ export class MemoryProcessor extends WorkerHost {
         })
       : '{}';
 
-    const result = await this.llm.completeContext({
-      systemPrompt: GOAL_EXTRACTION_SYSTEM_PROMPT,
-      messages: [
-        {
-          role: 'user',
-          content: `Existing preferences: ${existingJson}\n\nConversation transcript:\n${transcript}`,
-          timestamp: Date.now(),
-        },
-      ],
-    });
-
-    let parsed: Partial<UserGoalMemory> = {};
-    try {
-      const m = result.match(/\{[\s\S]*\}/);
-      if (m) parsed = JSON.parse(m[0]) as Partial<UserGoalMemory>;
-    } catch (err) {
-      this.logger.error({ err, userId }, 'Failed to parse goal extraction JSON from LLM — retrying via BullMQ');
-      throw err;
-    }
+    const parsed = await this.llm.structuredComplete(
+      {
+        systemPrompt: GOAL_EXTRACTION_SYSTEM_PROMPT,
+        messages: [
+          {
+            role: 'user',
+            content: `Existing preferences: ${existingJson}\n\nConversation transcript:\n${transcript}`,
+            timestamp: Date.now(),
+          },
+        ],
+      },
+      GoalExtractionSchema,
+    );
 
     const merged = {
       userId,

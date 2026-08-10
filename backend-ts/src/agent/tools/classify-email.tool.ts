@@ -9,6 +9,12 @@ import { FIELD_CRYPTO, type FieldCrypto } from '../../common/crypto/crypto.inter
 import type { ToolExecutor } from '../tool-registry.js';
 export const CLASSIFY_EMAIL_TOOL_NAME = 'classify_email';
 
+const EmailClassificationSchema = Type.Object({
+  kind: Type.String(),
+  keyInfo: Type.Object({}, { additionalProperties: true }),
+  summary: Type.String(),
+});
+
 @Injectable()
 export class ClassifyEmailTool implements ToolExecutor {
   constructor(
@@ -48,23 +54,16 @@ Subject: ${email.subject ?? '(no subject)'}
 From: ${email.fromAddr ?? 'unknown'}
 Body: ${bodyText.slice(0, 2000)}
 
-Return JSON with:
-- kind: one of INTERVIEW_INVITE | REJECTION | TEMPLATE_REJECTION | HR_FOLLOWUP | OFFER | OTHER
-- keyInfo: object with relevant fields (e.g., interviewDate, interviewFormat, nextSteps)
-- summary: 1-2 sentence plain-English summary`;
+Classify this as one of: INTERVIEW_INVITE, REJECTION, TEMPLATE_REJECTION, HR_FOLLOWUP, OFFER, or OTHER.
+Extract relevant metadata (interview date, format, next steps, offer details, etc.) into keyInfo.`;
 
-    const raw = await this.llm.completeContext({
-      systemPrompt: 'You classify recruitment emails. Respond only with valid JSON.',
-      messages: [{ role: 'user', content: prompt, timestamp: Date.now() }],
-    });
-
-    let parsed: { kind?: string; keyInfo?: Record<string, unknown>; summary?: string } = {};
-    try {
-      const jsonMatch = raw.match(/\{[\s\S]*\}/);
-      if (jsonMatch) parsed = JSON.parse(jsonMatch[0]) as typeof parsed;
-    } catch {
-      parsed = { kind: 'OTHER', summary: raw };
-    }
+    const parsed = await this.llm.structuredComplete(
+      {
+        systemPrompt: 'You classify recruitment emails.',
+        messages: [{ role: 'user', content: prompt, timestamp: Date.now() }],
+      },
+      EmailClassificationSchema,
+    );
 
     email.kind = parsed.kind ?? 'OTHER';
     email.parsed = { keyInfo: parsed.keyInfo ?? {}, summary: parsed.summary ?? '' };

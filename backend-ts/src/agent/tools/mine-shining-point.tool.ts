@@ -14,6 +14,12 @@ import type { ToolExecutor } from '../tool-registry.js';
 
 export const MINE_SHINING_POINT_TOOL_NAME = 'mine_shining_point';
 
+const ShiningPointSchema = Type.Object({
+  shiningText: Type.String(),
+  rationale: Type.String(),
+  tags: Type.Array(Type.String()),
+});
+
 @Injectable()
 export class MineShiningPointTool implements ToolExecutor {
   constructor(
@@ -43,26 +49,17 @@ export class MineShiningPointTool implements ToolExecutor {
 
 "${raw_text}"
 
-Return JSON with:
-- shiningText: A polished, third-person professional bullet (strong verb + impact + context)
+- shiningText: A polished, third-person professional bullet (strong verb + impact + context). Example: "Redesigned onboarding process within first 60 days, reducing new-hire ramp time by 30%".
 - rationale: Why this is a valuable highlight (1 sentence)
-- tags: Array of 2-4 tags from [leadership, ownership, technical_depth, process_improvement, cross_functional, initiative, crisis_management, quantified_impact, mentoring, communication]
+- tags: 2-4 tags from [leadership, ownership, technical_depth, process_improvement, cross_functional, initiative, crisis_management, quantified_impact, mentoring, communication]`;
 
-Example shiningText: "Redesigned onboarding process within first 60 days, reducing new-hire ramp time by 30%"`;
-
-    const raw = await this.llm.completeContext({
-      systemPrompt:
-        'You are a career coach who extracts professional achievements. Respond only with valid JSON.',
-      messages: [{ role: 'user', content: prompt, timestamp: Date.now() }],
-    });
-
-    let parsed: { shiningText?: string; rationale?: string; tags?: string[] } = {};
-    try {
-      const jsonMatch = raw.match(/\{[\s\S]*\}/);
-      if (jsonMatch) parsed = JSON.parse(jsonMatch[0]) as typeof parsed;
-    } catch {
-      parsed = { shiningText: raw_text };
-    }
+    const parsed = await this.llm.structuredComplete(
+      {
+        systemPrompt: 'You are a career coach who extracts professional achievements.',
+        messages: [{ role: 'user', content: prompt, timestamp: Date.now() }],
+      },
+      ShiningPointSchema,
+    );
 
     // Store raw text encrypted
     const encryptedRaw = await this.crypto.encrypt(raw_text);

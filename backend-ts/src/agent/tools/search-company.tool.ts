@@ -1,21 +1,43 @@
-import { Injectable, Inject } from '@nestjs/common';
+import { Injectable, Inject, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { ConfigService } from '@nestjs/config';
 import { Repository } from 'typeorm';
 import { Type } from '@sinclair/typebox';
 import { JobCompanyBrief } from '../../database/entities/jobs/company-brief.entity.js';
 import { LLM_PROVIDER, type LlmProvider } from '../../llm/llm-provider.interface.js';
+import { type AppConfig } from '../../config/configuration.js';
 import { ulid } from 'ulid';
 
 import type { ToolExecutor } from '../tool-registry.js';
 export const SEARCH_COMPANY_TOOL_NAME = 'search_company';
 
+const BRAVE_SEARCH_URL = 'https://api.search.brave.com/res/v1/web/search';
+
+const CompanyBriefSchema = Type.Object({
+  whatTheyDo: Type.String(),
+  sizeStage: Type.String(),
+  recentNews: Type.Array(Type.String()),
+  risks: Type.Object({
+    layoffs: Type.Boolean(),
+    regulatory: Type.Boolean(),
+    culture: Type.Optional(Type.String()),
+  }),
+  glassdoorRating: Type.Union([Type.Number(), Type.Null()]),
+});
+
 @Injectable()
 export class SearchCompanyTool implements ToolExecutor {
+  private readonly logger = new Logger(SearchCompanyTool.name);
+  private readonly braveApiKey?: string;
+
   constructor(
     @InjectRepository(JobCompanyBrief)
     private readonly repo: Repository<JobCompanyBrief>,
     @Inject(LLM_PROVIDER) private readonly llm: LlmProvider,
-  ) {}
+    config: ConfigService<AppConfig>,
+  ) {
+    this.braveApiKey = config.get('brave', { infer: true })!.apiKey;
+  }
 
   readonly name = SEARCH_COMPANY_TOOL_NAME;
   readonly scenes = ['JOB_ANALYSIS'] as const;
@@ -37,40 +59,79 @@ export class SearchCompanyTool implements ToolExecutor {
       return this.buildResult(cached);
     }
 
-    // Ask LLM for company research
-    const prompt = `Research the company "${company}" for a job seeker. Provide:
-1. What they do (1-2 sentences)
-2. Size and stage (startup/scaleup/enterprise, employee count if known)
-3. Recent news (last 6 months: funding, layoffs, acquisitions, product launches)
-4. Risk signals (mass layoffs, regulatory issues, leadership turnover, negative reviews)
-5. Glassdoor rating estimate (if known)
-
-Respond as JSON with keys: whatTheyDo, sizeStage, recentNews (array), risks (object with: layoffs, regulatory, culture), glassdoorRating (number or null)`;
-
-    const raw = await this.llm.completeContext({
-      systemPrompt: 'You are a company research assistant. Respond only with valid JSON.',
-      messages: [{ role: 'user', content: prompt, timestamp: Date.now() }],
-    });
-
-    let parsed: Record<string, unknown> = {};
-    try {
-      const jsonMatch = raw.match(/\{[\s\S]*\}/);
-      if (jsonMatch) parsed = JSON.parse(jsonMatch[0]) as Record<string, unknown>;
-    } catch {
-      parsed = { whatTheyDo: raw };
+    // Search the web for real-time company info
+    let searchContext = '';
+    if (this.braveApiKey) {
+      try {
+        const results = await this.braveSearch(company);
+        if (results.length > 0) {
+          searchContext = this.formatSearchResults(company, results);
+        }
+      } catch (err) {
+        this.logger.warn(
+          `Brave search failed for "${company}", falling back to LLM knowledge`,
+          err,
+        );
+      }
     }
+
+    const prompt = `Research the company "${company}" for a job seeker.${searchContext}`;
+    const parsed = await this.llm.structuredComplete(
+      {
+        systemPrompt:
+          'You are a company research assistant. Use search results when provided to give accurate, up-to-date information.',
+        messages: [{ role: 'user', content: prompt, timestamp: Date.now() }],
+      },
+      CompanyBriefSchema,
+    );
 
     const brief = cached ?? this.repo.create({ id: ulid() });
     brief.company = company;
-    brief.whatTheyDo = (parsed['whatTheyDo'] as string) ?? null;
-    brief.sizeStage = (parsed['sizeStage'] as string) ?? null;
-    brief.recentNews = (parsed['recentNews'] as unknown[]) ?? null;
-    brief.risks = (parsed['risks'] as Record<string, unknown>) ?? null;
-    brief.glassdoorRating = (parsed['glassdoorRating'] as number) ?? null;
-    brief.ttlExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 day TTL
+    brief.whatTheyDo = parsed.whatTheyDo ?? null;
+    brief.sizeStage = parsed.sizeStage ?? null;
+    brief.recentNews = parsed.recentNews ?? null;
+    brief.risks = parsed.risks as Record<string, unknown>;
+    brief.glassdoorRating = parsed.glassdoorRating ?? null;
+    brief.ttlExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
     await this.repo.save(brief);
     return this.buildResult(brief);
+  }
+
+  private formatSearchResults(
+    company: string,
+    results: Array<{ title: string; description: string; url: string }>,
+  ): string {
+    const lines = results.map((r, i) => `${i + 1}. ${r.title}\n   ${r.description}\n   ${r.url}`);
+    return `\n\nSearch results about ${company}:\n${lines.join('\n')}`;
+  }
+
+  // TODO naive company search, acturally it's a company research task...
+  private async braveSearch(
+    company: string,
+  ): Promise<Array<{ title: string; description: string; url: string }>> {
+    const params = new URLSearchParams({
+      q: `${company} company news layoffs funding`,
+      count: '5',
+      search_lang: 'en',
+    });
+
+    const resp = await fetch(`${BRAVE_SEARCH_URL}?${params}`, {
+      headers: {
+        Accept: 'application/json',
+        'Accept-Encoding': 'gzip',
+        'X-Subscription-Token': this.braveApiKey!,
+      },
+    });
+
+    if (!resp.ok) {
+      throw new Error(`Brave API returned ${resp.status}`);
+    }
+
+    const data = (await resp.json()) as {
+      web?: { results?: Array<{ title: string; description: string; url: string }> };
+    };
+    return data.web?.results ?? [];
   }
 
   private buildResult(brief: JobCompanyBrief): {

@@ -5,6 +5,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { extractText } from 'unpdf';
 import * as mammoth from 'mammoth';
+import { Type, type Static } from '@sinclair/typebox';
+import { Value } from '@sinclair/typebox/value';
 import { ProfileResumeSource } from '../../database/entities/profile/resume-source.entity.js';
 import { ProfileProfile } from '../../database/entities/profile/profile.entity.js';
 import { ProfileEducation } from '../../database/entities/profile/education.entity.js';
@@ -16,32 +18,37 @@ import { LLM_PROVIDER, type LlmProvider } from '../../llm/llm-provider.interface
 import { RESUME_PARSE_QUEUE } from './profile.service.js';
 import { ulid } from 'ulid';
 
-interface ParsedResume {
-  basicInfo: {
-    fullName?: string;
-    email?: string;
-    phone?: string;
-    location?: string;
-    linkedinUrl?: string;
-  };
-  education: Array<{
-    school: string;
-    degree?: string;
-    major?: string;
-    start?: string;
-    end?: string;
-    gpa?: string;
-  }>;
-  workExperience: Array<{
-    company: string;
-    title: string;
-    location?: string;
-    start?: string;
-    end?: string;
-    bullets: string[];
-  }>;
-  skills: Array<{ name: string; kind: string }>;
-}
+const ParsedResumeSchema = Type.Object({
+  basicInfo: Type.Object({
+    fullName: Type.Optional(Type.String()),
+    email: Type.Optional(Type.String()),
+    phone: Type.Optional(Type.String()),
+    location: Type.Optional(Type.String()),
+    linkedinUrl: Type.Optional(Type.String()),
+  }),
+  education: Type.Array(Type.Object({
+    school: Type.String(),
+    degree: Type.Optional(Type.String()),
+    major: Type.Optional(Type.String()),
+    start: Type.Optional(Type.String()),
+    end: Type.Optional(Type.String()),
+    gpa: Type.Optional(Type.String()),
+  })),
+  workExperience: Type.Array(Type.Object({
+    company: Type.String(),
+    title: Type.String(),
+    location: Type.Optional(Type.String()),
+    start: Type.Optional(Type.String()),
+    end: Type.Optional(Type.String()),
+    bullets: Type.Array(Type.String()),
+  })),
+  skills: Type.Array(Type.Object({
+    name: Type.String(),
+    kind: Type.String(),
+  })),
+});
+
+type ParsedResume = Static<typeof ParsedResumeSchema>;
 
 @Processor(RESUME_PARSE_QUEUE)
 export class ProfileProcessor extends WorkerHost {
@@ -88,34 +95,28 @@ export class ProfileProcessor extends WorkerHost {
         text = buffer.toString('utf8');
       }
 
-      // LLM parse
-      const prompt = `Parse this resume into structured JSON. Return ONLY valid JSON, no commentary.
+      // LLM parse with structured output
+      const prompt = `Parse this resume into structured data.
 
 Resume text:
-${text.slice(0, 8000)}
+${text.slice(0, 8000)}`;
 
-Return JSON matching this schema:
-{
-  "basicInfo": { "fullName": string, "email": string, "phone": string, "location": string, "linkedinUrl": string },
-  "education": [{ "school": string, "degree": string, "major": string, "start": "YYYY-MM", "end": "YYYY-MM", "gpa": string }],
-  "workExperience": [{ "company": string, "title": string, "location": string, "start": "YYYY-MM", "end": "YYYY-MM", "bullets": [string] }],
-  "skills": [{ "name": string, "kind": "HARD"|"SOFT"|"TOOL" }]
-}`;
+      const result = await this.llm.structuredComplete(
+        {
+          systemPrompt: 'You parse resumes into structured data.',
+          messages: [{ role: 'user', content: prompt, timestamp: Date.now() }],
+        },
+        ParsedResumeSchema,
+      );
 
-      const raw = await this.llm.completeContext({
-        systemPrompt: 'You parse resumes into structured JSON. Output only valid JSON.',
-        messages: [{ role: 'user', content: prompt, timestamp: Date.now() }],
-      });
-
-      let parsed: ParsedResume;
-      try {
-        const jsonMatch = raw.match(/\{[\s\S]*\}/);
-        parsed = jsonMatch
-          ? (JSON.parse(jsonMatch[0]) as ParsedResume)
-          : { basicInfo: {}, education: [], workExperience: [], skills: [] };
-      } catch {
-        throw new Error(`Failed to parse LLM response as JSON: ${raw.slice(0, 200)}`);
+      // Runtime validation — constrainedSampling guarantees valid output,
+      // but Check is a defensive safety net in case the LLM provider makes mistakes.
+      if (!Value.Check(ParsedResumeSchema, result)) {
+        const errors = [...Value.Errors(ParsedResumeSchema, result)];
+        throw new Error(`LLM structured output validation failed: ${errors.map(e => e.message).join('; ')}`);
       }
+
+      const parsed = result;
 
       // Upsert profile and related entities
       await this.profileRepo.upsert(

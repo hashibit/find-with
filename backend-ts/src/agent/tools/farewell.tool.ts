@@ -10,6 +10,11 @@ import { PROMPTS } from '../prompt-registry.js';
 import type { ToolExecutor } from '../tool-registry.js';
 export const FAREWELL_TOOL_NAME = 'farewell_recap';
 
+const FarewellRecapSchema = Type.Object({
+  farewellMessage: Type.String(),
+  recapMarkdown: Type.String(),
+});
+
 @Injectable()
 export class FarewellTool implements ToolExecutor {
   constructor(
@@ -65,16 +70,15 @@ Generate a warm farewell and structured recap.`;
     let recap = '';
 
     try {
-      const raw = await this.llm.completeContext({
-        systemPrompt: 'You are Quinn, an AI job search companion. Respond only with valid JSON.',
-        messages: [{ role: 'user', content: prompt, timestamp: Date.now() }],
-      });
-      const jsonMatch = raw.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]) as { farewellMessage?: string; recapMarkdown?: string };
-        farewell = parsed.farewellMessage ?? '';
-        recap = parsed.recapMarkdown ?? '';
-      }
+      const parsed = await this.llm.structuredComplete(
+        {
+          systemPrompt: 'You are Quinn, an AI job search companion.',
+          messages: [{ role: 'user', content: prompt, timestamp: Date.now() }],
+        },
+        FarewellRecapSchema,
+      );
+      farewell = parsed.farewellMessage;
+      recap = parsed.recapMarkdown;
     } catch {
       farewell = `Congratulations. This one was real work. Your profile now has ${materials.length} documented shining points — they'll still be here the next time you need them. Good luck with the new role.`;
       recap = `# Job Search Recap\n\n**Applications:** ${applied}\n**Interviews:** ${interviewed}\n**Offers:** ${offers}\n\n**Top highlights discovered:**\n${topMaterials.map((m) => `- ${m}`).join('\n')}`;

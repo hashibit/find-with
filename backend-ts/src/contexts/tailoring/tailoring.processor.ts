@@ -1,7 +1,7 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger, Inject } from '@nestjs/common';
-import { parseLlmJsonArray } from '../../common/llm-json.js';
 import { Job } from 'bullmq';
+import { Type } from '@sinclair/typebox';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { TailoringResume } from '../../database/entities/tailoring/tailoring-resume.entity.js';
@@ -75,55 +75,45 @@ Required skills: ${(parsedJd.hardSkills ?? []).join(', ')}
 Candidate's confirmed achievements (use ONLY these, never fabricate):
 ${materialContext || '(no materials yet)'}
 
-Return JSON array of sections:
-[{
-  "title": "Work Experience",
-  "bullets": [{
-    "id": "bullet_ULID",
-    "text": "Strong bullet point using achievement above",
-    "source": "MATERIAL",
-    "sourceId": "material_id_if_applicable",
-    "status": "CONFIRMED"
-  }]
-}]
-
 Rules:
 - Only use achievements from the candidate's materials
 - Rewrite them to match JD language
 - Use strong action verbs
 - Mark bullets you had to infer (not directly from materials) as status: "PENDING"`;
 
-    const raw = await this.llm.completeContext({
-      systemPrompt: 'You write tailored resume sections. Use only provided materials. Output JSON. BEFORE OUTPUTTING, ensure you are using materials from the list provided. If a bullet cannot reference an exact material, mark it as status: "PENDING".',
-      messages: [{ role: 'user', content: prompt, timestamp: Date.now() }],
-    });
+    const TailoringSectionsSchema = Type.Array(Type.Object({
+      title: Type.String(),
+      bullets: Type.Array(Type.Object({
+        id: Type.String(),
+        text: Type.String(),
+        source: Type.String(),
+        sourceId: Type.String(),
+        status: Type.String(),
+      })),
+    }));
 
-    const sections = parseLlmJsonArray(raw);
+    const sections = await this.llm.structuredComplete(
+      {
+        systemPrompt: 'You write tailored resume sections. Use only provided materials. BEFORE OUTPUTTING, ensure you are using materials from the list provided. If a bullet cannot reference an exact material, mark it as status: "PENDING".',
+        messages: [{ role: 'user', content: prompt, timestamp: Date.now() }],
+      },
+      TailoringSectionsSchema,
+    );
 
     // Validate and process sections with bullet-level validation
     const materialIds = new Set(relevantMaterials.map((m) => m.id));
     const bulletEntities: TailoringBullet[] = [];
 
-    for (const section of sections as Array<{
-      title?: string;
-      bullets?: Array<{
-        id?: string;
-        text?: string;
-        source?: string;
-        sourceId?: string;
-        status?: string;
-      }>;
-    }>) {
-      const sectionTitle = (section.title as string) ?? 'Work Experience';
-      const rawBullets = section.bullets ?? [];
+    for (const section of sections) {
+      const sectionTitle = section.title || 'Work Experience';
 
-      for (let pos = 0; pos < rawBullets.length; pos++) {
-        const b = rawBullets[pos];
+      for (let pos = 0; pos < section.bullets.length; pos++) {
+        const b = section.bullets[pos];
         const id = ulid();
-        const text = (b.text as string) ?? '';
-        const source = ((b.source as string) ?? 'MATERIAL').slice(0, 30);
-        const rawSourceId = b.sourceId as string | undefined;
-        let status: BulletStatus = (b.status as BulletStatus) ?? BulletStatus.PENDING;
+        const text = b.text || '';
+        const source = (b.source || 'MATERIAL').slice(0, 30);
+        const rawSourceId = b.sourceId || null;
+        let status: BulletStatus = (b.status as BulletStatus) || BulletStatus.PENDING;
 
         // sourceId is only valid if it references an actual material ULID (26 chars)
         const validSourceId = (rawSourceId && materialIds.has(rawSourceId)) ? rawSourceId : null;

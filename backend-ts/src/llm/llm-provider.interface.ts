@@ -1,4 +1,5 @@
 import { stream, type Context, type Model, type Api } from '@earendil-works/pi-ai/compat';
+import type { TSchema, StaticDecode } from '@sinclair/typebox';
 
 export const LLM_PROVIDER = Symbol('LLM_PROVIDER');
 
@@ -20,6 +21,9 @@ export interface LlmProvider {
 
   /** One-shot completion — used by tools for structured JSON extraction. */
   completeContext(context: Context): Promise<string>;
+
+  /** One-shot completion with structured output via pi-ai tool constrainedSampling. */
+  structuredComplete<T extends TSchema>(context: Context, outputSchema: T): Promise<StaticDecode<T>>;
 
   /** Text embedding. */
   embed(text: string): Promise<number[]>;

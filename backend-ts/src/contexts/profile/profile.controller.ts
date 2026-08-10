@@ -14,7 +14,10 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
-import { CurrentUser, type AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
+import {
+  CurrentUser,
+  type AuthenticatedUser,
+} from '../../common/decorators/current-user.decorator.js';
 import { ProfileService } from './profile.service.js';
 import { STORAGE, type Storage } from '../../adapters/storage/storage.interface.js';
 import { Inject } from '@nestjs/common';
@@ -58,7 +61,7 @@ export class ProfileController {
   @Post('resume')
   @ApiConsumes('multipart/form-data')
   @ApiOperation({ summary: 'Upload resume PDF/DOCX' })
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 10 * 1024 * 1024 } }))
   async uploadResume(
     @CurrentUser() user: AuthenticatedUser,
     @UploadedFile() file: Express.Multer.File,

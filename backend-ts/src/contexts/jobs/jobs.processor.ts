@@ -1,22 +1,42 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger, Inject } from '@nestjs/common';
-import { parseLlmJson } from '../../common/llm-json.js';
+import { Type } from '@sinclair/typebox';
 import { Job } from 'bullmq';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { JobCapture } from '../../database/entities/jobs/job-capture.entity.js';
 import { JobParsedJd } from '../../database/entities/jobs/parsed-jd.entity.js';
-import { JobCompanyBrief } from '../../database/entities/jobs/company-brief.entity.js';
 import { JobMatchResult } from '../../database/entities/jobs/match-result.entity.js';
 import { JobRadarItem } from '../../database/entities/jobs/radar-item.entity.js';
 import { LLM_PROVIDER, type LlmProvider } from '../../llm/llm-provider.interface.js';
 import { MaterialManager } from '../profile/material-manager.service.js';
+import { SearchCompanyTool } from '../../agent/tools/search-company.tool.js';
 import { JOB_ANALYZE_QUEUE } from './jobs.service.js';
 import { ulid } from 'ulid';
 
 // Number of top-scoring materials to use for deep match scoring.
 // Larger values pull in more context but dilute the signal from the closest matches.
 const TOP_K = 8;
+
+const ParsedJobDescription = Type.Object({
+  title: Type.String(),
+  company: Type.String(),
+  location: Type.String(),
+  hardSkills: Type.Array(Type.String()),
+  softSkills: Type.Array(Type.String()),
+  experience: Type.Object({
+    yearsMin: Type.Number(),
+    yearsMax: Type.Number(),
+    industries: Type.Array(Type.String()),
+  }),
+  educationRequired: Type.Object({
+    degree: Type.String(),
+    required: Type.Boolean(),
+  }),
+  hiddenSignals: Type.Array(Type.String()),
+  niceToHave: Type.Array(Type.String()),
+  buzzwordTranslation: Type.String(),
+});
 
 @Processor(JOB_ANALYZE_QUEUE)
 export class JobsProcessor extends WorkerHost {
@@ -25,11 +45,11 @@ export class JobsProcessor extends WorkerHost {
   constructor(
     @InjectRepository(JobCapture) private readonly captureRepo: Repository<JobCapture>,
     @InjectRepository(JobParsedJd) private readonly jdRepo: Repository<JobParsedJd>,
-    @InjectRepository(JobCompanyBrief) private readonly companyRepo: Repository<JobCompanyBrief>,
     @InjectRepository(JobMatchResult) private readonly matchRepo: Repository<JobMatchResult>,
     @InjectRepository(JobRadarItem) private readonly radarRepo: Repository<JobRadarItem>,
     @Inject(LLM_PROVIDER) private readonly llm: LlmProvider,
     private readonly materialManager: MaterialManager,
+    private readonly companySearcher: SearchCompanyTool,
   ) {
     super();
   }
@@ -44,45 +64,32 @@ export class JobsProcessor extends WorkerHost {
     // 1. Parse JD — idempotent: skip if already done for this capture
     let parsedJd = await this.jdRepo.findOne({ where: { captureId } });
     if (!parsedJd) {
-      const jdPrompt = `Parse this job description into structured JSON. Return ONLY valid JSON.
+      const jdPrompt = `Parse this job description into structured data
 
 JD text:
-${text.slice(0, 6000)}
+${text.slice(0, 6000)}`;
 
-Return JSON:
-{
-  "title": string,
-  "company": string,
-  "location": string,
-  "hardSkills": [string],
-  "softSkills": [string],
-  "experience": { "yearsMin": number, "yearsMax": number, "industries": [string] },
-  "educationRequired": { "degree": string, "required": boolean },
-  "hiddenSignals": [string],
-  "niceToHave": [string],
-  "buzzwordTranslation": string
-}`;
-
-      const jdRaw = await this.llm.completeContext({
-        systemPrompt: 'Parse job descriptions into structured JSON. Output only JSON.',
-        messages: [{ role: 'user', content: jdPrompt, timestamp: Date.now() }],
-      });
-
-      const jdParsed = parseLlmJson(jdRaw);
+      const parsed = await this.llm.structuredComplete(
+        {
+          systemPrompt: 'Parse job descriptions into structured data.',
+          messages: [{ role: 'user', content: jdPrompt, timestamp: Date.now() }],
+        },
+        ParsedJobDescription,
+      );
 
       parsedJd = this.jdRepo.create({
         id: ulid(),
         captureId,
-        title: (jdParsed['title'] as string) ?? null,
-        company: (jdParsed['company'] as string) ?? null,
-        location: (jdParsed['location'] as string) ?? null,
-        hardSkills: (jdParsed['hardSkills'] as string[]) ?? null,
-        softSkills: (jdParsed['softSkills'] as string[]) ?? null,
-        experience: (jdParsed['experience'] as Record<string, unknown>) ?? null,
-        educationRequired: (jdParsed['educationRequired'] as Record<string, unknown>) ?? null,
-        hiddenSignals: (jdParsed['hiddenSignals'] as string[]) ?? null,
-        niceToHave: (jdParsed['niceToHave'] as string[]) ?? null,
-        buzzwordTranslation: (jdParsed['buzzwordTranslation'] as string) ?? null,
+        title: parsed.title ?? null,
+        company: parsed.company ?? null,
+        location: parsed.location ?? null,
+        hardSkills: parsed.hardSkills ?? null,
+        softSkills: parsed.softSkills ?? null,
+        experience: parsed.experience ?? null,
+        educationRequired: parsed.educationRequired ?? null,
+        hiddenSignals: parsed.hiddenSignals ?? null,
+        niceToHave: parsed.niceToHave ?? null,
+        buzzwordTranslation: parsed.buzzwordTranslation ?? null,
       });
       await this.jdRepo.save(parsedJd);
     }
@@ -107,36 +114,10 @@ Return JSON:
       }
     }
 
-    // 2. Company research (with TTL cache — already effectively checkpointed at DB level)
+    // 2. Company research — delegated to SearchCompanyTool (Brave search + LLM + DB cache)
     const company = parsedJd.company;
     if (company) {
-      const existing = await this.companyRepo.findOne({ where: { company } });
-      if (!existing || !existing.ttlExpires || existing.ttlExpires < new Date()) {
-        const companyPrompt = `Research "${company}". Return JSON: { "whatTheyDo": string, "sizeStage": string, "recentNews": [string], "risks": { "layoffs": boolean, "regulatory": boolean }, "glassdoorRating": number|null }`;
-        const companyRaw = await this.llm.completeContext({
-          systemPrompt: 'You research companies. Return only JSON.',
-          messages: [{ role: 'user', content: companyPrompt, timestamp: Date.now() }],
-        });
-        let companyData: Record<string, unknown> = {};
-        try {
-          const m = companyRaw.match(/\{[\s\S]*\}/);
-          if (m) companyData = JSON.parse(m[0]) as Record<string, unknown>;
-        } catch {
-          /* ignore */
-        }
-
-        const brief = existing ?? this.companyRepo.create({ id: ulid() });
-        Object.assign(brief, {
-          company,
-          whatTheyDo: companyData['whatTheyDo'] ?? null,
-          sizeStage: companyData['sizeStage'] ?? null,
-          recentNews: companyData['recentNews'] ?? null,
-          risks: companyData['risks'] ?? null,
-          glassdoorRating: companyData['glassdoorRating'] ?? null,
-          ttlExpires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-        });
-        await this.companyRepo.save(brief);
-      }
+      await this.companySearcher.execute('ignored', { company });
     }
 
     // 3. Compute match scores — idempotent: skip if already scored for this JD

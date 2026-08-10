@@ -15,7 +15,7 @@
   │    └─ 4 步指引：Chrome Web Store 安装 → 登录 → 打开岗位页
   │
   ├─ 点击 "Log in" → /login
-  │    └─ Dev 模式：DevSignIn 表单（预填 dev@findwith.local / dev123）
+  │    └─ Dev 模式：LocalSignIn 表单（预填 dev@findwith.local / dev123）
   │        → POST /__clerk/v1/sign_ins（middleware 代理 → mock-clerk:14611）
   │        → mock-clerk 签发 httpOnly cookie：__session=<id>; HttpOnly; SameSite=Lax
   │        → cookie 存在 web 域（localhost:14606），跟生产 Clerk 行为一致
@@ -24,9 +24,9 @@
   └─ /dashboard：Stats 卡片 + "Install the FindWith extension" 提示
 ```
 
-**Auth 模式切换**：`AuthProvider`（`web/src/lib/auth.tsx`）启动时调用 `GET /api/v1/config/auth`，后端返回 `{authMode: 'mock' | 'clerk'}`。Dev 环境返回 `mock`，页面包装 `DevAuthProvider`；生产返回 `clerk`，包装 `ClerkProvider`。统一 `useAuth()` 接口使页面代码不分支。
+**Auth 模式切换**：`AuthProvider`（`web/src/lib/auth.tsx`）启动时调用 `GET /api/v1/config/auth`，后端返回 `{authMode: 'mock' | 'clerk'}`。Dev 环境返回 `mock`，页面包装 `LocalAuthProvider`（`web/src/lib/dev-auth.tsx`）；生产返回 `clerk`，包装 `ClerkProvider`。`LocalAuth` 内嵌 `isMock: true` 字段，UI 组件通过 `useContext(LocalAuthContext)` 区分模式，无需独立 `AuthModeContext`。统一 `useAuth()` / `useUser()` 接口使页面代码不分支。
 
-**Token 存储**：httpOnly cookie。Dev 模式下 mock-clerk 签发 `__session` cookie，生产下 Clerk 签发 `__client`/`__session` cookie。`dev-auth.tsx` 不再碰 localStorage，cookie 由浏览器自动管理，刷新页面后通过 `GET /__clerk/v1/client`（读 cookie）自动恢复登录态。
+**Token 存储**：httpOnly cookie。Dev 模式下 mock-clerk 签发 `__session` cookie，生产下 Clerk 签发 `__client`/`__session` cookie。`dev-auth.tsx` 不再碰 localStorage，cookie 由浏览器自动管理，刷新页面后通过 `GET /__clerk/v1/client`（读 cookie）自动恢复登录态。`LocalAuthContext` 统一暴露 `isMock`、`isLoaded`、`isSignedIn`、`user`、`getToken`、`signOut` 等字段。
 
 ### 登录页面逻辑
 
@@ -42,8 +42,8 @@
 用户在 chrome://extensions 加载 extension/dist/
   │
   ├─ 点击工具栏图标 → Side Panel 打开
-  │    └─ App.tsx mount: 读 chrome.storage.local['token']
-  │       └─ 无 token → 顶栏显示红色 "未登录 →"
+  │    └─ App.tsx mount: 读 chrome.storage.local['sessionToken']
+  │       └─ 无 sessionToken → 顶栏显示红色 "未登录 →"
   │
   ├─ 点击 "未登录 →"
   │    └─ 打开 web/auth/extension-callback 页面
@@ -52,11 +52,11 @@
   │       ├─ 拿 JWT → POST /api/v1/iam/auth/verify {clerkToken}
   │       ├─ 后端验证 Clerk JWT → upsert user → 签发 CSPRNG session token
   │       ├─ 存 Redis：session:<token> → userId（TTL 24h）
-  │       └─ 返回 {token, expires_at, user_id}
+  │       └─ 返回 {sessionToken, expires_at, user_id}
   │
-  ├─ Web 页面通过 chrome.runtime.sendMessage(EXT_ID, {AUTH_TOKEN, token, ...})
+  ├─ Web 页面通过 chrome.runtime.sendMessage(EXT_ID, {AUTH_SESSION_TOKEN, sessionToken, ...})
   │    └─ background/index.ts onMessageExternal 校验 sender origin
-  │       └─ 写入 chrome.storage.local {token, expires_at, user_id}
+  │       └─ 写入 chrome.storage.local {sessionToken, expires_at, user_id}
   │       └─ 清除 badge → 广播 AUTH_SUCCESS
   │
   └─ Sidepanel onChanged 监听到新 token
@@ -71,15 +71,15 @@
 | Token | 存储位置 | 谁签发 | 用途 |
 |---|---|---|---|
 | Clerk JWT | Web 端 httpOnly cookie（持久化）+ JS 内存（API 调用时） | Clerk / mock-clerk | 证明"我是谁"给 FindWith Backend |
-| Session Token | Extension `chrome.storage.local` + Backend Redis | FindWith Backend | 证明"我是谁"给 FindWith Backend |
+| Session Token | Extension `chrome.storage.local['sessionToken']` + Backend Redis | FindWith Backend | 证明"我是谁"给 FindWith Backend |
 
 **Web ↔ Extension 桥接**（`extension-callback` 页面）：
 ```
 Web:  Clerk JWT ──→ POST /auth/verify ──→ 后端签发 session token
-                                         ← {token, expires_at, user_id}
-Web:  chrome.runtime.sendMessage(EXT_ID, {type: AUTH_TOKEN, token, ...})
+                                         ← {sessionToken, expires_at, user_id}
+Web:  chrome.runtime.sendMessage(EXT_ID, {type: AUTH_SESSION_TOKEN, sessionToken, ...})
                                          ↓
-Ext:  chrome.storage.local['token'] = token
+Ext:  chrome.storage.local['sessionToken'] = sessionToken
 ```
 
 ---
@@ -271,6 +271,7 @@ POST /api/v1/apply/plan {radarItemId}
 | Landing → Install | `web/src/app/page.tsx`, `web/src/app/install/page.tsx` |
 | 登录/注册 | `web/src/app/login/`, `web/src/app/signup/`, `web/src/lib/auth.tsx`, `web/src/lib/dev-auth.tsx` |
 | Dashboard | `web/src/app/dashboard/page.tsx` |
+| Auth (统一层) | `web/src/lib/auth.tsx`（`AuthProvider`/`useAuth`/`SignedIn`/`SignedOut`/`UserButton`）, `web/src/lib/dev-auth.tsx`（`LocalAuthProvider`/`LocalAuthContext`/`LocalSignedIn` 等） |
 | Auth 桥接 | `web/src/app/auth/extension-callback/page.tsx`, `web/src/lib/extension.ts` |
 | Extension 入口 | `extension/src/sidepanel/App.tsx`, `extension/src/background/index.ts`, `extension/src/background/auth.ts` |
 | Onboarding | `extension/src/sidepanel/routes/Onboarding.tsx` |

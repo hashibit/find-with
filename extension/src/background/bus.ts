@@ -38,6 +38,12 @@ export type BgMsg =
   // Deep analysis on demand
   | { type: 'JOB_ANALYZE'; payload: { captureId: string } };
 
+/** Messages from the website (extension-callback) to the extension via chrome.runtime.onMessageExternal */
+export type ExternalMsg =
+  | { type: 'AUTH_NONCE'; nonce: string }
+  | { type: 'AUTH_SESSION_TOKEN'; sessionToken: string; expires_at: number; user_id: string }
+  | { type: 'ENTITLEMENTS_INVALIDATE' };
+
 interface JobCapturePayload {
   source: string;
   sourceUrl: string;

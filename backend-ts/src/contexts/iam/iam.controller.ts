@@ -39,7 +39,7 @@ class AuthExchangeDto extends createZodDto(
 ) {}
 
 class AuthExchangeResponse {
-  token: string;
+  sessionToken: string;
   expires_at: number;
   user_id: string;
 }
@@ -51,7 +51,7 @@ class AuthVerifyDto extends createZodDto(
 ) {}
 
 class AuthVerifyResponse {
-  token: string;
+  sessionToken: string;
   expires_at: number;
   user_id: string;
 }
@@ -118,7 +118,7 @@ export class IamController {
     // Store hashed token → userId in Redis for guard validation
     await this.redisService.client.setex(`session:${token}`, SESSION_TTL_SECONDS, userId);
 
-    return { token, expires_at: expiresAt, user_id: userId };
+    return { sessionToken: token, expires_at: expiresAt, user_id: userId };
   }
 
   @Post('account:export')
@@ -168,6 +168,6 @@ export class IamController {
 
     await this.redisService.client.setex(`session:${token}`, SESSION_TTL_SECONDS, verified.userId);
 
-    return { token, expires_at: expiresAt, user_id: verified.userId };
+    return { sessionToken: token, expires_at: expiresAt, user_id: verified.userId };
   }
 }

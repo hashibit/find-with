@@ -5,7 +5,7 @@ import { useAuth } from '@/lib/auth';
 
 // This page handles the OAuth flow for the Chrome extension.
 // Flow: extension opens this page → web validates Clerk JWT → calls backend auth endpoint →
-// backend validates and returns session token → web sends AUTH_TOKEN to extension.
+// backend validates and returns session token → web sends AUTH_SESSION_TOKEN to extension.
 
 const EXT_ID = process.env.NEXT_PUBLIC_EXTENSION_ID || '';
 
@@ -56,13 +56,13 @@ export default function ExtensionCallbackPage() {
         }
 
         const data = await resp.json();
-        console.log('[ext-callback] backend session token:', data.token ? 'ok' : 'MISSING', '| user_id:', data.user_id, '| expires_at:', data.expires_at);
+        console.log('[ext-callback] backend session token:', data.sessionToken ? 'ok' : 'MISSING', '| user_id:', data.user_id, '| expires_at:', data.expires_at);
 
         if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage && EXT_ID) {
-          console.log('[ext-callback] sending AUTH_TOKEN to extension', EXT_ID);
+          console.log('[ext-callback] sending AUTH_SESSION_TOKEN to extension', EXT_ID);
           chrome.runtime.sendMessage(
             EXT_ID,
-            { type: 'AUTH_TOKEN', token: data.token, expires_at: data.expires_at, user_id: data.user_id },
+            { type: 'AUTH_SESSION_TOKEN', sessionToken: data.sessionToken, expires_at: data.expires_at, user_id: data.user_id },
             (response) => {
               if (chrome.runtime.lastError) {
                 const msg = chrome.runtime.lastError.message || 'Unknown error';

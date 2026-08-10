@@ -5,7 +5,7 @@
  */
 export async function getToken(): Promise<string | null> {
   return new Promise((resolve) => {
-    chrome.storage.local.get(['token'], (res) => resolve(res['token'] ?? null));
+    chrome.storage.local.get(['sessionToken'], (res) => resolve(res['sessionToken'] ?? null));
   });
 }
 

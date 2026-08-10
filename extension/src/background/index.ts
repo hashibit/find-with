@@ -1,6 +1,11 @@
 /// <reference types="chrome" />
-import { handleMessage, type BgMsg } from './bus';
-import { initAuth, handleAuthNonce, handleAuthToken, handleEntitlementsInvalidate } from './auth';
+import { handleMessage, type BgMsg, type ExternalMsg } from './bus';
+import {
+  initAuth,
+  handleAuthNonce,
+  handleSessionToken,
+  handleEntitlementsInvalidate,
+} from './auth';
 
 // Bootstrap auth on service worker startup
 initAuth();
@@ -25,7 +30,7 @@ chrome.runtime.onMessage.addListener((msg: BgMsg, sender, sendResponse) => {
 });
 
 // External messages: website → SW (auth flow)
-chrome.runtime.onMessageExternal.addListener((msg, sender, sendResponse) => {
+chrome.runtime.onMessageExternal.addListener((msg: ExternalMsg, sender, sendResponse) => {
   // Origin check
   if (sender.origin !== 'https://findwith.com' && sender.origin !== 'http://localhost:14606') {
     return;
@@ -36,8 +41,8 @@ chrome.runtime.onMessageExternal.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
-  if (msg.type === 'AUTH_TOKEN') {
-    handleAuthToken(msg.token, msg.expires_at, msg.user_id).then((result) => {
+  if (msg.type === 'AUTH_SESSION_TOKEN') {
+    handleSessionToken(msg.sessionToken, msg.expires_at, msg.user_id).then((result) => {
       if (result.ok) {
         navPorts.forEach((p) => p.postMessage({ type: 'AUTH_SUCCESS' }));
       }

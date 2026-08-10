@@ -947,8 +947,8 @@ export function Archive() {
 
   // Check auth on mount
   useEffect(() => {
-    chrome.storage.local.get(['token'], (res) => {
-      setHasToken(!!res.token);
+    chrome.storage.local.get(['sessionToken'], (res) => {
+      setHasToken(!!res.sessionToken);
     });
   }, []);
 

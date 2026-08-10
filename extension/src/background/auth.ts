@@ -1,8 +1,8 @@
 import { API_BASE, API_V1 } from './config.js';
 
 export async function getToken(): Promise<string | null> {
-  const data = await chrome.storage.local.get(['token', 'expires_at']);
-  if (!data.token) return null;
+  const data = await chrome.storage.local.get(['sessionToken', 'expires_at']);
+  if (!data.sessionToken) return null;
 
   // Check expiry (with 5min buffer for proactive refresh).
   // expires_at is stored in Unix seconds; Date.now() / 1000 converts to the same unit.
@@ -11,10 +11,10 @@ export async function getToken(): Promise<string | null> {
     // (SW can't refresh Clerk token directly; needs DOM context)
     chrome.action.setBadgeText({ text: '!' });
     chrome.action.setBadgeBackgroundColor({ color: '#f59e0b' });
-    return data.token; // Return stale token, Side Panel will refresh on mount
+    return data.sessionToken; // Return stale token, Side Panel will refresh on mount
   }
 
-  return data.token;
+  return data.sessionToken;
 }
 
 /**
@@ -22,14 +22,14 @@ export async function getToken(): Promise<string | null> {
  * The caller (website) is responsible for providing expires_at (Unix seconds)
  * and user_id from the API response — do NOT re-derive these from the token string.
  */
-export async function handleAuthToken(
-  token: string,
+export async function handleSessionToken(
+  sessionToken: string,
   expiresAt: number,
   userId: string,
 ): Promise<{ ok: boolean }> {
   try {
     await chrome.storage.local.set({
-      token,
+      sessionToken,
       expires_at: expiresAt,
       user_id: userId,
     });
@@ -54,7 +54,7 @@ export async function handleAuthNonce(nonce: string): Promise<{ ok: boolean }> {
 
     const data = await resp.json();
     await chrome.storage.local.set({
-      token: data.token,
+      sessionToken: data.sessionToken,
       expires_at: data.expires_at,
       user_id: data.user_id,
     });
@@ -74,18 +74,20 @@ export async function handleAuthNonce(nonce: string): Promise<{ ok: boolean }> {
 export async function handleEntitlementsInvalidate(
   navPorts: Set<chrome.runtime.Port>,
 ): Promise<void> {
-  const data = await chrome.storage.local.get(['token']);
-  if (!data.token) return;
+  const data = await chrome.storage.local.get(['sessionToken']);
+  if (!data.sessionToken) return;
 
   try {
     const resp = await fetch(`${API_V1}/iam/me/entitlements`, {
-      headers: { Authorization: `Bearer ${data.token}` },
+      headers: { Authorization: `Bearer ${data.sessionToken}` },
     });
     if (resp.ok) {
       const entitlements = await resp.json();
       await chrome.storage.local.set({ entitlements });
       // Notify all connected sidepanels
-      navPorts.forEach((port) => port.postMessage({ type: 'ENTITLEMENTS_UPDATED', data: entitlements }));
+      navPorts.forEach((port) =>
+        port.postMessage({ type: 'ENTITLEMENTS_UPDATED', data: entitlements }),
+      );
     }
   } catch (e) {
     console.error('[Auth] entitlements refresh failed', e);

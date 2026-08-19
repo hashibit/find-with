@@ -22,7 +22,7 @@ import { resolveDensity, densityInstruction } from '../common/density-resolver.j
 import nunjucks from 'nunjucks';
 
 import { PinoLogger, InjectPinoLogger } from 'nestjs-pino';
-import { convertTools } from 'node_modules/@earendil-works/pi-ai/dist/providers/google-shared.js';
+import { convertTools } from '@earendil-works/pi-ai/api/google-shared';
 
 const QUINN_SYSTEM_PROMPT_TEMPLATE = `{{ basePrompt }}
 {% if goalMemory %}

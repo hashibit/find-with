@@ -9,7 +9,7 @@ import { FIELD_CRYPTO, type FieldCrypto } from '../../common/crypto/crypto.inter
 import type { ToolExecutor } from '../tool-registry.js';
 export const CLASSIFY_EMAIL_TOOL_NAME = 'classify_email';
 
-const EmailClassificationSchema = Type.Object({
+export const EmailClassificationSchema = Type.Object({
   kind: Type.String(),
   keyInfo: Type.Object({}, { additionalProperties: true }),
   summary: Type.String(),

@@ -8,11 +8,11 @@ function buildTool() {
     save: vi.fn().mockImplementation(async (entity) => entity),
   };
   const llm = {
-    completeContext: vi
-      .fn()
-      .mockResolvedValue(
-        '{"shiningText":"Redesigned onboarding within 60 days, reducing ramp time by 30%","rationale":"Shows ownership and early impact","tags":["ownership","process_improvement"]}',
-      ),
+    structuredComplete: vi.fn().mockResolvedValue({
+      shiningText: 'Redesigned onboarding within 60 days, reducing ramp time by 30%',
+      rationale: 'Shows ownership and early impact',
+      tags: ['ownership', 'process_improvement'],
+    }),
   };
   const crypto = {
     encrypt: vi.fn().mockResolvedValue('encrypted-raw'),
@@ -84,18 +84,18 @@ describe('MineShiningPointTool', () => {
       );
     });
 
-    it('falls back to raw_text as shiningText when JSON parse fails', async () => {
+    it('falls back to raw_text as shiningText when structuredComplete returns no shiningText', async () => {
       const { tool, llm } = buildTool();
-      llm.completeContext.mockResolvedValue('not valid json');
+      llm.structuredComplete.mockResolvedValue({});
 
       const result = await tool.execute('tc_01', params, ctx);
 
       expect(result.details['shiningText']).toBe(params.raw_text);
     });
 
-    it('repo.save still called when LLM returns malformed JSON', async () => {
+    it('repo.save still called when structuredComplete returns no shiningText', async () => {
       const { tool, repo, llm } = buildTool();
-      llm.completeContext.mockResolvedValue('{{broken json}}');
+      llm.structuredComplete.mockResolvedValue({});
 
       await tool.execute('tc_01', params, ctx);
 

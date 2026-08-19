@@ -12,6 +12,7 @@ import { JobMatchResult } from '../../database/entities/jobs/match-result.entity
 import { JobRadarItem } from '../../database/entities/jobs/radar-item.entity.js';
 import { ProfileSkill } from '../../database/entities/profile/skill.entity.js';
 import { ProfileModule } from '../profile/profile.module.js';
+import { AgentModule } from '../../agent/agent.module.js';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { ProfileModule } from '../profile/profile.module.js';
     ]),
     BullModule.registerQueue({ name: JOB_ANALYZE_QUEUE }),
     ProfileModule,
+    AgentModule,
   ],
   controllers: [JobsController, SelectorsController],
   providers: [JobsService, JobsProcessor],

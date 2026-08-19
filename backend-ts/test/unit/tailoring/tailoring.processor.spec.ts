@@ -29,7 +29,7 @@ const makeBaseResumeRepo = () => ({
 });
 
 const makeLlm = () => ({
-  completeContext: vi.fn(),
+  structuredComplete: vi.fn(),
 });
 
 const makeMaterialManager = () => ({
@@ -94,7 +94,8 @@ function makeLlmSectionsResponse(bullets: Array<{
   sourceId?: string;
   status?: string;
 }>) {
-  return JSON.stringify([{
+  // structuredComplete returns the schema-decoded object — not a JSON string
+  return [{
     title: 'Work Experience',
     bullets: bullets.map((b, i) => ({
       id: b.id ?? `bullet_${i}`,
@@ -103,7 +104,7 @@ function makeLlmSectionsResponse(bullets: Array<{
       sourceId: b.sourceId,
       status: b.status ?? 'CONFIRMED',
     })),
-  }]);
+  }];
 }
 
 // ---------------------------------------------------------------------------
@@ -118,7 +119,7 @@ describe('TailoringProcessor', () => {
 
       await processor.process(makeBullJob({ tailoredResumeId: 'tr_missing', userId: 'u1' }));
 
-      expect(llm.completeContext).not.toHaveBeenCalled();
+      expect(llm.structuredComplete).not.toHaveBeenCalled();
     });
 
     it('skips generation when bullets already exist (idempotent)', async () => {
@@ -129,7 +130,7 @@ describe('TailoringProcessor', () => {
 
       await processor.process(makeBullJob({ tailoredResumeId: 'tr_01', userId: 'u1' }));
 
-      expect(llm.completeContext).not.toHaveBeenCalled();
+      expect(llm.structuredComplete).not.toHaveBeenCalled();
     });
 
     it('returns early when parsedJd is missing', async () => {
@@ -141,7 +142,7 @@ describe('TailoringProcessor', () => {
 
       await processor.process(makeBullJob({ tailoredResumeId: 'tr_01', userId: 'u1' }));
 
-      expect(llm.completeContext).not.toHaveBeenCalled();
+      expect(llm.structuredComplete).not.toHaveBeenCalled();
     });
 
     it('returns early when baseResume is missing', async () => {
@@ -153,7 +154,7 @@ describe('TailoringProcessor', () => {
 
       await processor.process(makeBullJob({ tailoredResumeId: 'tr_01', userId: 'u1' }));
 
-      expect(llm.completeContext).not.toHaveBeenCalled();
+      expect(llm.structuredComplete).not.toHaveBeenCalled();
     });
   });
 
@@ -170,7 +171,7 @@ describe('TailoringProcessor', () => {
 
     it('marks bullet CONFIRMED when sourceId references a valid material', async () => {
       const { processor, bulletRepo, llm } = setup();
-      llm.completeContext.mockResolvedValue(
+      llm.structuredComplete.mockResolvedValue(
         makeLlmSectionsResponse([{ text: 'Led React migration at scale', sourceId: 'm_01', status: 'CONFIRMED' }]),
       );
 
@@ -183,7 +184,7 @@ describe('TailoringProcessor', () => {
 
     it('marks bullet PENDING when LLM marks PENDING despite valid sourceId (trust the model)', async () => {
       const { processor, bulletRepo, llm } = setup();
-      llm.completeContext.mockResolvedValue(
+      llm.structuredComplete.mockResolvedValue(
         makeLlmSectionsResponse([{ text: 'Some bullet', sourceId: 'm_01', status: 'PENDING' }]),
       );
 
@@ -195,7 +196,7 @@ describe('TailoringProcessor', () => {
 
     it('marks bullet PENDING when sourceId is absent (LLM fabricated)', async () => {
       const { processor, bulletRepo, llm } = setup();
-      llm.completeContext.mockResolvedValue(
+      llm.structuredComplete.mockResolvedValue(
         makeLlmSectionsResponse([{ text: 'Made up achievement', sourceId: undefined, status: 'CONFIRMED' }]),
       );
 
@@ -207,7 +208,7 @@ describe('TailoringProcessor', () => {
 
     it('marks bullet PENDING when sourceId does not match any confirmed material', async () => {
       const { processor, bulletRepo, llm } = setup();
-      llm.completeContext.mockResolvedValue(
+      llm.structuredComplete.mockResolvedValue(
         makeLlmSectionsResponse([{ text: 'Some bullet', sourceId: 'm_nonexistent', status: 'CONFIRMED' }]),
       );
 
@@ -219,7 +220,7 @@ describe('TailoringProcessor', () => {
 
     it('handles multiple bullets with mixed validation outcomes', async () => {
       const { processor, bulletRepo, llm } = setup();
-      llm.completeContext.mockResolvedValue(
+      llm.structuredComplete.mockResolvedValue(
         makeLlmSectionsResponse([
           { text: 'Valid bullet', sourceId: 'm_01', status: 'CONFIRMED' },
           { text: 'Fabricated bullet', sourceId: undefined, status: 'CONFIRMED' },
@@ -235,9 +236,9 @@ describe('TailoringProcessor', () => {
       expect(savedBullets[2].status).toBe('PENDING');
     });
 
-    it('handles malformed LLM JSON gracefully (saves empty bullets)', async () => {
+    it('saves empty bullets when structuredComplete returns no sections', async () => {
       const { processor, bulletRepo, llm } = setup();
-      llm.completeContext.mockResolvedValue('not valid json');
+      llm.structuredComplete.mockResolvedValue([]);
 
       await processor.process(makeBullJob({ tailoredResumeId: 'tr_01', userId: 'u1' }));
 
@@ -248,7 +249,7 @@ describe('TailoringProcessor', () => {
 
     it('persists the tailored resume after processing', async () => {
       const { processor, resumeRepo, llm } = setup();
-      llm.completeContext.mockResolvedValue(
+      llm.structuredComplete.mockResolvedValue(
         makeLlmSectionsResponse([{ text: 'Valid bullet', sourceId: 'm_01', status: 'CONFIRMED' }]),
       );
 
@@ -260,12 +261,10 @@ describe('TailoringProcessor', () => {
 
     it('assigns a ULID to bullets missing an id', async () => {
       const { processor, bulletRepo, llm } = setup();
-      llm.completeContext.mockResolvedValue(
-        JSON.stringify([{
-          title: 'Experience',
-          bullets: [{ text: 'No id bullet', source: 'MATERIAL', sourceId: 'm_01', status: 'CONFIRMED' }],
-        }]),
-      );
+      llm.structuredComplete.mockResolvedValue([{
+        title: 'Experience',
+        bullets: [{ text: 'No id bullet', source: 'MATERIAL', sourceId: 'm_01', status: 'CONFIRMED' }],
+      }]);
 
       await processor.process(makeBullJob({ tailoredResumeId: 'tr_01', userId: 'u1' }));
 
@@ -276,7 +275,7 @@ describe('TailoringProcessor', () => {
 
     it('sets sectionTitle and position on each bullet entity', async () => {
       const { processor, bulletRepo, llm } = setup();
-      llm.completeContext.mockResolvedValue(
+      llm.structuredComplete.mockResolvedValue(
         makeLlmSectionsResponse([
           { text: 'First bullet', sourceId: 'm_01', status: 'CONFIRMED' },
           { text: 'Second bullet', sourceId: 'm_02', status: 'CONFIRMED' },

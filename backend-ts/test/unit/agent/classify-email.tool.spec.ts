@@ -18,12 +18,14 @@ function buildTool() {
     findOne: vi.fn().mockResolvedValue(null),
     save: vi.fn().mockResolvedValue(undefined),
   };
+  // structuredComplete returns the schema-decoded object directly (the provider's
+  // constrained sampling guarantees the shape) — no JSON string, no parse.
   const llm = {
-    completeContext: vi
-      .fn()
-      .mockResolvedValue(
-        '{"kind":"INTERVIEW_INVITE","keyInfo":{"interviewDate":"2026-06-10"},"summary":"You have been invited to interview."}',
-      ),
+    structuredComplete: vi.fn().mockResolvedValue({
+      kind: 'INTERVIEW_INVITE',
+      keyInfo: { interviewDate: '2026-06-10' },
+      summary: 'You have been invited to interview',
+    }),
   };
   const crypto = {
     decrypt: vi.fn().mockResolvedValue('Please join us for an interview on June 10.'),
@@ -63,7 +65,7 @@ describe('ClassifyEmailTool', () => {
       expect(crypto.decrypt).not.toHaveBeenCalled();
     });
 
-    it('calls repo.save with kind from LLM JSON', async () => {
+    it('calls repo.save with kind from structuredComplete result', async () => {
       const { tool, repo } = buildTool();
       const email = makeEmail();
       repo.findOne.mockResolvedValue(email);
@@ -85,29 +87,16 @@ describe('ClassifyEmailTool', () => {
       expect(result.details).toHaveProperty('keyInfo');
     });
 
-    it('defaults kind to OTHER when LLM throws', async () => {
+    it('propagates LLM errors without saving', async () => {
       const { tool, repo, llm } = buildTool();
       repo.findOne.mockResolvedValue(makeEmail());
-      llm.completeContext.mockRejectedValue(new Error('LLM unavailable'));
+      llm.structuredComplete.mockRejectedValue(new Error('LLM unavailable'));
 
-      // LLM throws before parse — the tool will throw because there is no
-      // try/catch around the LLM call itself in the source. We verify the
-      // tool propagates, or if it catches, kind defaults to OTHER.
-      // Based on source: llm.completeContext is NOT wrapped in try/catch,
-      // only JSON.parse is. So we expect an uncaught error here.
+      // structuredComplete is not wrapped in try/catch in the source — an LLM
+      // failure propagates out of execute (the job/agent boundary handles it),
+      // and nothing is persisted.
       await expect(tool.execute('tc_01', params)).rejects.toThrow('LLM unavailable');
-    });
-
-    it('defaults kind to OTHER when LLM returns malformed JSON', async () => {
-      const { tool, repo, llm } = buildTool();
-      const email = makeEmail();
-      repo.findOne.mockResolvedValue(email);
-      llm.completeContext.mockResolvedValue('not valid json at all');
-
-      const result = await tool.execute('tc_01', params);
-
-      expect(email.kind).toBe('OTHER');
-      expect(result.details).toHaveProperty('kind', 'OTHER');
+      expect(repo.save).not.toHaveBeenCalled();
     });
 
     it('result.content[0].text contains summary from LLM', async () => {

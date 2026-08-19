@@ -147,9 +147,9 @@ describe('IamController', () => {
 
       const result = await controller.authExchange({ nonce: 'valid-nonce-12345' } as any);
 
-      expect(result.token).toBeTruthy();
-      expect(typeof result.token).toBe('string');
-      expect(result.token).toHaveLength(64); // 32 bytes → 64 hex chars
+      expect(result.sessionToken).toBeTruthy();
+      expect(typeof result.sessionToken).toBe('string');
+      expect(result.sessionToken).toHaveLength(64); // 32 bytes → 64 hex chars
       expect(result.user_id).toBe('user_01');
       expect(result.expires_at).toBeGreaterThan(Math.floor(Date.now() / 1000));
     });
@@ -162,7 +162,7 @@ describe('IamController', () => {
       const result = await controller.authExchange({ nonce: 'valid-nonce-12345' } as any);
 
       expect(redisService.client.setex).toHaveBeenCalledWith(
-        `session:${result.token}`,
+        `session:${result.sessionToken}`,
         86400,
         'user_01',
       );
@@ -178,7 +178,7 @@ describe('IamController', () => {
       const r1 = await controller.authExchange({ nonce: 'nonce-aaaaaa-1234' } as any);
       const r2 = await controller.authExchange({ nonce: 'nonce-bbbbbb-1234' } as any);
 
-      expect(r1.token).not.toBe(r2.token);
+      expect(r1.sessionToken).not.toBe(r2.sessionToken);
     });
   });
 
@@ -187,7 +187,7 @@ describe('IamController', () => {
       const { controller } = buildController();
       const result = await controller.authVerify({ clerkToken: 'jwt.token.here' } as any);
 
-      expect(result.token).toHaveLength(64);
+      expect(result.sessionToken).toHaveLength(64);
       expect(result.user_id).toBe('clerk_u1');
       expect(result.expires_at).toBeGreaterThan(Math.floor(Date.now() / 1000));
     });
@@ -197,7 +197,7 @@ describe('IamController', () => {
       const result = await controller.authVerify({ clerkToken: 'jwt.token.here' } as any);
 
       expect(redisService.client.setex).toHaveBeenCalledWith(
-        `session:${result.token}`,
+        `session:${result.sessionToken}`,
         86400,
         'clerk_u1',
       );

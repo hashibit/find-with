@@ -22,28 +22,32 @@ function buildTool() {
     save: vi.fn().mockImplementation(async (entity) => entity),
   };
   const llm = {
-    completeContext: vi
-      .fn()
-      .mockResolvedValue(
-        '{"whatTheyDo":"Makes anvils.","sizeStage":"Series B","recentNews":["Raised $30M"],"risks":{"layoffs":false},"glassdoorRating":4.1}',
-      ),
+    structuredComplete: vi.fn().mockResolvedValue({
+      whatTheyDo: 'Makes anvils.',
+      sizeStage: 'Series B',
+      recentNews: ['Raised $30M'],
+      risks: { layoffs: false },
+      glassdoorRating: 4.1,
+    }),
   };
+  // No braveApiKey → braveSearch is skipped, tests never hit the network
+  const config = { get: vi.fn().mockReturnValue({ apiKey: undefined }) };
 
-  const tool = new SearchCompanyTool(repo as any, llm as any);
-  return { tool, repo, llm };
+  const tool = new SearchCompanyTool(repo as any, llm as any, config as any);
+  return { tool, repo, llm, config };
 }
 
 const params = { company: 'Acme Corp' };
 
 describe('SearchCompanyTool', () => {
   describe('execute', () => {
-    it('calls llm.completeContext and repo.save when no cache exists', async () => {
+    it('calls llm.structuredComplete and repo.save when no cache exists', async () => {
       const { tool, repo, llm } = buildTool();
       repo.findOne.mockResolvedValue(null);
 
       await tool.execute('tc_01', params);
 
-      expect(llm.completeContext).toHaveBeenCalled();
+      expect(llm.structuredComplete).toHaveBeenCalled();
       expect(repo.save).toHaveBeenCalled();
     });
 
@@ -53,7 +57,7 @@ describe('SearchCompanyTool', () => {
 
       await tool.execute('tc_01', params);
 
-      expect(llm.completeContext).not.toHaveBeenCalled();
+      expect(llm.structuredComplete).not.toHaveBeenCalled();
     });
 
     it('calls llm again when cache is expired (ttlExpires in past)', async () => {
@@ -64,7 +68,7 @@ describe('SearchCompanyTool', () => {
 
       await tool.execute('tc_01', params);
 
-      expect(llm.completeContext).toHaveBeenCalled();
+      expect(llm.structuredComplete).toHaveBeenCalled();
     });
 
     it('result.details has companyBriefId and company', async () => {

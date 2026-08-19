@@ -1,5 +1,6 @@
 import { vi } from 'vitest';
 import { JobsProcessor } from '../../../src/contexts/jobs/jobs.processor.js';
+import { SearchCompanyTool } from '../../../src/agent/tools/search-company.tool.js';
 import type { Job } from 'bullmq';
 
 // ---------------------------------------------------------------------------
@@ -7,7 +8,7 @@ import type { Job } from 'bullmq';
 // ---------------------------------------------------------------------------
 
 const makeLlm = () => ({
-  completeContext: vi.fn().mockResolvedValue('{}'),
+  structuredComplete: vi.fn().mockResolvedValue({}),
   embed: vi.fn().mockResolvedValue([]),
   streamContext: vi.fn(),
   recordError: vi.fn(),
@@ -59,26 +60,32 @@ function buildProcessor(overrides: Partial<{
 }> = {}) {
   const captureRepo = overrides.captureRepo ?? makeCaptureRepo();
   const jdRepo = overrides.jdRepo ?? makeJdRepo();
-  const companyRepo = overrides.companyRepo ?? makeCompanyRepo();
   const matchRepo = overrides.matchRepo ?? makeMatchRepo();
   const radarRepo = overrides.radarRepo ?? makeRadarRepo();
   const llm = overrides.llm ?? makeLlm();
   const materialManager = overrides.materialManager ?? makeMaterialManager();
+  const companyRepo = overrides.companyRepo ?? makeCompanyRepo();
+
+  // Real SearchCompanyTool sharing the same llm mock; config mock disables
+  // braveSearch (no apiKey) so tests never hit the network.
+  const config = { get: vi.fn().mockReturnValue({ apiKey: undefined }) };
+  const companySearcher = new SearchCompanyTool(companyRepo as any, llm as any, config as any);
 
   const processor = new JobsProcessor(
     captureRepo as any,
     jdRepo as any,
-    companyRepo as any,
     matchRepo as any,
     radarRepo as any,
     llm as any,
     materialManager as any,
+    companySearcher as any,
   );
 
   return { processor, captureRepo, jdRepo, companyRepo, matchRepo, radarRepo, llm, materialManager };
 }
 
-const JD_RESPONSE = JSON.stringify({
+// structuredComplete returns the schema-decoded object — not a JSON string
+const JD_RESPONSE = {
   title: 'Senior PM',
   company: 'Stripe',
   location: 'Remote',
@@ -89,7 +96,7 @@ const JD_RESPONSE = JSON.stringify({
   hiddenSignals: ['fast-paced'],
   niceToHave: ['Go'],
   buzzwordTranslation: 'PM role building payment APIs',
-});
+};
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -109,7 +116,7 @@ describe('JobsProcessor', () => {
     it('parses JD when no parsedJd exists and saves result', async () => {
       const { processor, captureRepo, jdRepo, llm } = buildProcessor();
       captureRepo.findOne.mockResolvedValue({ id: 'cap_01', capturedText: 'Senior PM at Stripe' });
-      llm.completeContext.mockResolvedValueOnce(JD_RESPONSE);
+      llm.structuredComplete.mockResolvedValueOnce(JD_RESPONSE);
 
       await processor.process(makeBullJob({ captureId: 'cap_01', userId: 'u1' }));
 
@@ -135,16 +142,16 @@ describe('JobsProcessor', () => {
       await processor.process(makeBullJob({ captureId: 'cap_01', userId: 'u1' }));
 
       // LLM should not be called for JD parsing (second call would be company research)
-      const jdParseCall = llm.completeContext.mock.calls.find((c) =>
+      const jdParseCall = llm.structuredComplete.mock.calls.find((c) =>
         String(c[0]?.messages?.[0]?.content).includes('Parse this job description'),
       );
       expect(jdParseCall).toBeUndefined();
     });
 
-    it('handles malformed JD JSON gracefully and saves empty object', async () => {
+    it('saves nulls when structuredComplete returns an empty object', async () => {
       const { processor, captureRepo, jdRepo, llm } = buildProcessor();
       captureRepo.findOne.mockResolvedValue({ id: 'cap_01', capturedText: 'some text' });
-      llm.completeContext.mockResolvedValueOnce('not valid json at all');
+      llm.structuredComplete.mockResolvedValueOnce({});
 
       await processor.process(makeBullJob({ captureId: 'cap_01', userId: 'u1' }));
 
@@ -171,7 +178,7 @@ describe('JobsProcessor', () => {
     it('sets radar status to ANALYZED after processing', async () => {
       const { processor, captureRepo, jdRepo, llm, radarRepo } = buildProcessor();
       captureRepo.findOne.mockResolvedValue({ id: 'cap_01', capturedText: '' });
-      llm.completeContext.mockResolvedValueOnce(JD_RESPONSE);
+      llm.structuredComplete.mockResolvedValueOnce(JD_RESPONSE);
       // embed returns empty array so deep scoring uses fallback
       llm.embed.mockResolvedValue([]);
 
@@ -289,20 +296,18 @@ describe('JobsProcessor', () => {
           jdEmbedding: null,
           title: 'PM',
         };
-        const companyJson = JSON.stringify({
+        const companyBrief = {
           whatTheyDo: 'Payment infra',
           sizeStage: 'Large',
           recentNews: [],
           risks: { layoffs: false, regulatory: false },
           glassdoorRating: 4.2,
-        });
+        };
         const { processor, captureRepo, jdRepo, companyRepo, llm } = buildProcessor();
         captureRepo.findOne.mockResolvedValue({ id: 'cap_01', capturedText: '' });
         jdRepo.findOne.mockResolvedValueOnce(parsedJd);
-        // First LLM call: JD parse (returns empty), second: company research
-        llm.completeContext
-          .mockResolvedValueOnce('{}') // shouldn't be called for JD since already parsed
-          .mockResolvedValueOnce(companyJson);
+        // Only LLM call here is company research — JD is already parsed
+        llm.structuredComplete.mockResolvedValue(companyBrief);
 
         await processor.process(makeBullJob({ captureId: 'cap_01', userId: 'u1' }));
 
@@ -353,7 +358,7 @@ describe('JobsProcessor', () => {
         captureRepo.findOne.mockResolvedValue({ id: 'cap_01', capturedText: '' });
         jdRepo.findOne.mockResolvedValueOnce(parsedJd);
         companyRepo.findOne.mockResolvedValue(expiredBrief);
-        llm.completeContext.mockResolvedValue('{}');
+        llm.structuredComplete.mockResolvedValue({});
 
         await processor.process(makeBullJob({ captureId: 'cap_01', userId: 'u1' }));
 

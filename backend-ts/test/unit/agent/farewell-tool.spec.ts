@@ -15,9 +15,10 @@ function buildTool() {
     find: vi.fn().mockResolvedValue([]),
   };
   const llm = {
-    completeContext: vi
-      .fn()
-      .mockResolvedValue('{"farewellMessage":"Congrats","recapMarkdown":"# Recap"}'),
+    structuredComplete: vi.fn().mockResolvedValue({
+      farewellMessage: 'Congrats',
+      recapMarkdown: '# Recap',
+    }),
   };
 
   const tool = new FarewellTool(radarRepo as any, materialRepo as any, llm as any);
@@ -59,7 +60,7 @@ describe('FarewellTool', () => {
       expect(stats.offers).toBe(1);
     });
 
-    it('returns text containing farewellMessage when LLM returns valid JSON', async () => {
+    it('returns text containing farewellMessage from structuredComplete', async () => {
       const { tool } = buildTool();
 
       const result = await tool.execute('tc_01', params, ctx);
@@ -79,7 +80,7 @@ describe('FarewellTool', () => {
 
     it('falls back to hardcoded farewell when LLM throws', async () => {
       const { tool, llm } = buildTool();
-      llm.completeContext.mockRejectedValue(new Error('LLM down'));
+      llm.structuredComplete.mockRejectedValue(new Error('LLM down'));
 
       const result = await tool.execute('tc_01', params, ctx);
 
@@ -89,7 +90,7 @@ describe('FarewellTool', () => {
 
     it('fallback text contains materials count when LLM throws', async () => {
       const { tool, llm, materialRepo } = buildTool();
-      llm.completeContext.mockRejectedValue(new Error('LLM down'));
+      llm.structuredComplete.mockRejectedValue(new Error('LLM down'));
       materialRepo.find.mockResolvedValue([makeMaterial(), makeMaterial(), makeMaterial()]);
 
       const result = await tool.execute('tc_01', params, ctx);
@@ -99,11 +100,12 @@ describe('FarewellTool', () => {
       expect(farewell).toContain('3');
     });
 
-    it('result.details.farewellMessage is populated from LLM JSON', async () => {
+    it('result.details.farewellMessage is populated from structuredComplete', async () => {
       const { tool, llm } = buildTool();
-      llm.completeContext.mockResolvedValue(
-        '{"farewellMessage":"Well done","recapMarkdown":"## Done"}',
-      );
+      llm.structuredComplete.mockResolvedValue({
+        farewellMessage: 'Well done',
+        recapMarkdown: '## Done',
+      });
 
       const result = await tool.execute('tc_01', params, ctx);
 
@@ -111,11 +113,12 @@ describe('FarewellTool', () => {
       expect(result.details['recapMarkdown']).toBe('## Done');
     });
 
-    it('result.details.recapMarkdown is populated from LLM JSON', async () => {
+    it('result.details.recapMarkdown is populated from structuredComplete', async () => {
       const { tool, llm } = buildTool();
-      llm.completeContext.mockResolvedValue(
-        '{"farewellMessage":"Congrats","recapMarkdown":"# Recap\\n\\nGood work"}',
-      );
+      llm.structuredComplete.mockResolvedValue({
+        farewellMessage: 'Congrats',
+        recapMarkdown: '# Recap\n\nGood work',
+      });
 
       const result = await tool.execute('tc_01', params, ctx);
 

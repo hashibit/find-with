@@ -17,6 +17,7 @@
     "strictPropertyInitialization": false,
     "noFallthroughCasesInSwitch": true,
     "forceConsistentCasingInFileNames": true,
+    "types": ["vitest/globals"],
     "paths": {
       "@/*": ["src/*"]
     }

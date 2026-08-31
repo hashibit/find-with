@@ -10,6 +10,7 @@
     "proto:lint": "buf lint",
     "proto:breaking": "buf breaking --against .git#branch=main",
     "proto:generate": "buf generate",
+    "backend:dev": "pnpm --filter @findwith/backend start:dev",
     "ext:dev": "pnpm --filter @findwith/extension dev",
     "ext:build": "pnpm --filter @findwith/extension build",
     "ext:test": "pnpm --filter @findwith/extension test",

@@ -144,7 +144,7 @@ Content Script                          Background SW                        Bac
      │                                       ├─ QUINN_AMBIENT_MESSAGE ──→ nav ports
      │                                       │   (关键词匹配 + "要深度分析吗?")
      │                                       │                                  │
-Side Panel ← runtimeNavBus ─────────────────┤                                  │
+Side Panel ← runtimeEventBus ─────────────────┤                                  │
      │                                       │                                  │
      ├─ injectLocalQuinnMessage(text, captureId)                               │
      ├─ 显示 "深度分析这个岗位 →" 按钮                                          │

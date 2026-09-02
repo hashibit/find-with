@@ -14,18 +14,18 @@ initAuth();
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
 
 // Port connections for nav bus (content script → background → sidepanel)
-const navPorts: Set<chrome.runtime.Port> = new Set();
+const eventPorts: Set<chrome.runtime.Port> = new Set();
 
 chrome.runtime.onConnect.addListener((port) => {
-  if (port.name === 'nav') {
-    navPorts.add(port);
-    port.onDisconnect.addListener(() => navPorts.delete(port));
+  if (port.name === 'events') {
+    eventPorts.add(port);
+    port.onDisconnect.addListener(() => eventPorts.delete(port));
   }
 });
 
 // Message handler: content scripts → SW
 chrome.runtime.onMessage.addListener((msg: BgMsg, sender, sendResponse) => {
-  handleMessage(msg, sender, navPorts).then(sendResponse);
+  handleMessage(msg, sender, eventPorts).then(sendResponse);
   return true; // async
 });
 
@@ -44,7 +44,7 @@ chrome.runtime.onMessageExternal.addListener((msg: ExternalMsg, sender, sendResp
   if (msg.type === 'AUTH_SESSION_TOKEN') {
     handleSessionToken(msg.sessionToken, msg.expires_at, msg.user_id).then((result) => {
       if (result.ok) {
-        navPorts.forEach((p) => p.postMessage({ type: 'AUTH_SUCCESS' }));
+        eventPorts.forEach((p) => p.postMessage({ type: 'AUTH_SUCCESS' }));
       }
       sendResponse(result);
     });
@@ -52,7 +52,7 @@ chrome.runtime.onMessageExternal.addListener((msg: ExternalMsg, sender, sendResp
   }
 
   if (msg.type === 'ENTITLEMENTS_INVALIDATE') {
-    handleEntitlementsInvalidate(navPorts).then(() => sendResponse({ ok: true }));
+    handleEntitlementsInvalidate(eventPorts).then(() => sendResponse({ ok: true }));
     return true;
   }
 });

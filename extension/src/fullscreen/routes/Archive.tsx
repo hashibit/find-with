@@ -911,7 +911,7 @@ function DetailDrawer({
             });
             // Then send recall message via port (ensures delivery even if sidepanel already open)
             setTimeout(() => {
-              const port = chrome.runtime.connect({ name: 'nav' });
+              const port = chrome.runtime.connect({ name: 'events' });
               port.postMessage({
                 type: 'RECALL_MATERIAL',
                 materialId: material.id,

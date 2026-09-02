@@ -72,7 +72,7 @@ export async function handleAuthNonce(nonce: string): Promise<{ ok: boolean }> {
  * Called when backend pushes ENTITLEMENTS_INVALIDATE.
  */
 export async function handleEntitlementsInvalidate(
-  navPorts: Set<chrome.runtime.Port>,
+  eventPorts: Set<chrome.runtime.Port>,
 ): Promise<void> {
   const data = await chrome.storage.local.get(['sessionToken']);
   if (!data.sessionToken) return;
@@ -85,7 +85,7 @@ export async function handleEntitlementsInvalidate(
       const entitlements = await resp.json();
       await chrome.storage.local.set({ entitlements });
       // Notify all connected sidepanels
-      navPorts.forEach((port) =>
+      eventPorts.forEach((port) =>
         port.postMessage({ type: 'ENTITLEMENTS_UPDATED', data: entitlements }),
       );
     }

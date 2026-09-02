@@ -61,7 +61,7 @@ export function EasyApply() {
   // Listen for EASY_APPLY_SUBMITTED from background (user clicked Submit on LinkedIn)
   // Must be before any early returns to satisfy React Rules of Hooks
   useEffect(() => {
-    const port = chrome.runtime.connect({ name: 'nav' });
+    const port = chrome.runtime.connect({ name: 'events' });
     port.onMessage.addListener((msg: { type: string }) => {
       if (msg.type === 'EASY_APPLY_SUBMITTED') setSubmitted(true);
     });

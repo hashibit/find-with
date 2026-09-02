@@ -6,14 +6,14 @@ import { Tailoring } from './routes/Tailoring';
 import { Radar } from './routes/Radar';
 import { Library } from './routes/Library';
 import { EasyApply } from './routes/EasyApply';
-import { runtimeNavBus, type NavBusMessage } from '../lib/runtime';
+import { runtimeEventBus, type EventBusMessage } from '../lib/runtime';
 import { getToken } from '../lib/auth';
 import { API_V1 } from '../background/config';
 import { QuinnIcon, Icons } from './components/Quinn';
 import { useConversationStore } from './stores/conversation';
 import './quinn.css';
 
-// Global recall callback - set by NavBus when receiving RECALL_MATERIAL
+// Global recall callback - set by EventBus when receiving RECALL_MATERIAL
 let recallCallback: ((content: string) => void) | null = null;
 
 export function setRecallCallback(cb: (content: string) => void) {
@@ -24,13 +24,13 @@ export function setRecallCallback(cb: (content: string) => void) {
  * Listens for NAVIGATE and RECALL_MATERIAL messages from background/other contexts.
  * Must live inside <BrowserRouter> to access useNavigate.
  */
-function NavBus() {
+function EventBus() {
   const navigate = useNavigate();
   const { injectLocalQuinnMessage } = useConversationStore();
   useEffect(() => {
-    const cleanup = runtimeNavBus(
+    const cleanup = runtimeEventBus(
       (route) => navigate(route),
-      (msg: NavBusMessage) => {
+      (msg: EventBusMessage) => {
         if (msg.type === 'RECALL_MATERIAL') {
           navigate('/onboarding');
           if (recallCallback) {
@@ -49,33 +49,48 @@ function NavBus() {
   return null;
 }
 
-function useAuthUser() {
-  const [user, setUser] = useState<{ name?: string; email?: string } | null>(null);
+type AuthState =
+  | { status: 'loading' } // storage read / backend check in flight
+  | { status: 'anonymous' } // no token in storage
+  | { status: 'expired' } // token present but rejected by backend
+  | { status: 'ok'; user: { name?: string; email?: string } };
+
+function useAuthUser(): AuthState {
+  const [state, setState] = useState<AuthState>({ status: 'loading' });
 
   useEffect(() => {
     let cancelled = false;
 
     async function fetchUser() {
       const token = await getToken();
-      if (!token || cancelled) return;
+      if (cancelled) return;
+      if (!token) {
+        setState({ status: 'anonymous' });
+        return;
+      }
       try {
         const resp = await fetch(`${API_V1}/iam/me`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        if (!resp.ok || cancelled) return;
+        if (cancelled) return;
+        if (resp.status === 401) {
+          setState({ status: 'expired' });
+          return;
+        }
+        if (!resp.ok) return; // transient backend error — keep current state
         const data = await resp.json();
-        if (!cancelled) setUser({
-          name: data?.fullName,
-          email: data?.email,
+        if (!cancelled) setState({
+          status: 'ok',
+          user: { name: data?.fullName, email: data?.email },
         });
-      } catch { /* ignore */ }
+      } catch { /* backend unreachable — keep current state */ }
     }
 
     fetchUser();
 
-    // Re-fetch when token is written to storage (e.g. after login popup completes)
+    // Re-fetch when the token is written to storage (e.g. after login popup completes)
     const onChanged = (changes: Record<string, chrome.storage.StorageChange>) => {
-      if (changes.token?.newValue) fetchUser();
+      if (changes.sessionToken?.newValue) fetchUser();
     };
     chrome.storage.local.onChanged.addListener(onChanged);
 
@@ -85,7 +100,7 @@ function useAuthUser() {
     };
   }, []);
 
-  return user;
+  return state;
 }
 
 /**
@@ -117,7 +132,7 @@ function useEntitlements() {
     fetchEntitlements();
 
     // Listen for ENTITLEMENTS_UPDATED from background (push notification)
-    const port = chrome.runtime.connect({ name: 'nav' });
+    const port = chrome.runtime.connect({ name: 'events' });
     port.onMessage.addListener((msg) => {
       if (msg.type === 'ENTITLEMENTS_UPDATED') {
         setEntitlements(msg.data);
@@ -132,6 +147,8 @@ function useEntitlements() {
 
   return entitlements;
 }
+
+const LOGIN_URL = 'http://localhost:14606/auth/extension-callback';
 
 const TAB_DEFS = [
   { key: 'chat',    label: '对话',  path: '/onboarding', fullscreen: false },
@@ -150,11 +167,17 @@ function pathToTab(pathname: string): TabKey {
 function AppShell() {
   const navigate = useNavigate();
   const location = useLocation();
-  const user = useAuthUser();
+  const auth = useAuthUser();
   const entitlements = useEntitlements(); // Fetch on mount, listen for push
   const [fullscreenTabActive, setFullscreenTabActive] = useState<TabKey | null>(null);
 
   const activeTab = fullscreenTabActive || pathToTab(location.pathname);
+
+  const statusDot =
+    auth.status === 'ok' ? 'var(--good)'
+    : auth.status === 'expired' ? 'var(--warn)'
+    : auth.status === 'anonymous' ? 'var(--bad)'
+    : '#9ca3af';
 
   return (
     <div className="sp">
@@ -172,16 +195,27 @@ function AppShell() {
                 width: 6,
                 height: 6,
                 borderRadius: 99,
-                background: 'var(--good)',
+                background: statusDot,
                 marginRight: 6,
                 verticalAlign: 1,
               }}
             />
-            {user?.name || user?.email ? (
-              <span title={user.email}>{user.name || user.email}</span>
+            {auth.status === 'ok' && (auth.user.name || auth.user.email) ? (
+              <span title={auth.user.email}>{auth.user.name || auth.user.email}</span>
+            ) : auth.status === 'expired' ? (
+              <a
+                href={LOGIN_URL}
+                target="_blank"
+                rel="noreferrer"
+                style={{ color: 'var(--warn)', textDecoration: 'none' }}
+              >
+                登录已过期，点击重新登录 →
+              </a>
+            ) : auth.status === 'loading' ? (
+              <span style={{ color: '#6b7280' }}>正在检查登录…</span>
             ) : (
               <a
-                href="http://localhost:14606/auth/extension-callback"
+                href={LOGIN_URL}
                 target="_blank"
                 rel="noreferrer"
                 style={{ color: 'var(--bad)', textDecoration: 'none' }}
@@ -243,7 +277,7 @@ function AppShell() {
 export function App() {
   return (
     <BrowserRouter>
-      <NavBus />
+      <EventBus />
       <AppShell />
     </BrowserRouter>
   );

@@ -29,7 +29,7 @@ FindWith Chrome Extension uses a simplified architecture where the Sidepanel dir
 │   │  useEntitlements│──── fetch /iam/me/entitlements ─────>│           │
 │   │  (打开时fetch)   │                                                 │
 │   │                 │                                                 │
-│   │  runtimeNavBus  │<───── NAVIGATE (port 'nav') ──────   │           │
+│   │  runtimeEventBus  │<───── NAVIGATE (port 'events') ──────   │           │
 │   │                 │<───── ENTITLEMENTS_UPDATED ─────────  │           │
 │   └─────────────────┘                                                 │
 │          │                                                             │
@@ -42,7 +42,7 @@ FindWith Chrome Extension uses a simplified architecture where the Sidepanel dir
 │   │ JOB_CAPTURE     │──msg───> │ handleMessage()  │                   │
 │   │ EMAIL_CAPTURE   │          │ → fetch backend  │                   │
 │   │ OPEN_SIDEPANEL  │          │ → chrome.sidePanel.open()            │
-│   │ EASY_APPLY_*    │          │ → 广播给 navPorts                    │
+│   │ EASY_APPLY_*    │          │ → 广播给 eventPorts                    │
 │   │                 │          │                  │                   │
 │   └─────────────────┘          │ External msgs:   │                   │
 │                                │ - AUTH_NONCE     │<── Website         │
@@ -128,7 +128,7 @@ Two mechanisms work together:
 | Trigger | Flow |
 |---------|------|
 | **Sidepanel opens** | `useEntitlements()` → fetch `/iam/me/entitlements` → store in state + chrome.storage |
-| **Backend push** | Stripe webhook → Backend → `ENTITLEMENTS_INVALIDATE` → Background → fetch → broadcast to navPorts → Sidepanel receives `ENTITLEMENTS_UPDATED` |
+| **Backend push** | Stripe webhook → Backend → `ENTITLEMENTS_INVALIDATE` → Background → fetch → broadcast to eventPorts → Sidepanel receives `ENTITLEMENTS_UPDATED` |
 
 ---
 

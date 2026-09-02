@@ -101,22 +101,25 @@ export function runtimeStream(
   };
 }
 
-// ─── runtimeNavBus ──────────────────────────────────────────────────────────
+// ─── runtimeEventBus ──────────────────────────────────────────────────────────
 
-export type NavBusMessage =
+export type EventBusMessage =
   | { type: 'NAVIGATE'; route: string }
   | { type: 'RECALL_MATERIAL'; materialId: string; content: string; tags?: string[] }
   | { type: 'QUINN_AMBIENT_MESSAGE'; text: string; captureId?: string };
 
 /**
- * Receives navigation commands and other events from background/content scripts.
+ * Subscribe to the background's event broadcast channel (port 'events'):
+ * background fire-and-forget posts to every connected extension context.
+ * NAVIGATE is routed to onNavigate; all messages also reach onMessage.
+ * Returns an unsubscribe function.
  */
-export function runtimeNavBus(
+export function runtimeEventBus(
   onNavigate: (route: string) => void,
-  onMessage?: (msg: NavBusMessage) => void,
+  onMessage?: (msg: EventBusMessage) => void,
 ): () => void {
-  const port = chrome.runtime.connect({ name: 'nav' });
-  port.onMessage.addListener((msg: NavBusMessage) => {
+  const port = chrome.runtime.connect({ name: 'events' });
+  port.onMessage.addListener((msg: EventBusMessage) => {
     if (msg.type === 'NAVIGATE') {
       onNavigate(msg.route);
     }

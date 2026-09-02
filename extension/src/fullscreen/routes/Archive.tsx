@@ -907,7 +907,7 @@ function DetailDrawer({
             // Open sidepanel first
             chrome.runtime.sendMessage({
               type: 'OPEN_SIDEPANEL',
-              payload: { route: '/onboarding' },
+              payload: { route: '/chat' },
             });
             // Then send recall message via port (ensures delivery even if sidepanel already open)
             setTimeout(() => {

@@ -49,7 +49,7 @@ async function uploadResume(token: string, file: File): Promise<void> {
   }
 }
 
-export function Onboarding() {
+export function Chat() {
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const {
@@ -177,7 +177,7 @@ export function Onboarding() {
   if (loading) {
     return (
       <div
-        data-testid="onboarding-loading"
+        data-testid="chat-loading"
         style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
       >
         <div className="muted" style={{ fontSize: 13 }}>Loading profile...</div>
@@ -188,7 +188,7 @@ export function Onboarding() {
   return (
     <>
       <MessageList
-        testId="onboarding-view"
+        testId="chat-view"
         prepend={
           <>
             {/* Intro message */}

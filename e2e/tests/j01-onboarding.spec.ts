@@ -20,13 +20,13 @@ test.describe('J-01: Onboarding', () => {
 
     // Inject auth token for fresh onboarding user, then reload from the canonical
     // extension URL (avoid ERR_FILE_NOT_FOUND caused by BrowserRouter rewriting
-    // the URL to /onboarding before the reload).
+    // the URL to /chat before the reload).
     await injectAuthToken(sidepanel, E2E_USER_ONBOARD);
     await sidepanel.goto(SIDEPANEL_URL);
     await sidepanel.waitForLoadState('domcontentloaded');
 
-    // Step 1-2: Onboarding view with upload prompt
-    await waitForElement(sidepanel, '[data-testid="onboarding-view"]');
+    // Step 1-2: Chat view with upload prompt (onboarding lives inside the chat route)
+    await waitForElement(sidepanel, '[data-testid="chat-view"]');
     await expect(sidepanel.locator('[data-testid="upload-resume-btn"]')).toBeVisible();
 
     // Step 3: Upload the resume PDF

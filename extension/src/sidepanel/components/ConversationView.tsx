@@ -4,7 +4,7 @@ import { ChatInput } from './ChatInput';
 
 /**
  * Plain chat surface used by Radar / JobAnalysis / Tailoring routes.
- * Onboarding composes MessageList + ChatInput directly instead (it interleaves
+ * Chat composes MessageList + ChatInput directly instead (it interleaves
  * onboarding cards above the messages).
  */
 export function ConversationView() {

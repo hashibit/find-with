@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
-import { Onboarding } from './routes/Onboarding';
+import { Chat } from './routes/Chat';
 import { JobAnalysis } from './routes/JobAnalysis';
 import { Tailoring } from './routes/Tailoring';
 import { Radar } from './routes/Radar';
@@ -32,14 +32,14 @@ function EventBus() {
       (route) => navigate(route),
       (msg: EventBusMessage) => {
         if (msg.type === 'RECALL_MATERIAL') {
-          navigate('/onboarding');
+          navigate('/chat');
           if (recallCallback) {
             recallCallback(msg.content);
           }
         }
         if (msg.type === 'QUINN_AMBIENT_MESSAGE') {
           // Navigate to chat tab so the message is visible, but don't force-open the panel
-          navigate('/onboarding');
+          navigate('/chat');
           injectLocalQuinnMessage(msg.text, msg.captureId);
         }
       },
@@ -151,7 +151,7 @@ function useEntitlements() {
 const LOGIN_URL = 'http://localhost:14606/auth/extension-callback';
 
 const TAB_DEFS = [
-  { key: 'chat',    label: '对话',  path: '/onboarding', fullscreen: false },
+  { key: 'chat',    label: '对话',  path: '/chat', fullscreen: false },
   { key: 'radar',   label: '雷达',  path: '/radar', fullscreen: false },
   { key: 'profile', label: '档案',  path: '/library', fullscreen: true, activeWhenFullscreen: true },
 ] as const;
@@ -260,14 +260,16 @@ function AppShell() {
       {/* Main content — each route manages its own sp-body layout */}
       <div className="sp-body">
         <Routes>
-          <Route path="/" element={<Navigate to="/onboarding" />} />
-          <Route path="/onboarding" element={<Onboarding />} />
+          <Route path="/" element={<Navigate to="/chat" />} />
+          <Route path="/chat" element={<Chat />} />
+          {/* Legacy path — NAVIGATE payloads issued before the rename */}
+          <Route path="/onboarding" element={<Navigate to="/chat" replace />} />
           <Route path="/job-analysis" element={<JobAnalysis />} />
           <Route path="/tailoring" element={<Tailoring />} />
           <Route path="/radar" element={<Radar />} />
           <Route path="/library" element={<Library />} />
           <Route path="/easy-apply" element={<EasyApply />} />
-          <Route path="*" element={<Navigate to="/onboarding" />} />
+          <Route path="*" element={<Navigate to="/chat" />} />
         </Routes>
       </div>
     </div>

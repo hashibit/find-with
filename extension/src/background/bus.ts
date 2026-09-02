@@ -126,7 +126,7 @@ export async function handleMessage(
       }
       // Notify all connected sidepanel ports to navigate.
       eventPorts.forEach((port) => {
-        port.postMessage({ type: 'NAVIGATE', route: msg.payload.route ?? '/onboarding' });
+        port.postMessage({ type: 'NAVIGATE', route: msg.payload.route ?? '/chat' });
       });
       return { opened: true };
 

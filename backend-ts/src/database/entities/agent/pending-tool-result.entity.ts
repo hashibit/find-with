@@ -9,7 +9,7 @@ export class PendingToolResult extends BaseEntity {
   @Column({ type: 'varchar', length: 100, nullable: false })
   toolName: string;
 
-  @Column({ type: 'varchar', length: 26, nullable: false })
+  @Column({ type: 'varchar', length: 64, nullable: false })
   toolCallId: string;
 
   @Column({ type: 'jsonb', nullable: true })

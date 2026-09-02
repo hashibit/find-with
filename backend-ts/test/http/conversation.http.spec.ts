@@ -63,6 +63,23 @@ describe('POST /api/v1/conversations', () => {
     expect(Array.isArray(res.body.messages)).toBe(true);
   });
 
+  it('GET /api/v1/conversations lists conversations newest first', async () => {
+    if (!conversationId) return;
+    const res = await request(app.getHttpServer())
+      .get('/api/v1/conversations')
+      .set(AUTH);
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body)).toBe(true);
+    const ids: string[] = res.body.map((c: { id: string }) => c.id);
+    expect(ids).toContain(conversationId);
+    // listByUser orders by lastActivity DESC
+    const dates: number[] = res.body.map(
+      (c: { lastActivity: string }) => new Date(c.lastActivity).getTime(),
+    );
+    const sorted = [...dates].sort((a, b) => b - a);
+    expect(dates).toEqual(sorted);
+  });
+
   it('POST /api/v1/conversations/:id/close enqueues memory job', async () => {
     if (!conversationId) return;
     const res = await request(app.getHttpServer())

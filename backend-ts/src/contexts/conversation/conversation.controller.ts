@@ -35,6 +35,12 @@ export class ConversationController {
     return this.service.create(user.userId, dto.kind, dto.anchorId);
   }
 
+  @Get()
+  @ApiOperation({ summary: 'List recent conversations, newest first' })
+  list(@CurrentUser() user: AuthenticatedUser) {
+    return this.service.listByUser(user.userId);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get conversation with messages' })
   async get(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {

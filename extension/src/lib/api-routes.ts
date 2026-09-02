@@ -16,6 +16,8 @@ export function bgMsgToRequest(msg: BgMsg): ApiRequest | null {
     // Conversation
     case 'CONVERSATION_CREATE':
       return { path: 'conversations', method: 'POST', body: msg.payload };
+    case 'CONVERSATION_LIST':
+      return { path: 'conversations', method: 'GET' };
     case 'CONVERSATION_GET':
       return { path: `conversations/${msg.payload.conversationId}`, method: 'GET' };
     case 'CONVERSATION_CLOSE':

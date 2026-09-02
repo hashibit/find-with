@@ -1,10 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { useConversationStore } from '../../src/sidepanel/stores/conversation';
+import { chromeMock } from '../setup';
 
 const INITIAL_STATE = {
   messages: [],
   isStreaming: false,
   currentConversationId: null,
+  recentConversations: [],
 } as const;
 
 beforeEach(() => {
@@ -161,5 +163,61 @@ describe('sendMessage', () => {
     expect(messages[0].timestamp).toBeGreaterThan(0);
     await vi.runAllTimersAsync();
     await promise;
+  });
+});
+
+// ---------------------------------------------------------------------------
+// fetchRecentConversations
+// ---------------------------------------------------------------------------
+
+/** One-shot storage.get mock that supplies a sessionToken AND still invokes the
+ *  callback form used by lib/auth getToken. */
+function mockStorageGetOnce(result: object) {
+  (chromeMock.storage.local.get as ReturnType<typeof vi.fn>).mockImplementationOnce(
+    (_keys: string[], cb?: (res: object) => void) => {
+      if (typeof cb === 'function') cb(result);
+      return Promise.resolve(result);
+    },
+  );
+}
+
+describe('fetchRecentConversations', () => {
+  it('maps the backend list into summaries and stores them', async () => {
+    mockStorageGetOnce({ sessionToken: 'tok' });
+    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: () =>
+        Promise.resolve([
+          { id: 'conv_2', kind: 'ONBOARDING', lastActivity: '2026-09-01T10:00:00Z' },
+          { id: 'conv_1', kind: 'FREE_CHAT', lastActivity: '2026-08-31T10:00:00Z' },
+        ]),
+    });
+
+    const summaries = await useConversationStore.getState().fetchRecentConversations();
+    expect(summaries).toEqual([
+      { id: 'conv_2', kind: 'ONBOARDING', lastActivity: '2026-09-01T10:00:00Z' },
+      { id: 'conv_1', kind: 'FREE_CHAT', lastActivity: '2026-08-31T10:00:00Z' },
+    ]);
+    expect(useConversationStore.getState().recentConversations).toEqual(summaries);
+  });
+
+  it('returns an empty list when not authenticated', async () => {
+    const summaries = await useConversationStore.getState().fetchRecentConversations();
+    expect(summaries).toEqual([]);
+    expect(useConversationStore.getState().recentConversations).toEqual([]);
+  });
+
+  it('returns an empty list when the backend responds with an error body', async () => {
+    mockStorageGetOnce({ sessionToken: 'tok' });
+    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      text: () => Promise.resolve('boom'),
+      json: () => Promise.resolve({}),
+    });
+
+    const summaries = await useConversationStore.getState().fetchRecentConversations();
+    expect(summaries).toEqual([]);
   });
 });

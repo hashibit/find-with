@@ -12,6 +12,7 @@ export type BgMsg =
   | { type: 'SSE_EVENT'; payload: any }
   // Conversation
   | { type: 'CONVERSATION_CREATE'; payload: { kind: string; anchorId?: string } }
+  | { type: 'CONVERSATION_LIST' }
   | { type: 'CONVERSATION_GET'; payload: { conversationId: string } }
   | { type: 'CONVERSATION_CLOSE'; payload: { conversationId: string } }
   // Radar
@@ -74,7 +75,7 @@ let easyApplyTabId: number | null = null;
 export async function handleMessage(
   msg: BgMsg,
   sender: chrome.runtime.MessageSender,
-  navPorts: Set<chrome.runtime.Port>,
+  eventPorts: Set<chrome.runtime.Port>,
 ): Promise<any> {
   switch (msg.type) {
     case 'JOB_CAPTURE': {
@@ -84,7 +85,7 @@ export async function handleMessage(
           captureResult.capture?.capturedText ?? '',
           captureResult.quickMatch,
         );
-        navPorts.forEach((port) =>
+        eventPorts.forEach((port) =>
           port.postMessage({
             type: 'QUINN_AMBIENT_MESSAGE',
             text: ambientText,
@@ -115,7 +116,7 @@ export async function handleMessage(
       return { sent: true };
     case 'EASY_APPLY_SUBMITTED':
       easyApplyTabId = null;
-      navPorts.forEach((port) =>
+      eventPorts.forEach((port) =>
         port.postMessage({ type: 'EASY_APPLY_SUBMITTED' }),
       );
       return { received: true };
@@ -124,7 +125,7 @@ export async function handleMessage(
         await chrome.sidePanel.open({ windowId: sender.tab.windowId });
       }
       // Notify all connected sidepanel ports to navigate.
-      navPorts.forEach((port) => {
+      eventPorts.forEach((port) => {
         port.postMessage({ type: 'NAVIGATE', route: msg.payload.route ?? '/onboarding' });
       });
       return { opened: true };

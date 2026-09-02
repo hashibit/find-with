@@ -18,16 +18,35 @@ export interface ConversationMessage {
   captureId?: string;
 }
 
+/** Summary of a past conversation, as returned by GET /conversations. */
+export interface ConversationSummary {
+  id: string;
+  kind: string;
+  lastActivity: string;
+}
+
+/** Valid conversation kinds. Must mirror the backend zod enum in
+ *  conversation.controller.ts — invalid values make CONVERSATION_CREATE return 400. */
+export type ConversationKind =
+  | 'FREE_CHAT'
+  | 'ONBOARDING'
+  | 'JOB_ANALYSIS'
+  | 'GAP_MINING'
+  | 'TAILOR_EDIT'
+  | 'FOLLOWUP';
+
 interface ConversationState {
   messages: ConversationMessage[];
   isStreaming: boolean;
   currentConversationId: string | null;
   pendingCaptureId: string | null;
-  sendMessage: (text: string, conversationKind?: string) => Promise<void>;
+  recentConversations: ConversationSummary[];
+  sendMessage: (text: string, conversationKind?: ConversationKind) => Promise<void>;
   setStreaming: (streaming: boolean) => void;
   appendAssistantChunk: (chunk: string) => void;
   startNewConversation: () => void;
   loadConversation: (id: string) => Promise<void>;
+  fetchRecentConversations: () => Promise<ConversationSummary[]>;
   injectLocalQuinnMessage: (text: string, captureId?: string) => void;
   clearPendingCapture: () => void;
 }
@@ -37,6 +56,7 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
   isStreaming: false,
   currentConversationId: null,
   pendingCaptureId: null,
+  recentConversations: [],
 
   sendMessage: async (text: string, conversationKind = 'FREE_CHAT') => {
     const userMsg: ConversationMessage = { role: 'user', text, timestamp: Date.now() };
@@ -164,6 +184,20 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
       currentConversationId: null,
       pendingCaptureId: null,
     });
+  },
+
+  fetchRecentConversations: async () => {
+    const result = await runtimeCall({ type: 'CONVERSATION_LIST' });
+    if (result.error || !Array.isArray(result)) return [];
+    const summaries: ConversationSummary[] = (result as Array<Record<string, unknown>>).map(
+      (c) => ({
+        id: String(c.id),
+        kind: String(c.kind ?? 'FREE_CHAT'),
+        lastActivity: String(c.lastActivity ?? ''),
+      }),
+    );
+    set({ recentConversations: summaries });
+    return summaries;
   },
 
   injectLocalQuinnMessage: (text: string, captureId?: string) => {

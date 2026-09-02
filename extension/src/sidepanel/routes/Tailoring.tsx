@@ -55,7 +55,7 @@ export function Tailoring() {
     const contextMsg = bulletsSummary
       ? `I've loaded my tailored resume for ${jobLabel}. Here are my tailored bullets:\n\n${bulletsSummary}\n\nBased on these, what are the key gaps I should address to improve my match?`
       : `I've loaded my tailored resume for ${jobLabel}. What are the key gaps I should address to improve my match?`;
-    sendMessage(contextMsg, 'TAILORING');
+    sendMessage(contextMsg, 'TAILOR_EDIT');
   }, [tailoring?.id]);
 
   useEffect(() => {

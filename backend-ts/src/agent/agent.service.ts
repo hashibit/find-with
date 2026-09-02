@@ -223,7 +223,12 @@ export class AgentService {
             });
           } else if (event.type === 'error') {
             this.llm.recordError();
-            subject.next({ data: JSON.stringify({ kind: 'error', message: String(event.error) }) });
+            // pi-ai delivers failures as an AssistantMessage — String() of it
+            // renders as "[object Object]". Surface the provider error text.
+            const failed = event.error;
+            const detail = failed.errorMessage || `LLM stream ${event.reason}`;
+            this.logger.warn(`LLM stream error (${failed.provider}/${failed.model}): ${detail}`);
+            subject.next({ data: JSON.stringify({ kind: 'error', message: detail }) });
             subject.complete();
             return;
           }

@@ -124,12 +124,13 @@ ${text.slice(0, 8000)}`;
         ParsedResumeSchema,
       );
 
-      // Runtime validation — constrainedSampling guarantees valid output,
-      // but Check is a defensive safety net in case the LLM provider makes mistakes.
+      // Runtime validation — strict tool schemas are silently ignored by some
+      // OpenAI-compatible providers (e.g. OpenRouter routes to upstreams that
+      // drop the `strict` flag), so Check is load-bearing, not a safety net.
       if (!Value.Check(ParsedResumeSchema, result)) {
         const errors = [...Value.Errors(ParsedResumeSchema, result)];
         throw new Error(
-          `LLM structured output validation failed: ${errors.map((e) => e.message).join('; ')}`,
+          `LLM structured output validation failed: ${errors.map((e) => `${e.path}: ${e.message}`).join('; ')}`,
         );
       }
 

@@ -1,13 +1,27 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { stream, complete, type Context, type Model, type Api, type Tool } from '@earendil-works/pi-ai/compat';
+import {
+  stream,
+  complete,
+  type Context,
+  type Model,
+  type Api,
+  type Tool,
+} from '@earendil-works/pi-ai/compat';
 import type { TSchema, StaticDecode } from '@sinclair/typebox';
 import OpenAI from 'openai';
 import { type LlmProvider } from './llm-provider.interface.js';
 import { type AppConfig } from '../config/configuration.js';
+import { Timed } from '../common/decorators/timed.decorator.js';
 
 const FAILOVER_THRESHOLD = 5;
 const FAILOVER_WINDOW_MS = 60_000;
+
+/** Compact log-friendly signature of a Typebox object schema (top-level property names). */
+function schemaKeys(schema: unknown): string {
+  const props = (schema as { properties?: Record<string, unknown> }).properties ?? {};
+  return Object.keys(props).join(',');
+}
 
 @Injectable()
 export class LlmService implements LlmProvider {
@@ -87,6 +101,7 @@ export class LlmService implements LlmProvider {
   }
 
   /** One-shot completion — used by tools for structured JSON extraction. */
+  @Timed()
   async completeContext(context: Context): Promise<string> {
     const llmConfig = this.configService.get('llm', { infer: true });
     const provider = llmConfig.provider;
@@ -111,15 +126,23 @@ export class LlmService implements LlmProvider {
 
     const options: Record<string, unknown> = {};
     if (provider === 'openai' && this.openaiApiKey) options.apiKey = this.openaiApiKey;
-    else if (provider === 'anthropic' && this.anthropicApiKey) options.apiKey = this.anthropicApiKey;
-    else if (provider === 'openrouter' && this.openrouterApiKey) options.apiKey = this.openrouterApiKey;
+    else if (provider === 'anthropic' && this.anthropicApiKey)
+      options.apiKey = this.anthropicApiKey;
+    else if (provider === 'openrouter' && this.openrouterApiKey)
+      options.apiKey = this.openrouterApiKey;
 
     const msg = await complete(model, context, options);
     const block = msg.content.find((b) => b.type === 'text');
     return block?.type === 'text' ? block.text : '';
   }
 
-  async structuredComplete<T extends TSchema>(context: Context, outputSchema: T): Promise<StaticDecode<T>> {
+  @Timed({
+    describe: (args) => `schema=[${schemaKeys(args[1])}]`,
+  })
+  async structuredComplete<T extends TSchema>(
+    context: Context,
+    outputSchema: T,
+  ): Promise<StaticDecode<T>> {
     const llmConfig = this.configService.get('llm', { infer: true });
     const provider = llmConfig.provider;
     const providerConfig = llmConfig[provider];
@@ -143,8 +166,10 @@ export class LlmService implements LlmProvider {
 
     const options: Record<string, unknown> = {};
     if (provider === 'openai' && this.openaiApiKey) options.apiKey = this.openaiApiKey;
-    else if (provider === 'anthropic' && this.anthropicApiKey) options.apiKey = this.anthropicApiKey;
-    else if (provider === 'openrouter' && this.openrouterApiKey) options.apiKey = this.openrouterApiKey;
+    else if (provider === 'anthropic' && this.anthropicApiKey)
+      options.apiKey = this.anthropicApiKey;
+    else if (provider === 'openrouter' && this.openrouterApiKey)
+      options.apiKey = this.openrouterApiKey;
 
     const tool: Tool = {
       name: 'respond',
@@ -153,7 +178,9 @@ export class LlmService implements LlmProvider {
       constrainedSampling: { type: 'json_schema', strict: 'require' },
     };
 
+    this.logger.log(`LLM structured start: provider=${provider} model=${modelId}`);
     const msg = await complete(model, { ...context, tools: [tool] }, options);
+
     const toolBlock = msg.content.find((b) => b.type === 'toolCall');
     if (toolBlock && toolBlock.type === 'toolCall') {
       return toolBlock.arguments as StaticDecode<T>;
@@ -161,6 +188,7 @@ export class LlmService implements LlmProvider {
     throw new Error('LLM did not produce structured output');
   }
 
+  @Timed()
   async embed(text: string): Promise<number[]> {
     const llmConfig = this.configService.get('llm', { infer: true });
     const embeddingModel = llmConfig.embeddingModel;

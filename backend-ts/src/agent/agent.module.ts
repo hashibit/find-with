@@ -114,6 +114,6 @@ const TOOL_EXECUTORS_LIST = [
 
     ToolRegistry,
   ],
-  exports: [AgentService, ContextBuilderService, SearchCompanyTool],
+  exports: [AgentService, ContextBuilderService, SearchCompanyTool, FIELD_CRYPTO],
 })
 export class AgentModule {}

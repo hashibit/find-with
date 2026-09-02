@@ -1,9 +1,21 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { ConvConversation } from '../../database/entities/conversation/conversation.entity.js';
 import { ConvMessage } from '../../database/entities/conversation/message.entity.js';
+import { FIELD_CRYPTO, type FieldCrypto } from '../../common/crypto/crypto.interface.js';
 import { ulid } from 'ulid';
+
+/** A chat turn as returned by findOne — plaintext text, no ciphertext. */
+export interface ConversationMessageView {
+  id: string;
+  conversationId: string;
+  role: string;
+  text: string | null;
+  payload: unknown | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 @Injectable()
 export class ConversationService {
@@ -12,6 +24,7 @@ export class ConversationService {
     private readonly convRepo: Repository<ConvConversation>,
     @InjectRepository(ConvMessage)
     private readonly messageRepo: Repository<ConvMessage>,
+    @Inject(FIELD_CRYPTO) private readonly crypto: FieldCrypto,
   ) {}
 
   async create(userId: string, kind: string, anchorId?: string): Promise<ConvConversation> {
@@ -29,15 +42,30 @@ export class ConversationService {
   async findOne(
     userId: string,
     id: string,
-  ): Promise<{ conversation: ConvConversation; messages: ConvMessage[] }> {
+  ): Promise<{ conversation: ConvConversation; messages: ConversationMessageView[] }> {
     const conv = await this.convRepo.findOne({ where: { id } });
     if (!conv) throw new NotFoundException('Conversation not found');
     if (conv.userId !== userId) throw new ForbiddenException();
 
-    const messages = await this.messageRepo.find({
-      where: { conversationId: id },
+    // Display view: chat turns with decrypted text, so clients can restore the
+    // transcript (text is null on write; plaintext only lives in encryptedText).
+    // TOOL_RESULT rows are agent-internal plumbing, not chat turns, and
+    // encryptedText is ciphertext — neither belongs in the response.
+    const rows = await this.messageRepo.find({
+      where: { conversationId: id, role: In(['USER', 'ASSISTANT']) },
       order: { createdAt: 'ASC' },
     });
+
+    const messages = await Promise.all(
+      rows.map(async (m) => {
+        if (m.encryptedText) {
+          m.text = await this.crypto.decrypt(m.encryptedText);
+        }
+        const { encryptedText, ...rest } = m;
+        void encryptedText;
+        return rest;
+      }),
+    );
 
     return { conversation: conv, messages };
   }

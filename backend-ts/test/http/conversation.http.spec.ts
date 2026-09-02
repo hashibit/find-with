@@ -8,6 +8,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
 import { getApp, closeApp, AUTH } from './bootstrap.js';
 import { type INestApplication } from '@nestjs/common';
+import { ConvMessageRepository } from '../../src/agent/conv-message.repository.js';
 
 let app: INestApplication;
 
@@ -58,9 +59,37 @@ describe('POST /api/v1/conversations', () => {
       .get(`/api/v1/conversations/${conversationId}`)
       .set(AUTH);
     expect(res.status).toBe(200);
-    // findOne returns { conversation: ConvConversation, messages: ConvMessage[] }
+    // findOne returns { conversation: ConvConversation, messages: ConversationMessageView[] }
     expect(res.body.conversation).toHaveProperty('id', conversationId);
     expect(Array.isArray(res.body.messages)).toBe(true);
+  });
+
+  it('GET /api/v1/conversations/:id decrypts message text and hides ciphertext', async () => {
+    if (!conversationId) return;
+    // Write through the same path the agent loop uses: plaintext only in
+    // encryptedText, text left null. Covers the side-panel restore flow, where
+    // user bubbles previously came back empty.
+    const convMessages = app.get(ConvMessageRepository);
+    await convMessages.saveUser(conversationId, 'hello from the user');
+    await convMessages.saveAssistant(
+      conversationId,
+      { role: 'assistant', content: [{ type: 'text', text: 'hi, how can I help' }], timestamp: Date.now() } as never,
+      'hi, how can I help',
+    );
+
+    const res = await request(app.getHttpServer())
+      .get(`/api/v1/conversations/${conversationId}`)
+      .set(AUTH);
+    expect(res.status).toBe(200);
+
+    const messages = res.body.messages as Array<{ role: string; text?: string | null; encryptedText?: unknown }>;
+    const user = messages.find((m) => m.role === 'USER');
+    const assistant = messages.find((m) => m.role === 'ASSISTANT');
+    expect(user?.text).toBe('hello from the user');
+    expect(assistant?.text).toBe('hi, how can I help');
+    for (const m of messages) {
+      expect(m).not.toHaveProperty('encryptedText');
+    }
   });
 
   it('GET /api/v1/conversations lists conversations newest first', async () => {

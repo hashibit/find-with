@@ -114,7 +114,10 @@ export class IamController {
     const token = randomBytes(32).toString('hex');
     const expiresAt = Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS;
 
-    // Store hashed token → userId in Redis for guard validation
+    // Store raw token → userId in Redis for guard validation (the guard looks up
+    // `session:<raw token>`, see user-auth.guard.ts). NOT hashed: a Redis read
+    // leak therefore yields live sessions — accepted for v0.1; if revisited, hash
+    // the token on both write and guard-lookup.
     await this.redisService.client.setex(`session:${token}`, SESSION_TTL_SECONDS, userId);
 
     return { sessionToken: token, expires_at: expiresAt, user_id: userId };

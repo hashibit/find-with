@@ -13,7 +13,6 @@ const TAG_LEN = 16;
  * with a KEK (Key Encryption Key). Both are stored in env vars as base64.
  *
  * Wire format (bytea): nonce[12] + ciphertext + authTag[16]
- * This matches the Python crypto.py implementation exactly.
  */
 @Injectable()
 export class EnvelopeCryptoService implements FieldCrypto {

@@ -16,7 +16,7 @@ export class FollowupEmail extends BaseEntity {
   @Column({ type: 'varchar', length: 255, nullable: true })
   fromAddr: string | null;
 
-  /** AES-256-GCM encrypted bytes (nonce[12] + ciphertext). §12.1 */
+  /** AES-256-GCM encrypted bytes (nonce[12] + ciphertext + tag[16]). §12.1 */
   @Column({ type: 'bytea', nullable: true })
   bodyText: Buffer | null;
 

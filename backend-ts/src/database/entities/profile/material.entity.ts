@@ -8,7 +8,7 @@ export class ProfileMaterial extends BaseEntity {
   userId: string;
 
   /**
-   * AES-256-GCM encrypted bytes (nonce[12] + ciphertext).
+   * AES-256-GCM encrypted bytes (nonce[12] + ciphertext + tag[16]).
    * §12.1: stored as bytea, never plaintext.
    */
   @Column({ type: 'bytea', nullable: true })

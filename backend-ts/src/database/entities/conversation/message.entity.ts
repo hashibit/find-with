@@ -14,11 +14,13 @@ export class ConvMessage extends BaseEntity {
   @Column({ type: 'text', nullable: true })
   text: string | null;
 
-  // Encrypted text using AES-256. For PII protection.
+  // Encrypted text using AES-256-GCM. For PII protection. The `text` column
+  // stays NULL on write; plaintext exists only after decryption (display view).
   @Column({ type: 'bytea', nullable: true })
   encryptedText: Buffer | null;
 
-  // Full pi-ai Message object. Null only for legacy USER messages.
+  // Full pi-ai Message object. Null for USER messages (their plaintext lives
+  // only in encryptedText); populated for ASSISTANT and TOOL_RESULT rows.
   @Column({ type: 'jsonb', nullable: true })
   payload: unknown | null;
 

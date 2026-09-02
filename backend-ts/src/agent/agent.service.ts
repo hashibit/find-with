@@ -17,7 +17,7 @@ import { ConvConversation } from '../database/entities/conversation/conversation
 import { LLM_PROVIDER, type LlmProvider } from '../llm/llm-provider.interface.js';
 import { ContextBuilderService } from './context-builder.service.js';
 import { ConvMessageRepository } from './conv-message.repository.js';
-import { ToolRegistry, type ToolContext } from './tool-registry.js';
+import { ToolRegistry, resolveScene, type ToolContext } from './tool-registry.js';
 import { ulid } from 'ulid';
 import { MEMORY_QUEUE, type MemoryJobData } from '../contexts/memory/memory.constants.js';
 import { PendingToolResult } from '../database/entities/agent/pending-tool-result.entity.js';
@@ -192,7 +192,7 @@ export class AgentService {
       );
 
       // Attach scene-filtered tools for the LLM to see
-      context.tools = this.toolRegistry.getToolsForScene(conversationKind);
+      context.tools = this.toolRegistry.getToolsForScene(resolveScene(conversationKind));
 
       // Add the current user turn
       context.messages.push({ role: 'user', content: userMessage, timestamp: Date.now() });

@@ -31,6 +31,32 @@ export interface ToolExecutor {
 
 export const TOOL_EXECUTORS = Symbol('TOOL_EXECUTORS');
 
+/** Scene values that correspond 1:1 to a stored conversation kind. */
+const KIND_SCENES: ReadonlySet<string> = new Set([
+  'JOB_ANALYSIS',
+  'ONBOARDING',
+  'GAP_MINING',
+  'TAILOR_EDIT',
+  'FOLLOWUP',
+  'FREE_CHAT',
+]);
+
+/**
+ * Resolve a stored conversation kind into a tool-gating scene.
+ *
+ * Today this is the identity map over the known kinds, with unknown/null/legacy
+ * values normalized to FREE_CHAT (the kind column is varchar and only the create
+ * endpoint is enum-guarded, so arbitrary strings can exist in the DB — a bare
+ * cast would silently yield a toolset containing only 'ALL' tools).
+ *
+ * This is the seam where future non-identity scene derivation lands (e.g. a
+ * moment-scene derived from radar status transitions, or entitlement-based
+ * gating) — those need a signal source, not a bigger switch here.
+ */
+export function resolveScene(kind: string | null | undefined): Scene {
+  return kind !== null && kind !== undefined && KIND_SCENES.has(kind) ? (kind as Scene) : 'FREE_CHAT';
+}
+
 @Injectable()
 export class ToolRegistry {
   private readonly toolMap: Map<string, ToolExecutor>;
@@ -47,9 +73,9 @@ export class ToolRegistry {
     return this.toolMap.get(name);
   }
 
-  getToolsForScene(conversationKind: string): Tool[] {
+  getToolsForScene(scene: Scene): Tool[] {
     return Array.from(this.toolMap.values())
-      .filter((t) => t.scenes.includes('ALL') || t.scenes.includes(conversationKind as Scene))
+      .filter((t) => t.scenes.includes('ALL') || t.scenes.includes(scene))
       .map((t) => ({
         name: t.name,
         description: t.description,

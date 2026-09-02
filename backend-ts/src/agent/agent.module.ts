@@ -15,6 +15,7 @@ import { DraftReplyTool } from './tools/draft-reply.tool.js';
 import { SetConversationDensityTool } from './tools/set-conversation-density.tool.js';
 import { FarewellTool } from './tools/farewell.tool.js';
 import { RecomputeMatchTool } from './tools/recompute-match.tool.js';
+import { GetProfileTool } from './tools/get-profile.tool.js';
 import { JobMatchResult } from '../database/entities/jobs/match-result.entity.js';
 import { ConvMessage } from '../database/entities/conversation/message.entity.js';
 import { ConvConversation } from '../database/entities/conversation/conversation.entity.js';
@@ -22,6 +23,9 @@ import { ConvRollingSummary } from '../database/entities/conversation/rolling-su
 import { UserGoalMemory } from '../database/entities/memory/user-goal-memory.entity.js';
 import { JobRadarItem } from '../database/entities/jobs/radar-item.entity.js';
 import { ProfileProfile } from '../database/entities/profile/profile.entity.js';
+import { ProfileWorkExperience } from '../database/entities/profile/work-experience.entity.js';
+import { ProfileEducation } from '../database/entities/profile/education.entity.js';
+import { ProfileSkill } from '../database/entities/profile/skill.entity.js';
 import { ProfileMaterial } from '../database/entities/profile/material.entity.js';
 import { JobCompanyBrief } from '../database/entities/jobs/company-brief.entity.js';
 import { JobParsedJd } from '../database/entities/jobs/parsed-jd.entity.js';
@@ -51,6 +55,7 @@ const TOOL_EXECUTORS_LIST = [
   SetConversationDensityTool,
   FarewellTool,
   RecomputeMatchTool,
+  GetProfileTool,
 ];
 
 @Module({
@@ -62,6 +67,9 @@ const TOOL_EXECUTORS_LIST = [
       ConvRollingSummary,
       ProfileProfile,
       ProfileMaterial,
+      ProfileWorkExperience,
+      ProfileEducation,
+      ProfileSkill,
       JobCompanyBrief,
       JobParsedJd,
       JobRadarItem,

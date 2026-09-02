@@ -11,6 +11,9 @@ import { AUTH_VERIFIER, type AuthVerifier } from '../../adapters/auth/auth.inter
 import { RedisService } from '../../redis/redis.module.js';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator.js';
 
+/** Session lifetime in Redis. Shared with the endpoints that issue sessions. */
+export const SESSION_TTL_SECONDS = 86400; // 24 hours
+
 @Injectable()
 export class UserAuthGuard implements CanActivate {
   constructor(
@@ -43,6 +46,10 @@ export class UserAuthGuard implements CanActivate {
     if (this.isSessionToken(token)) {
       const userId = await this.redisService.client.get(`session:${token}`);
       if (!userId) throw new UnauthorizedException('Invalid or expired session token');
+      // Sliding expiration: every authenticated request extends the session by
+      // the full TTL, so active users stay logged in and the session only dies
+      // after 24h of inactivity (or Redis eviction/restart).
+      await this.redisService.client.expire(`session:${token}`, SESSION_TTL_SECONDS);
       request.user = { userId };
       return true;
     }

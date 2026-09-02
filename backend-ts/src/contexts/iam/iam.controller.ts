@@ -6,14 +6,13 @@ import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 import { CurrentUser, type AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { Public } from '../../common/decorators/public.decorator.js';
+import { SESSION_TTL_SECONDS } from '../../common/guards/user-auth.guard.js';
 import { IamService } from './iam.service.js';
 import { AUTH_VERIFIER, type AuthVerifier } from '../../adapters/auth/auth.interface.js';
 import { NonceStore } from './services/nonce.store.js';
 import { AccountPurgeSagaService } from './services/account-purge-saga.service.js';
 import { AccountExportService } from './services/account-export.service.js';
 import { RedisService } from '../../redis/redis.module.js';
-
-const SESSION_TTL_SECONDS = 86400; // 24 hours
 
 class UpsertUserDto extends createZodDto(
   z.object({

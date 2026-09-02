@@ -22,7 +22,11 @@ services:
     image: redis:7-alpine
     ports:
       - '14601:14601'
-    command: redis-server --port 14601 --save "" --appendonly no
+    # AOF persistence: Redis holds BullMQ queues alongside session tokens, so a
+    # restart must not wipe pending/delayed jobs. RDB snapshots stay at defaults.
+    command: redis-server --port 14601 --appendonly yes
+    volumes:
+      - redis-data:/data
     healthcheck:
       test: ['CMD', 'redis-cli', '-p', '14601', 'ping']
       interval: 5s
@@ -127,3 +131,4 @@ services:
 volumes:
   pgdata:
   miniodata:
+  redis-data:

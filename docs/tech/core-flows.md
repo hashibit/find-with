@@ -698,6 +698,8 @@ SMTP_FROM=quinn@findwith.com
 # Encryption — generate once per install:
 CRYPTO_KEK=<base64 32-byte key>
 CRYPTO_DEK_CIPHERTEXT=<base64 nonce+ciphertext>
+# (non-production uses EphemeralCrypto — identity mapping. Full crypto map:
+#  docs/tech/security-inventory.md)
 
 # Other required
 SVIX_SIGNING_SECRET=mock_svix_signing_secret_unused

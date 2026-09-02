@@ -16,7 +16,12 @@ import { ProfileBaseResume } from '../../database/entities/profile/base-resume.e
 import { STORAGE, type Storage } from '../../adapters/storage/storage.interface.js';
 import { LLM_PROVIDER, type LlmProvider } from '../../llm/llm-provider.interface.js';
 import { RESUME_PARSE_QUEUE } from './profile.service.js';
+import { parseMonthDate } from './month-date.js';
 import { ulid } from 'ulid';
+
+// LLMs emit null for absent dates far more often than omitting the key —
+// accept both, normalizeMonthDate turns null into a clean absent date.
+const MonthDate = Type.Optional(Type.Union([Type.String(), Type.Null()]));
 
 const ParsedResumeSchema = Type.Object({
   basicInfo: Type.Object({
@@ -26,26 +31,34 @@ const ParsedResumeSchema = Type.Object({
     location: Type.Optional(Type.String()),
     linkedinUrl: Type.Optional(Type.String()),
   }),
-  education: Type.Array(Type.Object({
-    school: Type.String(),
-    degree: Type.Optional(Type.String()),
-    major: Type.Optional(Type.String()),
-    start: Type.Optional(Type.String()),
-    end: Type.Optional(Type.String()),
-    gpa: Type.Optional(Type.String()),
-  })),
-  workExperience: Type.Array(Type.Object({
-    company: Type.String(),
-    title: Type.String(),
-    location: Type.Optional(Type.String()),
-    start: Type.Optional(Type.String()),
-    end: Type.Optional(Type.String()),
-    bullets: Type.Array(Type.String()),
-  })),
-  skills: Type.Array(Type.Object({
-    name: Type.String(),
-    kind: Type.String(),
-  })),
+  education: Type.Array(
+    Type.Object({
+      school: Type.String(),
+      degree: Type.Optional(Type.String()),
+      major: Type.Optional(Type.String()),
+      start: Type.Optional(MonthDate),
+      end: Type.Optional(MonthDate),
+      isCurrentlyEnrolled: Type.Optional(Type.Boolean()),
+      gpa: Type.Optional(Type.String()),
+    }),
+  ),
+  workExperience: Type.Array(
+    Type.Object({
+      company: Type.String(),
+      title: Type.String(),
+      location: Type.Optional(Type.String()),
+      start: Type.Optional(MonthDate),
+      end: Type.Optional(MonthDate),
+      isCurrent: Type.Optional(Type.Boolean()),
+      bullets: Type.Array(Type.String()),
+    }),
+  ),
+  skills: Type.Array(
+    Type.Object({
+      name: Type.String(),
+      kind: Type.Union([Type.Literal('HARD'), Type.Literal('SOFT'), Type.Literal('TOOL')]),
+    }),
+  ),
 });
 
 type ParsedResume = Static<typeof ParsedResumeSchema>;
@@ -98,6 +111,8 @@ export class ProfileProcessor extends WorkerHost {
       // LLM parse with structured output
       const prompt = `Parse this resume into structured data.
 
+Date rules: every start/end must be exactly "YYYY-MM". Convert formats like "March 2020", "2020.03" or "2020-03-15". If only a year is known, use "YYYY-01". For an ongoing role/education, omit end and set isCurrent/isCurrentlyEnrolled to true. Never write "Present" into end.
+
 Resume text:
 ${text.slice(0, 8000)}`;
 
@@ -113,7 +128,9 @@ ${text.slice(0, 8000)}`;
       // but Check is a defensive safety net in case the LLM provider makes mistakes.
       if (!Value.Check(ParsedResumeSchema, result)) {
         const errors = [...Value.Errors(ParsedResumeSchema, result)];
-        throw new Error(`LLM structured output validation failed: ${errors.map(e => e.message).join('; ')}`);
+        throw new Error(
+          `LLM structured output validation failed: ${errors.map((e) => e.message).join('; ')}`,
+        );
       }
 
       const parsed = result;
@@ -125,14 +142,35 @@ ${text.slice(0, 8000)}`;
       );
 
       if (parsed.education?.length) {
-        const edu = parsed.education.map((e) => this.eduRepo.create({ id: ulid(), userId, ...e }));
+        const edu = parsed.education.map((e) => {
+          const start = parseMonthDate(e.start);
+          const end = parseMonthDate(e.end);
+          return this.eduRepo.create({
+            id: ulid(),
+            userId,
+            ...e,
+            start: start.date,
+            end: end.date,
+            // "Present"-style end or an explicit LLM flag marks enrollment as ongoing
+            isCurrentlyEnrolled: e.isCurrentlyEnrolled ?? end.isPresent,
+          });
+        });
         await this.eduRepo.save(edu);
       }
 
       if (parsed.workExperience?.length) {
-        const exp = parsed.workExperience.map((e) =>
-          this.expRepo.create({ id: ulid(), userId, ...e }),
-        );
+        const exp = parsed.workExperience.map((e) => {
+          const start = parseMonthDate(e.start);
+          const end = parseMonthDate(e.end);
+          return this.expRepo.create({
+            id: ulid(),
+            userId,
+            ...e,
+            start: start.date,
+            end: end.date,
+            isCurrent: e.isCurrent ?? end.isPresent,
+          });
+        });
         await this.expRepo.save(exp);
       }
 

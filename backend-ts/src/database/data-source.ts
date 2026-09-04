@@ -24,6 +24,7 @@ import { JobMatchResult } from './entities/jobs/match-result.entity.js';
 import { JobRadarItem } from './entities/jobs/radar-item.entity.js';
 import { ConvConversation } from './entities/conversation/conversation.entity.js';
 import { ConvMessage } from './entities/conversation/message.entity.js';
+import { ConvToolCall } from './entities/conversation/tool-call.entity.js';
 import { ConvRollingSummary } from './entities/conversation/rolling-summary.entity.js';
 import { UserGoalMemory } from './entities/memory/user-goal-memory.entity.js';
 import { TailoringResume } from './entities/tailoring/tailoring-resume.entity.js';
@@ -67,6 +68,7 @@ const ALL_ENTITIES = [
   JobRadarItem,
   ConvConversation,
   ConvMessage,
+  ConvToolCall,
   ConvRollingSummary,
   UserGoalMemory,
   TailoringResume,

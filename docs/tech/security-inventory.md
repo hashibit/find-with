@@ -107,24 +107,31 @@ assistant `payload` JSON are all plaintext (see §2 boundaries).
 
 | Column | Contents | Written by | Read by |
 |---|---|---|---|
-| `conv_messages.encryptedText` (`message.entity.ts:19`) | Full chat text, USER + ASSISTANT | `agent/conv-message.repository.ts:16` (`saveUser`), `:23` (`saveAssistant`); followup-scheduler nudge (`followup-scheduler.service.ts:106`) | `findRecentForContext` → LLM context; `GET /conversations/:id` display view (`conversation.service.ts:42`) |
+| `conv_messages.encryptedText` | Chat content — USER: user input; ASSISTANT: joined text blocks | `conv-message.repository.ts` (`saveUser`, `saveAssistant`); followup-scheduler nudge (`followup-scheduler.service.ts`) | `findRecentForContext` → LLM context; `GET /conversations/:id` display view (`conversation.service.ts`) |
+| `conv_messages.encryptedThinking` | ASSISTANT thinking blocks JSON (incl. `thinkingSignature` — required for Anthropic tool-turn replay) | `saveAssistant` | `findRecentForContext` |
+| `conv_tool_calls.encryptedArguments` / `.encryptedResult` | Tool invocation arguments + result text (PII); one row per call, paired via `assistantId` | `saveToolCall` | `findRecentForContext`, `findDecryptedTurns` |
 | `profile_materials.rawText` (`material.entity.ts:15`) | Raw material text | `profile.service.ts:112` | `listMaterials` decrypts (`profile.service.ts:96`) |
 | `followup_emails.bodyText` (`followup-email.entity.ts:19`) | Email body (read off the page by content script — deliberately no Gmail API) | `followup.service.ts:29` | classify-email / draft-reply tools (`classify-email.tool.ts:48`, `draft-reply.tool.ts:54`) |
+
+Schema (2026-09, `RestructureConvMessages`): `conv_messages.role` is a speaker
+(`USER` \| `ASSISTANT`); tool invocations live in `conv_tool_calls`, one row per
+call with arguments + result encrypted atomically and paired to the assistant
+row via the indexed `assistantId` column — reassembly never depends on row
+order. Design record: `conv-messages-restructure.md`.
 
 ### Plaintext boundaries — things people forget
 
 | Data | State | Why it matters |
 |---|---|---|
-| `conv_messages.payload` for ASSISTANT messages | **Plaintext jsonb** | `saveAssistant` writes `encryptedText`, but the full pi-ai message (containing the same text in its content blocks) is stored unencrypted in `payload`. Context building reads `payload` and never decrypts. The encryption boundary is narrower than it looks |
-| `conv_messages.payload` for TOOL_RESULT | **Plaintext** | Tool args/results as JSON; may embed profile content |
-| `conv_rolling_summaries.content` (`rolling-summary.entity.ts:17`) | **Plaintext** | LLM-written compression summaries |
-| `conv_messages.text` | Always `NULL` in DB (by design) | Plaintext exists only transiently: decrypted into the GET response, never written back |
+| `conv_messages.metadata` | **Plaintext jsonb by design** | `{provider, model, responseId, stopReason, errorMessage}` — provider/turn telemetry, no user content |
+| `conv_tool_calls` plaintext columns (`toolName`, `toolCallId`, `seq`, `isError`) | **Plaintext by design** | Fixed vocabulary + opaque ids + ordering; the user content (arguments/result) is encrypted |
+| `conv_rolling_summary.content` (`rolling-summary.entity.ts:17`) | **Plaintext** | LLM-written compression summaries of (now-encrypted) conversation content — known gap |
 | Non-production databases | No encryption at all | EphemeralCrypto is identity; don't treat local `encryptedText` as sensitive |
 
-**Rule of thumb:** the encryption contract covers three columns (chat text, material
-raw text, email body). Everything else in the conversation domain — assistant payload,
-tool results, rolling summaries — is plaintext by implementation, outside the
-§12.1 promise (which named resume bytes, email body, material.raw_text).
+**Rule of thumb:** the encryption contract now covers every column carrying
+conversation content (chat text, thinking, tool arguments/results, material
+raw text, email body). Plaintext in the conversation domain is limited to
+non-sensitive structural metadata and the rolling-summary gap above.
 
 ## 3. Design (§12.1) vs implementation
 
@@ -190,3 +197,6 @@ while also writing plaintext into `text`) — removed from the working tree on
 5. If the field surfaces in a REST response, decrypt in the service layer and strip
    the ciphertext column from the payload (see `conversation.service.ts` `findOne`).
 6. Add the column to the table in §2 above.
+7. Tool invocations pair to their assistant row via the explicit `assistantId`
+   column — never by row order. One row = one call, arguments + result written
+   together by `saveToolCall`.

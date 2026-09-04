@@ -10,6 +10,7 @@ import { ConvMessage } from '../../database/entities/conversation/message.entity
 import { ConvRollingSummary } from '../../database/entities/conversation/rolling-summary.entity.js';
 import { ProfileMaterial } from '../../database/entities/profile/material.entity.js';
 import { UserGoalMemory } from '../../database/entities/memory/user-goal-memory.entity.js';
+import { FIELD_CRYPTO, type FieldCrypto } from '../../common/crypto/crypto.interface.js';
 import { LLM_PROVIDER, type LlmProvider } from '../../llm/llm-provider.interface.js';
 import { ContextBuilderService } from '../../agent/context-builder.service.js';
 import { MEMORY_QUEUE, type MemoryJobData } from './memory.constants.js';
@@ -47,6 +48,7 @@ export class MemoryProcessor extends WorkerHost {
     private readonly materialRepo: Repository<ProfileMaterial>,
     @InjectRepository(UserGoalMemory)
     private readonly goalMemoryRepo: Repository<UserGoalMemory>,
+    @Inject(FIELD_CRYPTO) private readonly crypto: FieldCrypto,
     @Inject(LLM_PROVIDER) private readonly llm: LlmProvider,
     private readonly contextBuilder: ContextBuilderService,
   ) {
@@ -108,11 +110,18 @@ export class MemoryProcessor extends WorkerHost {
       take: 60,
     });
 
-    const transcript = messages
-      .filter((m) => m.role === 'USER')
-      .map((m) => m.text ?? '')
-      .filter(Boolean)
-      .join('\n');
+    // USER rows carry the user's words in encryptedText — decrypt them for
+    // the transcript. A poisoned row is skipped, not fatal to the job.
+    const userTexts: string[] = [];
+    for (const m of messages) {
+      if (m.role !== 'USER' || !m.encryptedText) continue;
+      try {
+        userTexts.push(await this.crypto.decrypt(m.encryptedText));
+      } catch (err) {
+        this.logger.warn(`Skipping undecryptable user message ${m.id}: ${err}`);
+      }
+    }
+    const transcript = userTexts.filter(Boolean).join('\n');
 
     if (!transcript.trim()) return;
 

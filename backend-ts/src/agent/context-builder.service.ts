@@ -5,8 +5,8 @@ import {
 } from './prompts/quinn-prompt.provider.js';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { type AssistantMessage, type Context, type ToolResultMessage } from '@earendil-works/pi-ai';
-import { ConvMessageRepository } from './conv-message.repository.js';
+import { type Context } from '@earendil-works/pi-ai';
+import { ConvMessageRepository, type DecryptedTurn } from './conv-message.repository.js';
 
 import { ConvMessage } from '../database/entities/conversation/message.entity.js';
 import { ConvConversation } from '../database/entities/conversation/conversation.entity.js';
@@ -175,44 +175,35 @@ export class ContextBuilderService {
   }
 
   async findMessagesToCompress(conversationId: string): Promise<CompressableMessages> {
-    const query = {
+    const count = await this.messageRepo.count({
       where: { conversationId: conversationId, archived: false },
-      order: { createdAt: 'ASC' },
-    };
-    const count = await this.messageRepo.count(query as any);
+    });
     if (count < ROLLING_MESSAGES_WINDOW) {
       return { messages: [] };
     }
 
-    const convMessages = await this.messageRepo.find(query as any);
-    if (convMessages.length < ROLLING_MESSAGES_WINDOW) {
+    // Briefs carry real content — the summarizer consumes them verbatim via
+    // buildForCompress. Turns that fail to decrypt are dropped by the repo.
+    const turns = await this.convMessages.findDecryptedTurns(conversationId);
+    if (turns.length < ROLLING_MESSAGES_WINDOW) {
       return { messages: [] };
     }
 
-    const start_message_id = convMessages[0]!.id;
-    const end_message_id = convMessages[convMessages.length - 1]!.id;
+    const start_message_id = turns[0]!.id;
+    const end_message_id = turns[turns.length - 1]!.id;
     const messages: string[] = [];
 
-    const tokens = convMessages.reduce((sum, convMessage) => {
-      const brief = this.messageBrief(convMessage);
+    const tokens = turns.reduce((sum, turn) => {
+      const brief = this.turnBrief(turn);
       if (brief) {
         messages.push(brief);
       }
-      if (convMessage.role == 'USER') {
-        return sum + this.estimateStringTokens(convMessage.text);
-      }
-      if (convMessage.role == 'ASSISTANT') {
-        return sum + (convMessage.payload as AssistantMessage).usage.totalTokens;
-      }
-      if (convMessage.role == 'TOOL_RESULT') {
-        const content = (convMessage.payload as ToolResultMessage).content;
-        const tool_tokens = content.reduce((v, c) => {
-          if (c.type == 'text') return v + this.estimateStringTokens(c.text);
-          return v + c.data.length / 3;
-        }, 0);
-        return sum + tool_tokens;
-      }
-      return sum;
+      return (
+        sum +
+        this.estimateStringTokens(turn.text) +
+        this.estimateStringTokens(turn.thinkingText) +
+        turn.calls.reduce((v, c) => v + this.estimateStringTokens(c.resultText), 0)
+      );
     }, 0);
 
     if (tokens > TOKEN_COMPRESS_THRESHOLD) {
@@ -290,35 +281,15 @@ export class ContextBuilderService {
     return (text?.length ?? 0) / 3;
   }
 
-  private messageBrief(message: ConvMessage): string | null {
-    switch (message.role) {
-      case 'USER':
-        // encryptedText is intentionally not decrypted in brief — brief is used
-        // for token counting only, so a placeholder is fine.
-        return `User: ${message.text ?? '[encrypted]'}`;
-      case 'ASSISTANT':
-        const assistant = message.payload as AssistantMessage;
-        const contents = assistant.content.map((c) => {
-          switch (c.type) {
-            case 'text':
-              return c.text;
-            case 'toolCall':
-              return `[Call tool: ${c.name}]`;
-            case 'thinking':
-              return null;
-          }
-        });
-        return `Quinn: ${contents.join('\n')}`;
-      case 'TOOL_RESULT':
-        const toolResult = message.payload as ToolResultMessage;
-        const block = toolResult.content[0];
-        if (block.type == 'text') {
-          return `[Tool Result for ${toolResult.toolName}: ${block.text}]`;
-        }
-        return null;
-      default:
-        return null;
+  private turnBrief(turn: DecryptedTurn): string {
+    if (turn.role === 'USER') {
+      return `User: ${turn.text}`;
     }
+    const toolParts = turn.calls.flatMap((c) => [
+      `[Call tool: ${c.toolName}]`,
+      `[Tool Result for ${c.toolName}: ${c.resultText}]`,
+    ]);
+    return `Quinn: ${[turn.text, ...toolParts].filter(Boolean).join('\n')}`;
   }
 
   async buildForCompress(

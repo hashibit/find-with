@@ -16,7 +16,7 @@ import { ConfigService } from '@nestjs/config';
 import { ConvConversation } from '../database/entities/conversation/conversation.entity.js';
 import { LLM_PROVIDER, type LlmProvider } from '../llm/llm-provider.interface.js';
 import { ContextBuilderService } from './context-builder.service.js';
-import { ConvMessageRepository } from './conv-message.repository.js';
+import { ConvMessageRepository, type ToolExecutionRecord } from './conv-message.repository.js';
 import { ToolRegistry, resolveScene, type ToolContext } from './tool-registry.js';
 import { ulid } from 'ulid';
 import { MEMORY_QUEUE, type MemoryJobData } from '../contexts/memory/memory.constants.js';
@@ -240,12 +240,7 @@ export class AgentService {
         completionTokens += finalMessage.usage.output;
         this.llm.clearErrors();
 
-        const fullText = finalMessage.content
-          .filter((b) => b.type == 'text')
-          .map((b) => b.text)
-          .join('');
-
-        await this.saveAssistantMessage(conversationId, finalMessage, fullText);
+        const assistantId = await this.saveAssistantMessage(conversationId, finalMessage);
 
         // 4. Execute tool calls and stream continuation
         const toolCalls = finalMessage.content.filter((b) => b.type === 'toolCall');
@@ -253,7 +248,7 @@ export class AgentService {
           break;
         }
 
-        for (const call of toolCalls) {
+        for (const [seq, call] of toolCalls.entries()) {
           if (call.type !== 'toolCall') continue;
           const result = await this.executeTool(
             call.name,
@@ -271,22 +266,25 @@ export class AgentService {
             }),
           });
 
+          const resultText = result.ok ? JSON.stringify(result.data) : result.error;
           const toolResultMsg: ToolResultMessage = {
             role: 'toolResult' as const,
             toolCallId: call.id,
             toolName: call.name,
-            content: [
-              {
-                type: 'text' as const,
-                text: result.ok ? JSON.stringify(result.data) : result.error,
-              },
-            ],
+            content: [{ type: 'text' as const, text: resultText }],
             isError: !result.ok,
             timestamp: Date.now(),
           };
 
           context.messages.push(toolResultMsg);
-          await this.saveToolResult(conversationId, toolResultMsg);
+          await this.saveToolCall(conversationId, assistantId, {
+            toolCallId: call.id,
+            toolName: call.name,
+            seq,
+            arguments: call.arguments,
+            result: resultText,
+            isError: !result.ok,
+          });
         }
       }
 
@@ -312,16 +310,16 @@ export class AgentService {
   private async saveAssistantMessage(
     conversationId: string,
     finalMessage: AssistantMessage,
-    fullText: string,
-  ): Promise<void> {
-    await this.convMessages.saveAssistant(conversationId, finalMessage, fullText);
+  ): Promise<string> {
+    return this.convMessages.saveAssistant(conversationId, finalMessage);
   }
 
-  private async saveToolResult(
+  private async saveToolCall(
     conversationId: string,
-    toolResultMsg: ToolResultMessage,
+    assistantId: string,
+    rec: ToolExecutionRecord,
   ): Promise<void> {
-    await this.convMessages.saveToolResult(conversationId, toolResultMsg);
+    await this.convMessages.saveToolCall(conversationId, assistantId, rec);
   }
 
   private async finalizeLoop(

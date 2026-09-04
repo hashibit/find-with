@@ -66,29 +66,31 @@ describe('POST /api/v1/conversations', () => {
 
   it('GET /api/v1/conversations/:id decrypts message text and hides ciphertext', async () => {
     if (!conversationId) return;
-    // Write through the same path the agent loop uses: plaintext only in
-    // encryptedText, text left null. Covers the side-panel restore flow, where
-    // user bubbles previously came back empty.
+    // Write through the same path the agent loop uses: plaintext only inside
+    // the encrypted columns. Covers the side-panel restore flow.
     const convMessages = app.get(ConvMessageRepository);
     await convMessages.saveUser(conversationId, 'hello from the user');
-    await convMessages.saveAssistant(
-      conversationId,
-      { role: 'assistant', content: [{ type: 'text', text: 'hi, how can I help' }], timestamp: Date.now() } as never,
-      'hi, how can I help',
-    );
+    await convMessages.saveAssistant(conversationId, {
+      role: 'assistant',
+      content: [{ type: 'text', text: 'hi, how can I help' }],
+      timestamp: Date.now(),
+    } as never);
 
     const res = await request(app.getHttpServer())
       .get(`/api/v1/conversations/${conversationId}`)
       .set(AUTH);
     expect(res.status).toBe(200);
 
-    const messages = res.body.messages as Array<{ role: string; text?: string | null; encryptedText?: unknown }>;
+    const messages = res.body.messages as Array<{ role: string; text?: string | null; encryptedText?: unknown; encryptedThinking?: unknown; metadata?: unknown }>;
     const user = messages.find((m) => m.role === 'USER');
     const assistant = messages.find((m) => m.role === 'ASSISTANT');
     expect(user?.text).toBe('hello from the user');
     expect(assistant?.text).toBe('hi, how can I help');
     for (const m of messages) {
       expect(m).not.toHaveProperty('encryptedText');
+      expect(m).not.toHaveProperty('encryptedThinking');
+      expect(m).not.toHaveProperty('metadata');
+      expect(m).not.toHaveProperty('payload');
     }
   });
 

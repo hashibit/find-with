@@ -1,14 +1,13 @@
 import { create } from 'zustand';
 import { runtimeCall, runtimeStream } from '../../lib/runtime';
 
-/** Shape of a message as returned by the backend GET /conversations/:id endpoint. */
+/** Shape of a message as returned by the backend GET /conversations/:id endpoint.
+ *  The backend decrypts chat text server-side; no ciphertext or tool plumbing
+ *  crosses the wire. */
 interface BackendMessage {
   role: 'USER' | 'ASSISTANT';
   createdAt: string;
   text?: string;
-  payload?: {
-    content?: Array<{ type: string; text?: string }>;
-  };
 }
 
 export interface ConversationMessage {
@@ -225,13 +224,7 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
       }
       const messages: ConversationMessage[] = (result.messages as BackendMessage[]).map((m) => ({
         role: m.role === 'USER' ? 'user' : 'assistant',
-        text:
-          m.text ||
-          m.payload?.content
-            ?.filter((b) => b.type === 'text')
-            .map((b) => b.text ?? '')
-            .join('') ||
-          '',
+        text: m.text ?? '',
         timestamp: new Date(m.createdAt).getTime(),
       }));
       set({

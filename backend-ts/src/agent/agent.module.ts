@@ -18,6 +18,7 @@ import { RecomputeMatchTool } from './tools/recompute-match.tool.js';
 import { GetProfileTool } from './tools/get-profile.tool.js';
 import { JobMatchResult } from '../database/entities/jobs/match-result.entity.js';
 import { ConvMessage } from '../database/entities/conversation/message.entity.js';
+import { ConvToolCall } from '../database/entities/conversation/tool-call.entity.js';
 import { ConvConversation } from '../database/entities/conversation/conversation.entity.js';
 import { ConvRollingSummary } from '../database/entities/conversation/rolling-summary.entity.js';
 import { UserGoalMemory } from '../database/entities/memory/user-goal-memory.entity.js';
@@ -63,6 +64,7 @@ const TOOL_EXECUTORS_LIST = [
     BullModule.registerQueue({ name: MEMORY_QUEUE }),
     TypeOrmModule.forFeature([
       ConvMessage,
+      ConvToolCall,
       ConvConversation,
       ConvRollingSummary,
       ProfileProfile,

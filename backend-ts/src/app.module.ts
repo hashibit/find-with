@@ -38,6 +38,10 @@ import { type AppConfig } from './config/configuration.js';
       pinoHttp: {
         transport: process.env.NODE_ENV !== 'production' ? { target: 'pino-pretty' } : undefined,
         level: process.env.NODE_ENV !== 'production' ? 'debug' : 'info',
+        serializers: {
+          req: (req) => ({ id: req.id, method: req.method, url: req.url }),
+          res: (res) => ({ statusCode: res.statusCode }),
+        },
       },
     }),
     ThrottlerModule.forRootAsync({

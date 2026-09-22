@@ -72,8 +72,11 @@ export function runtimeStream(
       if (!token) onMessage({ type: 'SSE_ERROR', error: 'not_authenticated' });
       return;
     }
+    // Per-send idempotency key: the backend collapses SSE re-sends carrying
+    // the same messageId to the already-persisted user message.
+    const messageId = crypto.randomUUID();
     openSseStream(
-      `${API_V1}/conversations/${conversationId}/prompt?message=${encodeURIComponent(message)}`,
+      `${API_V1}/conversations/${conversationId}/prompt?message=${encodeURIComponent(message)}&messageId=${encodeURIComponent(messageId)}`,
       token,
       (event) => {
         if (!aborted) onMessage({ type: 'SSE_EVENT', data: event.data });

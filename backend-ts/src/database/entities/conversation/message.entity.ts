@@ -4,11 +4,18 @@ import { BaseEntity } from '../base.entity.js';
 /** role = conversation speaker. Tool invocations live in conv_tool_calls. */
 export type ConvMessageRole = 'USER' | 'ASSISTANT';
 
+@Index('UQ_conv_messages_client_msg', ['conversationId', 'clientMessageId'], { unique: true })
 @Entity('conv_messages')
 export class ConvMessage extends BaseEntity {
   @Index()
   @Column({ type: 'varchar', length: 26 })
   conversationId: string;
+
+  // Client-generated id (USER rows only) — send-side idempotency key. SSE
+  // re-sends of the same prompt carry the same messageId and collapse to the
+  // original row via UQ_conv_messages_client_msg. Null for ASSISTANT rows.
+  @Column({ type: 'varchar', length: 64, nullable: true })
+  clientMessageId: string | null;
 
   @Column({ type: 'varchar', length: 20 })
   role: ConvMessageRole;

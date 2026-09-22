@@ -2,7 +2,7 @@ import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger, Inject } from '@nestjs/common';
 import { Job } from 'bullmq';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Between, IsNull, Repository } from 'typeorm';
+import { Between, IsNull, MoreThan, Repository } from 'typeorm';
 import { ulid } from 'ulid';
 import { Type } from '@sinclair/typebox';
 
@@ -28,12 +28,15 @@ const GoalExtractionSchema = Type.Object({
 
 const GOAL_EXTRACTION_SYSTEM_PROMPT = `Given the conversation transcript and the user's existing preferences, extract or update job search preferences.
 
+The transcript covers only messages since the last extraction — treat it as the new evidence, not the full history.
+
 Rules:
-- Only include fields where there is clear evidence in this conversation
+- Only extract preferences with clear evidence in this transcript
 - Do NOT infer or hallucinate preferences not explicitly stated
 - dealBreakers: things user said they explicitly do not want
 - rawStatements: copy exact user phrases that reveal preferences
-- Return empty arrays for fields with no evidence`;
+- For structured fields return the full updated value based on this transcript — an empty array or null means "no new evidence" and existing values are kept, not erased
+- Lines prefixed "Quinn:" are the assistant's suggestions; count a preference as the user's only when the user states it themselves or clearly confirms it`;
 
 @Processor(MEMORY_QUEUE)
 export class MemoryProcessor extends WorkerHost {
@@ -104,28 +107,33 @@ export class MemoryProcessor extends WorkerHost {
   }
 
   private async extractPreferences(conversationId: string, userId: string): Promise<void> {
+    const existing = await this.goalMemoryRepo.findOne({ where: { userId } });
+
+    // Incremental slice: only rows past this conversation's watermark. ULIDs
+    // sort lexicographically by creation time, so id comparison is exact and
+    // unchanged history never triggers an LLM call.
+    const since = existing?.extractedUpto?.[conversationId] ?? '';
     const messages = await this.messageRepo.find({
-      where: { conversationId },
-      order: { createdAt: 'ASC' },
+      where: { conversationId, id: MoreThan(since) },
+      order: { id: 'ASC' },
       take: 60,
     });
+    if (!messages.length) return;
 
-    // USER rows carry the user's words in encryptedText — decrypt them for
-    // the transcript. A poisoned row is skipped, not fatal to the job.
-    const userTexts: string[] = [];
+    // USER and ASSISTANT rows both carry conversation content — a transcript
+    // without Quinn's lines cannot separate the user's own preferences from
+    // confirmations of Quinn's suggestions. A poisoned row is skipped, not
+    // fatal to the job.
+    const lines: string[] = [];
     for (const m of messages) {
-      if (m.role !== 'USER' || !m.encryptedText) continue;
+      if (!m.encryptedText) continue;
       try {
-        userTexts.push(await this.crypto.decrypt(m.encryptedText));
+        const text = await this.crypto.decrypt(m.encryptedText);
+        if (text.trim()) lines.push(`${m.role === 'USER' ? 'User' : 'Quinn'}: ${text}`);
       } catch (err) {
-        this.logger.warn(`Skipping undecryptable user message ${m.id}: ${err}`);
+        this.logger.warn(`Skipping undecryptable message ${m.id}: ${err}`);
       }
     }
-    const transcript = userTexts.filter(Boolean).join('\n');
-
-    if (!transcript.trim()) return;
-
-    const existing = await this.goalMemoryRepo.findOne({ where: { userId } });
 
     const existingJson = existing
       ? JSON.stringify({
@@ -139,33 +147,49 @@ export class MemoryProcessor extends WorkerHost {
         })
       : '{}';
 
-    const parsed = await this.llm.structuredComplete(
-      {
-        systemPrompt: GOAL_EXTRACTION_SYSTEM_PROMPT,
-        messages: [
+    const parsed = lines.length
+      ? await this.llm.structuredComplete(
           {
-            role: 'user',
-            content: `Existing preferences: ${existingJson}\n\nConversation transcript:\n${transcript}`,
-            timestamp: Date.now(),
+            systemPrompt: GOAL_EXTRACTION_SYSTEM_PROMPT,
+            messages: [
+              {
+                role: 'user',
+                content: `Existing preferences: ${existingJson}\n\nConversation transcript:\n${lines.join('\n')}`,
+                timestamp: Date.now(),
+              },
+            ],
           },
-        ],
-      },
-      GoalExtractionSchema,
-    );
+          GoalExtractionSchema,
+        )
+      : null;
 
+    // Structured fields: the model returns the full updated value for the new
+    // slice — overwrite when present, keep the accumulated value otherwise.
+    // Empty array / null / "" mean "no new evidence", not "erase".
+    // rawStatements keeps union semantics: it accumulates exact user phrases
+    // across slices.
     const merged = {
       userId,
-      targetRoles: mergeStringArray(existing?.targetRoles, parsed.targetRoles),
-      targetIndustries: mergeStringArray(existing?.targetIndustries, parsed.targetIndustries),
-      locationPrefs: mergeStringArray(existing?.locationPrefs, parsed.locationPrefs),
-      dealBreakers: mergeStringArray(existing?.dealBreakers, parsed.dealBreakers),
-      preferredStages: mergeStringArray(existing?.preferredStages, parsed.preferredStages),
-      salaryFloorUsd: parsed.salaryFloorUsd ?? existing?.salaryFloorUsd ?? null,
-      shortTermGoal: parsed.shortTermGoal ?? existing?.shortTermGoal ?? null,
-      rawStatements: mergeStringArray(existing?.rawStatements, parsed.rawStatements),
+      targetRoles: overwriteArr(existing?.targetRoles, parsed?.targetRoles),
+      targetIndustries: overwriteArr(existing?.targetIndustries, parsed?.targetIndustries),
+      locationPrefs: overwriteArr(existing?.locationPrefs, parsed?.locationPrefs),
+      dealBreakers: overwriteArr(existing?.dealBreakers, parsed?.dealBreakers),
+      preferredStages: overwriteArr(existing?.preferredStages, parsed?.preferredStages),
+      salaryFloorUsd: parsed?.salaryFloorUsd ?? existing?.salaryFloorUsd ?? null,
+      shortTermGoal: parsed?.shortTermGoal || existing?.shortTermGoal || null,
+      rawStatements: mergeStringArray(existing?.rawStatements, parsed?.rawStatements),
     };
 
-    await this.goalMemoryRepo.upsert(merged as UserGoalMemory, ['userId']);
+    await this.goalMemoryRepo.upsert(
+      {
+        ...merged,
+        extractedUpto: {
+          ...(existing?.extractedUpto ?? {}),
+          [conversationId]: messages[messages.length - 1].id,
+        },
+      } as UserGoalMemory,
+      ['userId'],
+    );
     this.logger.log(`Goal memory updated for user ${userId}`);
   }
 
@@ -195,6 +219,10 @@ export class MemoryProcessor extends WorkerHost {
       }
     }
   }
+}
+
+function overwriteArr(current: string[] | undefined, incoming: unknown): string[] {
+  return Array.isArray(incoming) && incoming.length ? (incoming as string[]) : (current ?? []);
 }
 
 function mergeStringArray(existing: string[] | undefined, incoming: unknown): string[] {

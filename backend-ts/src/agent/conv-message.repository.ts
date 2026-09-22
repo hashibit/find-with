@@ -66,11 +66,34 @@ export class ConvMessageRepository {
     @InjectPinoLogger(ConvMessageRepository.name) private readonly logger: PinoLogger,
   ) {}
 
-  async saveUser(conversationId: string, plainText: string): Promise<void> {
+  /**
+   * Persist a user message. With clientMessageId the insert is idempotent per
+   * (conversationId, clientMessageId): SSE re-sends of the same prompt
+   * collapse to the original row. Returns true when a new row was inserted.
+   */
+  async saveUser(
+    conversationId: string,
+    plainText: string,
+    clientMessageId?: string,
+  ): Promise<boolean> {
     const encryptedText = await this.crypto.encrypt(plainText);
-    await this.repo.save(
-      this.repo.create({ id: ulid(), conversationId, role: 'USER', encryptedText }),
-    );
+    // orIgnore → ON CONFLICT DO NOTHING; RETURNING id makes the duplicate case
+    // distinguishable (conflict yields no returned row).
+    const result = await this.repo
+      .createQueryBuilder()
+      .insert()
+      .into(ConvMessage)
+      .values({
+        id: ulid(),
+        conversationId,
+        role: 'USER',
+        encryptedText,
+        clientMessageId: clientMessageId ?? null,
+      })
+      .orIgnore(true)
+      .returning('id')
+      .execute();
+    return (result.raw as Array<{ id: string }>).length > 0;
   }
 
   /**

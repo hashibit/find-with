@@ -29,6 +29,12 @@ export class UserGoalMemory {
   @Column({ type: 'jsonb', default: [] })
   rawStatements: string[];
 
+  // Per-conversation extraction watermark: ULID of the last conv_messages row
+  // fed into preference extraction. ULIDs sort lexicographically by creation
+  // time, so `id > watermark` selects exactly the not-yet-extracted slice.
+  @Column({ type: 'jsonb', default: {} })
+  extractedUpto: Record<string, string>;
+
   @UpdateDateColumn({ type: 'timestamptz' })
   updatedAt: Date;
 }

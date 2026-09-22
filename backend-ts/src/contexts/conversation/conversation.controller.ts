@@ -65,9 +65,12 @@ export class ConversationController {
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
     @Query('message') message: string,
+    // Client-generated idempotency key — SSE re-sends of the same URL carry
+    // the same messageId and collapse to the already-persisted user message.
+    @Query('messageId') messageId?: string,
   ): Observable<MessageEvent> {
     return this.agent
-      .respond(id, user.userId, message)
+      .respond(id, user.userId, message, undefined, undefined, messageId)
       .pipe(map((evt) => ({ data: evt.data }) as MessageEvent));
   }
 }

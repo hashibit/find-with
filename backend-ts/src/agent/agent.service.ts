@@ -146,6 +146,7 @@ export class AgentService {
     userMessage: string,
     conversationKind?: string | null,
     anchorId?: string | null,
+    clientMessageId?: string | null,
   ): Observable<AgentSseEvent> {
     if (userMessage.length > AgentService.MAX_USER_MESSAGE) {
       throw new BadRequestException(`Message exceeds ${AgentService.MAX_USER_MESSAGE} characters`);
@@ -157,6 +158,7 @@ export class AgentService {
       userMessage,
       conversationKind: conversationKind ?? null,
       anchorId,
+      clientMessageId: clientMessageId ?? null,
     });
     return subject.asObservable();
   }
@@ -169,6 +171,7 @@ export class AgentService {
       userMessage: string;
       conversationKind: string | null;
       anchorId?: string | null;
+      clientMessageId?: string | null;
     },
   ): Promise<void> {
     const { conversationId, userId, userMessage } = opts;
@@ -180,8 +183,22 @@ export class AgentService {
     const toolCtx: ToolContext = { userId, conversationId };
 
     try {
-      // 1. Persist user message
-      await this.saveUserMessage(conversationId, userMessage);
+      // 1. Persist user message — a duplicate clientMessageId (SSE re-send of
+      // the same prompt) means this turn already ran and its response is in
+      // conv_messages. Skip the loop; the stream just ends.
+      const inserted = await this.saveUserMessage(
+        conversationId,
+        userMessage,
+        opts.clientMessageId ?? undefined,
+      );
+      if (!inserted) {
+        this.logger.warn(
+          `Duplicate prompt (clientMessageId already persisted) in conversation ${conversationId} — skipping loop`,
+        );
+        subject.next({ data: JSON.stringify({ kind: 'done', promptTokens: 0, completionTokens: 0 }) });
+        subject.complete();
+        return;
+      }
 
       // 2. Build pi-ai Context (system prompt + history)
       const context: Context = await this.contextBuilder.build(
@@ -303,8 +320,12 @@ export class AgentService {
     }
   }
 
-  private async saveUserMessage(conversationId: string, userMessage: string): Promise<void> {
-    await this.convMessages.saveUser(conversationId, userMessage);
+  private async saveUserMessage(
+    conversationId: string,
+    userMessage: string,
+    clientMessageId?: string,
+  ): Promise<boolean> {
+    return this.convMessages.saveUser(conversationId, userMessage, clientMessageId);
   }
 
   private async saveAssistantMessage(

@@ -192,12 +192,22 @@ export class AgentService {
         opts.clientMessageId ?? undefined,
       );
       if (!inserted) {
-        this.logger.warn(
-          `Duplicate prompt (clientMessageId already persisted) in conversation ${conversationId} — skipping loop`,
-        );
-        subject.next({ data: JSON.stringify({ kind: 'done', promptTokens: 0, completionTokens: 0 }) });
-        subject.complete();
-        return;
+        // A client retry is only a completed turn when an assistant row exists.
+        // The user row is intentionally written before the provider call, so a
+        // provider failure must remain retryable.
+        const completed = opts.clientMessageId
+          ? await this.convMessages.isTurnCompleted(conversationId, opts.clientMessageId)
+          : true;
+        if (completed) {
+          this.logger.warn(
+            `Duplicate completed prompt (clientMessageId already processed) in conversation ${conversationId} — skipping loop`,
+          );
+          subject.next({
+            data: JSON.stringify({ kind: 'done', promptTokens: 0, completionTokens: 0 }),
+          });
+          subject.complete();
+          return;
+        }
       }
 
       // 2. Build pi-ai Context (system prompt + history)
@@ -212,7 +222,11 @@ export class AgentService {
       context.tools = this.toolRegistry.getToolsForScene(resolveScene(conversationKind));
 
       // Add the current user turn
-      context.messages.push({ role: 'user', content: userMessage, timestamp: Date.now() });
+      // If the user row was already persisted by a failed attempt, it is
+      // already present in the replay context. Do not append it twice.
+      if (inserted) {
+        context.messages.push({ role: 'user', content: userMessage, timestamp: Date.now() });
+      }
 
       let promptTokens = 0;
       let completionTokens = 0;
@@ -267,12 +281,7 @@ export class AgentService {
 
         for (const [seq, call] of toolCalls.entries()) {
           if (call.type !== 'toolCall') continue;
-          const result = await this.executeTool(
-            call.name,
-            this.validateToolArgs(call.name, call.arguments),
-            call.id,
-            toolCtx,
-          );
+          const result = await this.executeTool(call.name, call.arguments, call.id, toolCtx);
           subject.next({
             data: JSON.stringify({
               kind: 'tool_result',
@@ -377,7 +386,7 @@ export class AgentService {
 
   private async executeTool(
     toolName: string,
-    args: Record<string, unknown>,
+    args: unknown,
     callId: string,
     ctx: ToolContext,
   ): Promise<{ ok: boolean; data: Record<string, unknown>; error: string }> {
@@ -385,8 +394,26 @@ export class AgentService {
     if (!executor) return { ok: false, data: {}, error: `Unknown tool: ${toolName}` };
 
     try {
+      const previous = await this.convMessages.findToolResult(ctx.conversationId, callId);
+      if (previous) {
+        if (previous.isError) return { ok: false, data: {}, error: previous.result };
+        try {
+          return {
+            ok: true,
+            data: JSON.parse(previous.result) as Record<string, unknown>,
+            error: '',
+          };
+        } catch {
+          return { ok: true, data: { text: previous.result }, error: '' };
+        }
+      }
+      const validArgs = this.toolRegistry.validateArguments(toolName, args);
       // Execute with 90s timeout
-      const result = await doWithTimeout(executor.execute(callId, args, ctx), 90_000, toolName);
+      const result = await doWithTimeout(
+        executor.execute(callId, validArgs, ctx),
+        90_000,
+        toolName,
+      );
       // const result = await Promise.race([
       //   executor.execute(callId, args, ctx),
       //   new Promise<never>((_, reject) =>
@@ -429,14 +456,6 @@ export class AgentService {
 
       return errorResult;
     }
-  }
-
-  /** Validate tool args against required parameter keys before execution. */
-  private validateToolArgs(toolName: string, args: unknown): Record<string, unknown> {
-    if (typeof args !== 'object' || args === null || Array.isArray(args)) {
-      throw new BadRequestException(`Tool '${toolName}' received non-object arguments`);
-    }
-    return args as Record<string, unknown>;
   }
 
   private shouldFailover(): boolean {

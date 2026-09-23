@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { MoreThan, Repository } from 'typeorm';
 import { ulid } from 'ulid';
 import { PinoLogger, InjectPinoLogger } from 'nestjs-pino';
 import type {
@@ -22,6 +22,11 @@ export interface ToolExecutionRecord {
   toolName: string;
   seq: number;
   arguments: Record<string, unknown>;
+  result: string;
+  isError: boolean;
+}
+
+export interface PersistedToolResult {
   result: string;
   isError: boolean;
 }
@@ -96,6 +101,22 @@ export class ConvMessageRepository {
     return (result.raw as Array<{ id: string }>).length > 0;
   }
 
+  /** A send-side idempotency key is complete only after an assistant response exists. */
+  async isTurnCompleted(conversationId: string, clientMessageId: string): Promise<boolean> {
+    const user = await this.repo.findOne({
+      where: { conversationId, clientMessageId, role: 'USER' },
+      select: ['id', 'createdAt'],
+    });
+    if (!user) return false;
+
+    const assistant = await this.repo.findOne({
+      where: { conversationId, role: 'ASSISTANT', createdAt: MoreThan(user.createdAt) },
+      order: { createdAt: 'ASC' },
+      select: ['id', 'createdAt'],
+    });
+    return Boolean(assistant && assistant.createdAt > user.createdAt);
+  }
+
   /**
    * Persist one assistant turn: text + thinking encrypted on the row,
    * non-sensitive metadata extracted for debugging. Tool calls are persisted
@@ -162,6 +183,17 @@ export class ConvMessageRepository {
         isError: rec.isError,
       }),
     );
+  }
+
+  /** Return a previously persisted result so a retried model turn is side-effect free. */
+  async findToolResult(
+    conversationId: string,
+    toolCallId: string,
+  ): Promise<PersistedToolResult | null> {
+    const row = await this.toolCallRepo.findOne({ where: { conversationId, toolCallId } });
+    if (!row) return null;
+    const result = await this.decryptText(row.encryptedResult);
+    return result === null ? null : { result, isError: row.isError };
   }
 
   /**
@@ -296,9 +328,7 @@ export class ConvMessageRepository {
     try {
       return await this.crypto.decrypt(blob);
     } catch (err) {
-      this.logger.warn(
-        `conv_messages: dropping undecryptable content — ${(err as Error).message}`,
-      );
+      this.logger.warn(`conv_messages: dropping undecryptable content — ${(err as Error).message}`);
       return null;
     }
   }

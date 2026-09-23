@@ -1,6 +1,12 @@
 // FILE: test/unit/agent/tool-registry.spec.ts
 import { describe, it, expect } from 'vitest';
-import { ToolRegistry, resolveScene, type ToolExecutor, type Scene } from '../../../src/agent/tool-registry.js';
+import {
+  ToolRegistry,
+  resolveScene,
+  type ToolExecutor,
+  type Scene,
+} from '../../../src/agent/tool-registry.js';
+import { Type } from '@sinclair/typebox';
 
 function makeTool(name: string, scenes: readonly Scene[]): ToolExecutor {
   return {
@@ -25,7 +31,14 @@ function buildRegistry() {
 
 describe('resolveScene', () => {
   it('maps every known kind to itself', () => {
-    for (const kind of ['FREE_CHAT', 'ONBOARDING', 'JOB_ANALYSIS', 'GAP_MINING', 'TAILOR_EDIT', 'FOLLOWUP']) {
+    for (const kind of [
+      'FREE_CHAT',
+      'ONBOARDING',
+      'JOB_ANALYSIS',
+      'GAP_MINING',
+      'TAILOR_EDIT',
+      'FOLLOWUP',
+    ]) {
       expect(resolveScene(kind)).toBe(kind);
     }
   });
@@ -59,7 +72,14 @@ describe('ToolRegistry.getToolsForScene', () => {
 
   it("exposes 'ALL' tools in every scene", () => {
     const { registry } = buildRegistry();
-    for (const scene of ['FREE_CHAT', 'ONBOARDING', 'GAP_MINING', 'TAILOR_EDIT', 'FOLLOWUP', 'JOB_ANALYSIS'] as const) {
+    for (const scene of [
+      'FREE_CHAT',
+      'ONBOARDING',
+      'GAP_MINING',
+      'TAILOR_EDIT',
+      'FOLLOWUP',
+      'JOB_ANALYSIS',
+    ] as const) {
       const names = registry.getToolsForScene(scene).map((t) => t.name);
       expect(names).toContain('density');
       expect(names).toContain('get_profile');
@@ -80,5 +100,31 @@ describe('ToolRegistry.getToolsForScene', () => {
       description: 'draft_reply description',
       parameters: { type: 'object' },
     });
+  });
+});
+
+describe('ToolRegistry.validateArguments', () => {
+  it('accepts arguments that satisfy the exposed TypeBox schema', () => {
+    const registry = new ToolRegistry([
+      {
+        ...makeTool('search', ['JOB_ANALYSIS']),
+        parameters: Type.Object({ company: Type.String() }),
+      },
+    ]);
+
+    expect(registry.validateArguments('search', { company: 'Acme' })).toEqual({ company: 'Acme' });
+  });
+
+  it('rejects malformed model arguments before executor invocation', () => {
+    const registry = new ToolRegistry([
+      {
+        ...makeTool('search', ['JOB_ANALYSIS']),
+        parameters: Type.Object({ company: Type.String() }),
+      },
+    ]);
+
+    expect(() => registry.validateArguments('search', { company: 42 })).toThrow(
+      "Invalid arguments for tool 'search'",
+    );
   });
 });

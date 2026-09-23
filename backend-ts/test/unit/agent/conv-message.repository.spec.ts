@@ -25,6 +25,36 @@ function makeRepo() {
 
   const messageRepo = {
     create: vi.fn().mockImplementation((data: ConvMessage) => data),
+    createQueryBuilder: vi.fn().mockImplementation(() => {
+      let values: ConvMessage;
+      return {
+        insert: () => ({
+          into: () => ({
+            values: (data: ConvMessage) => {
+              values = data;
+              return {
+                orIgnore: () => ({
+                  returning: () => ({
+                    execute: async () => {
+                      const duplicate = messages.some(
+                        (m) =>
+                          m.conversationId === values.conversationId &&
+                          values.clientMessageId !== null &&
+                          m.clientMessageId === values.clientMessageId,
+                      );
+                      if (duplicate) return { raw: [] };
+                      values.createdAt = new Date(T0 + clock++);
+                      messages.push(values);
+                      return { raw: [{ id: values.id }] };
+                    },
+                  }),
+                }),
+              };
+            },
+          }),
+        }),
+      };
+    }),
     save: vi.fn().mockImplementation(async (data: ConvMessage) => {
       // Backfill what the DB would (createdAt + id ordering).
       data.createdAt = new Date(T0 + clock++);
@@ -85,7 +115,12 @@ describe('ConvMessageRepository', () => {
       assistantMessage([
         { type: 'thinking', thinking: 'let me look that up', thinkingSignature: 'sig123' },
         { type: 'text', text: 'Checking the company now.' },
-        { type: 'toolCall', id: 'call_1', name: 'search_company_info', arguments: { company: 'Stripe' } },
+        {
+          type: 'toolCall',
+          id: 'call_1',
+          name: 'search_company_info',
+          arguments: { company: 'Stripe' },
+        },
       ]),
     );
     await repo.saveToolCall(CONV, assistantId, {
@@ -151,7 +186,12 @@ describe('ConvMessageRepository', () => {
       CONV,
       assistantMessage([
         { type: 'text', text: 'turn text' },
-        { type: 'toolCall', id: 'call_1', name: 'search_company_info', arguments: { company: 'Stripe' } },
+        {
+          type: 'toolCall',
+          id: 'call_1',
+          name: 'search_company_info',
+          arguments: { company: 'Stripe' },
+        },
       ]),
     );
     await repo.saveToolCall(CONV, assistantId, {
@@ -187,10 +227,7 @@ describe('ConvMessageRepository', () => {
   it('stores non-sensitive metadata and omits absent optional fields', async () => {
     const { repo, messages } = makeRepo();
 
-    await repo.saveAssistant(
-      CONV,
-      assistantMessage([{ type: 'text', text: 'plain answer' }]),
-    );
+    await repo.saveAssistant(CONV, assistantMessage([{ type: 'text', text: 'plain answer' }]));
 
     expect(messages[0]!.metadata).toEqual({
       provider: 'anthropic',

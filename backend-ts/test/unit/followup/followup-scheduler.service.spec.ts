@@ -171,7 +171,9 @@ describe('FollowupSchedulerService', () => {
 
       const savedMsg = messageRepo.save.mock.calls[0][0];
       expect(savedMsg.role).toBe('ASSISTANT');
-      expect((savedMsg.payload as any).content[0].text).toContain('Senior PM at Acme');
+      expect(savedMsg.encryptedText).toEqual(Buffer.from('encrypted'));
+      expect(savedMsg).not.toHaveProperty('payload');
+      expect(savedMsg).not.toHaveProperty('text');
     });
   });
 

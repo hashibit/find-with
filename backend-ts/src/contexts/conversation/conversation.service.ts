@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, ForbiddenException, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import { ConvConversation } from '../../database/entities/conversation/conversation.entity.js';
 import { ConvMessage } from '../../database/entities/conversation/message.entity.js';
 import { FIELD_CRYPTO, type FieldCrypto } from '../../common/crypto/crypto.interface.js';
@@ -12,7 +12,6 @@ export interface ConversationMessageView {
   conversationId: string;
   role: string;
   text: string | null;
-  payload: unknown | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -48,23 +47,22 @@ export class ConversationService {
     if (conv.userId !== userId) throw new ForbiddenException();
 
     // Display view: chat turns with decrypted text, so clients can restore the
-    // transcript (text is null on write; plaintext only lives in encryptedText).
-    // TOOL_RESULT rows are agent-internal plumbing, not chat turns, and
-    // encryptedText is ciphertext — neither belongs in the response.
+    // transcript. role is a speaker (USER | ASSISTANT) — every row is a chat
+    // turn; encrypted columns and metadata never leave the backend.
     const rows = await this.messageRepo.find({
-      where: { conversationId: id, role: In(['USER', 'ASSISTANT']) },
+      where: { conversationId: id },
       order: { createdAt: 'ASC' },
     });
 
     const messages = await Promise.all(
-      rows.map(async (m) => {
-        if (m.encryptedText) {
-          m.text = await this.crypto.decrypt(m.encryptedText);
-        }
-        const { encryptedText, ...rest } = m;
-        void encryptedText;
-        return rest;
-      }),
+      rows.map(async (m) => ({
+        id: m.id,
+        conversationId: m.conversationId,
+        role: m.role,
+        text: m.encryptedText ? await this.crypto.decrypt(m.encryptedText) : null,
+        createdAt: m.createdAt,
+        updatedAt: m.updatedAt,
+      })),
     );
 
     return { conversation: conv, messages };

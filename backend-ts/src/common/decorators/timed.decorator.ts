@@ -30,15 +30,17 @@ export function Timed(options: TimedOptions | string = {}): MethodDecorator {
       const startedAt = Date.now();
       const uuid = randomUUID().slice(0, 8);
       const desc = describe ? ` ${describe(args)}` : '';
-      const context = `${name}-${uuid}${desc}`;
+      const ctx = `${name}-${uuid}${desc}`;
       try {
-        logger.log(`${context} start...`);
+        logger.log(`${ctx} start...`);
+        logger.debug({ ctx, args });
         const result = await original.apply(this, args);
-        logger.log(`${context} took ${Date.now() - startedAt}ms`);
+        logger.log(`${ctx} took ${Date.now() - startedAt}ms`);
+        logger.debug({ ctx, result });
         return result;
       } catch (err) {
         logger.error(
-          `${context} failed after ${Date.now() - startedAt}ms: ${
+          `${ctx} failed after ${Date.now() - startedAt}ms: ${
             err instanceof Error ? err.message : String(err)
           }`,
         );

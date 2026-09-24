@@ -28,7 +28,7 @@ export class FarewellTool implements ToolExecutor {
   readonly name = FAREWELL_TOOL_NAME;
   readonly scenes = ['FREE_CHAT', 'OFFER_ACCEPTED'] as const;
   readonly description =
-    "Generate a farewell message and job search recap when the user accepts an offer. Call when status transitions to OFFER_ACCEPTED.";
+    'Generate a farewell message and job search recap when the user accepts an offer. Call when status transitions to OFFER_ACCEPTED.';
   readonly parameters = Type.Object({
     radar_item_id: Type.String({ description: 'The radar item ID of the accepted offer' }),
   });
@@ -53,7 +53,10 @@ export class FarewellTool implements ToolExecutor {
       order: { createdAt: 'ASC' },
     });
 
-    const topMaterials = materials.slice(0, 5).map((m) => m.shiningText ?? '').filter(Boolean);
+    const topMaterials = materials
+      .slice(0, 5)
+      .map((m) => m.shiningText ?? '')
+      .filter(Boolean);
 
     const prompt = `${PROMPTS.farewell_recap_v1}
 
@@ -85,11 +88,15 @@ Generate a warm farewell and structured recap.`;
     }
 
     // Mark the accepted radar item
-    await this.radarRepo.update({ id: params.radar_item_id }, { status: 'OFFER_ACCEPTED' });
+    await this.radarRepo.update({ id: params.radar_item_id, userId }, { status: 'OFFER_ACCEPTED' });
 
     return {
       content: [{ type: 'text', text: `${farewell}\n\n---\n\n${recap}` }],
-      details: { farewellMessage: farewell, recapMarkdown: recap, stats: { applied, interviewed, offers } },
+      details: {
+        farewellMessage: farewell,
+        recapMarkdown: recap,
+        stats: { applied, interviewed, offers },
+      },
     };
   }
 }

@@ -58,7 +58,11 @@ export class LlmService implements LlmProvider {
   }
 
   /** Stream with a specific model. Used by AgentService. */
-  streamContextWithModel(model: Model<Api>, context: Context): ReturnType<typeof stream> {
+  streamContextWithModel(
+    model: Model<Api>,
+    context: Context,
+    signal?: AbortSignal,
+  ): ReturnType<typeof stream> {
     // Build options with apiKey based on provider
     const options: Record<string, unknown> = {};
 
@@ -70,7 +74,7 @@ export class LlmService implements LlmProvider {
       options.apiKey = this.openrouterApiKey;
     }
 
-    return stream(model, context, options);
+    return stream(model, context, { ...options, signal });
   }
 
   /** Legacy method - kept for compatibility. Returns a pi-ai stream. */

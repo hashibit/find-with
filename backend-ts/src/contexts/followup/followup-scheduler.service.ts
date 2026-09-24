@@ -109,13 +109,7 @@ export class FollowupSchedulerService {
         id: ulid(),
         conversationId: conv.id,
         role: 'ASSISTANT',
-        text: null,
         encryptedText: encrypted,
-        payload: {
-          role: 'assistant',
-          content: [{ type: 'text', text: nudgeText }],
-          timestamp: Date.now(),
-        },
       }),
     );
 

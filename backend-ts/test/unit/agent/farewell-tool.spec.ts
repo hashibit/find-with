@@ -36,7 +36,7 @@ describe('FarewellTool', () => {
       await tool.execute('tc_01', params, ctx);
 
       expect(radarRepo.update).toHaveBeenCalledWith(
-        { id: 'r_01' },
+        { id: 'r_01', userId: 'u_01' },
         { status: 'OFFER_ACCEPTED' },
       );
     });

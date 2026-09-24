@@ -48,7 +48,9 @@ export class RecomputeMatchTool implements ToolExecutor {
 
     if (!radarItem.parsedJdId) {
       return {
-        content: [{ type: 'text', text: 'Radar item has no parsed JD yet. Analysis may still be pending.' }],
+        content: [
+          { type: 'text', text: 'Radar item has no parsed JD yet. Analysis may still be pending.' },
+        ],
         details: { error: 'no_parsed_jd' },
       };
     }
@@ -61,7 +63,9 @@ export class RecomputeMatchTool implements ToolExecutor {
       };
     }
 
-    const matchResult = await this.matchRepo.findOne({ where: { parsedJdId: radarItem.parsedJdId } });
+    const matchResult = await this.matchRepo.findOne({
+      where: { parsedJdId: radarItem.parsedJdId, userId },
+    });
     if (!matchResult) {
       return {
         content: [{ type: 'text', text: 'No match result found for this radar item.' }],
@@ -93,7 +97,9 @@ export class RecomputeMatchTool implements ToolExecutor {
       }
 
       const topMaterialTexts = ranked
-        .map((r) => ((r.material.shiningText ?? '') + ' ' + (r.material.tags ?? []).join(' ')).toLowerCase())
+        .map((r) =>
+          ((r.material.shiningText ?? '') + ' ' + (r.material.tags ?? []).join(' ')).toLowerCase(),
+        )
         .join(' ');
       deepHits = hardSkills.filter((s) => topMaterialTexts.includes(s.toLowerCase()));
     } else {
@@ -105,10 +111,7 @@ export class RecomputeMatchTool implements ToolExecutor {
       deepHits = hardSkills.filter((s) => materialTexts.includes(s.toLowerCase()));
       deepScore =
         hardSkills.length > 0
-          ? (Math.max(
-              (existingSurfaceScore / 100) * hardSkills.length,
-              deepHits.length,
-            ) /
+          ? (Math.max((existingSurfaceScore / 100) * hardSkills.length, deepHits.length) /
               hardSkills.length) *
             100
           : 0;
@@ -116,7 +119,7 @@ export class RecomputeMatchTool implements ToolExecutor {
     }
 
     const gaps = hardSkills.filter(
-      (s) => !deepHits.includes(s) && !(matchResult.hitsSurface as string[] ?? []).includes(s),
+      (s) => !deepHits.includes(s) && !((matchResult.hitsSurface as string[]) ?? []).includes(s),
     );
 
     matchResult.deepScore = deepScore;

@@ -11,7 +11,7 @@ function buildTool() {
   return { tool, repo };
 }
 
-const ctx = { conversationId: 'conv_01' };
+const ctx = { conversationId: 'conv_01', userId: 'u_01' };
 
 describe('SetConversationDensityTool', () => {
   describe('execute', () => {
@@ -21,7 +21,7 @@ describe('SetConversationDensityTool', () => {
       await tool.execute('tc_01', { density: 'ENGAGED', reason: 'user asked' }, ctx);
 
       expect(repo.update).toHaveBeenCalledWith(
-        { id: 'conv_01' },
+        { id: 'conv_01', userId: 'u_01' },
         { effectiveDensity: 'ENGAGED' },
       );
     });
@@ -40,7 +40,7 @@ describe('SetConversationDensityTool', () => {
       await tool.execute('tc_01', { density: 'BALANCED', reason: 'default' }, ctx);
 
       expect(repo.update).toHaveBeenCalledWith(
-        { id: 'conv_01' },
+        { id: 'conv_01', userId: 'u_01' },
         { effectiveDensity: 'BALANCED' },
       );
     });
@@ -51,7 +51,7 @@ describe('SetConversationDensityTool', () => {
       await tool.execute('tc_01', { density: 'QUIET', reason: 'do not disturb' }, ctx);
 
       expect(repo.update).toHaveBeenCalledWith(
-        { id: 'conv_01' },
+        { id: 'conv_01', userId: 'u_01' },
         { effectiveDensity: 'QUIET' },
       );
     });
@@ -59,7 +59,11 @@ describe('SetConversationDensityTool', () => {
     it('result.content[0].text contains "minimal" for QUIET', async () => {
       const { tool } = buildTool();
 
-      const result = await tool.execute('tc_01', { density: 'QUIET', reason: 'do not disturb' }, ctx);
+      const result = await tool.execute(
+        'tc_01',
+        { density: 'QUIET', reason: 'do not disturb' },
+        ctx,
+      );
 
       expect(result.content[0].text.toLowerCase()).toContain('minimal');
     });
@@ -76,10 +80,14 @@ describe('SetConversationDensityTool', () => {
     it('repo.update uses conversationId from context', async () => {
       const { tool, repo } = buildTool();
 
-      await tool.execute('tc_01', { density: 'QUIET', reason: 'test' }, { conversationId: 'conv_99' });
+      await tool.execute(
+        'tc_01',
+        { density: 'QUIET', reason: 'test' },
+        { conversationId: 'conv_99', userId: 'u_01' },
+      );
 
       expect(repo.update).toHaveBeenCalledWith(
-        { id: 'conv_99' },
+        { id: 'conv_99', userId: 'u_01' },
         expect.any(Object),
       );
     });

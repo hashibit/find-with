@@ -34,8 +34,11 @@ export class ClassifyEmailTool implements ToolExecutor {
   async execute(
     _toolCallId: string,
     params: { email_capture_id: string },
+    context: { userId: string },
   ): Promise<{ content: Array<{ type: 'text'; text: string }>; details: Record<string, unknown> }> {
-    const email = await this.repo.findOne({ where: { id: params.email_capture_id } });
+    const email = await this.repo.findOne({
+      where: { id: params.email_capture_id, userId: context.userId },
+    });
     if (!email) {
       return {
         content: [{ type: 'text', text: 'Email not found.' }],

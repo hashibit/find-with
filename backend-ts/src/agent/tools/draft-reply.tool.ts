@@ -44,7 +44,9 @@ export class DraftReplyTool implements ToolExecutor {
     params: { email_capture_id: string; intent: Static<typeof IntentEnum> },
     context: { userId: string },
   ): Promise<{ content: Array<{ type: 'text'; text: string }>; details: Record<string, unknown> }> {
-    const email = await this.emailRepo.findOne({ where: { id: params.email_capture_id } });
+    const email = await this.emailRepo.findOne({
+      where: { id: params.email_capture_id, userId: context.userId },
+    });
     if (!email) {
       return { content: [{ type: 'text', text: 'Email not found.' }], details: {} };
     }

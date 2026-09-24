@@ -15,6 +15,8 @@ export type SseErrorHandler = (error: Error) => void;
 
 export interface SseOptions {
   lastEventId?: string;
+  method?: 'GET' | 'POST';
+  body?: BodyInit;
   onError?: SseErrorHandler;
   /** Called fire-and-forget when an event ID is received. Background passes chrome.storage write here; dev omits it. */
   persistEventId?: (id: string) => void;
@@ -26,19 +28,22 @@ export async function openSseStream(
   onEvent: SseHandler,
   options: SseOptions = {},
 ): Promise<AbortController> {
-  const { lastEventId, onError, persistEventId } = options;
+  const { lastEventId, onError, persistEventId, method = 'GET', body } = options;
   const ctrl = new AbortController();
 
   const headers: HeadersInit = {
     Accept: 'text/event-stream',
     Authorization: `Bearer ${token}`,
   };
+  if (body !== undefined) headers['Content-Type'] = 'application/json';
   if (lastEventId) {
     headers['Last-Event-ID'] = lastEventId;
   }
 
   const resp = await fetch(url, {
+    method,
     headers,
+    body,
     signal: ctrl.signal,
   });
 

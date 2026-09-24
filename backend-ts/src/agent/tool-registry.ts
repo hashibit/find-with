@@ -1,5 +1,7 @@
 import { Injectable, Inject } from '@nestjs/common';
 import type { Tool } from '@earendil-works/pi-ai';
+import { Value } from '@sinclair/typebox/value';
+import type { TSchema } from '@sinclair/typebox';
 
 export type Scene =
   | 'JOB_ANALYSIS'
@@ -54,7 +56,9 @@ const KIND_SCENES: ReadonlySet<string> = new Set([
  * gating) — those need a signal source, not a bigger switch here.
  */
 export function resolveScene(kind: string | null | undefined): Scene {
-  return kind !== null && kind !== undefined && KIND_SCENES.has(kind) ? (kind as Scene) : 'FREE_CHAT';
+  return kind !== null && kind !== undefined && KIND_SCENES.has(kind)
+    ? (kind as Scene)
+    : 'FREE_CHAT';
 }
 
 @Injectable()
@@ -71,6 +75,20 @@ export class ToolRegistry {
 
   get(name: string): ToolExecutor | undefined {
     return this.toolMap.get(name);
+  }
+
+  /** Validate model-produced arguments against the same schema exposed to the model. */
+  validateArguments(name: string, args: unknown): Record<string, unknown> {
+    const tool = this.toolMap.get(name);
+    if (!tool) throw new Error(`Unknown tool: ${name}`);
+    if (!Value.Check(tool.parameters as TSchema, args)) {
+      const errors = [...Value.Errors(tool.parameters as TSchema, args)]
+        .slice(0, 5)
+        .map((error) => `${error.path || '(root)'} ${error.message}`)
+        .join('; ');
+      throw new Error(`Invalid arguments for tool '${name}': ${errors}`);
+    }
+    return args as Record<string, unknown>;
   }
 
   getToolsForScene(scene: Scene): Tool[] {

@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Type } from '@sinclair/typebox';
 import { JobParsedJd } from '../../database/entities/jobs/parsed-jd.entity.js';
+import { JobRadarItem } from '../../database/entities/jobs/radar-item.entity.js';
 import { LLM_PROVIDER, type LlmProvider } from '../../llm/llm-provider.interface.js';
 
 import type { ToolExecutor } from '../tool-registry.js';
@@ -13,6 +14,8 @@ export class DraftMotivationTool implements ToolExecutor {
   constructor(
     @InjectRepository(JobParsedJd)
     private readonly jdRepo: Repository<JobParsedJd>,
+    @InjectRepository(JobRadarItem)
+    private readonly radarRepo: Repository<JobRadarItem>,
     @Inject(LLM_PROVIDER) private readonly llm: LlmProvider,
   ) {}
 
@@ -27,8 +30,14 @@ export class DraftMotivationTool implements ToolExecutor {
   async execute(
     _toolCallId: string,
     params: { parsed_jd_id: string; profile_summary?: string },
+    context: { userId: string },
   ): Promise<{ content: Array<{ type: 'text'; text: string }>; details: Record<string, unknown> }> {
-    const jd = await this.jdRepo.findOne({ where: { id: params.parsed_jd_id } });
+    const ownedRadarItem = await this.radarRepo.findOne({
+      where: { userId: context.userId, parsedJdId: params.parsed_jd_id },
+    });
+    const jd = ownedRadarItem
+      ? await this.jdRepo.findOne({ where: { id: params.parsed_jd_id } })
+      : null;
     if (!jd) {
       return {
         content: [{ type: 'text', text: 'Could not find the parsed JD. Please try again.' }],
@@ -36,7 +45,7 @@ export class DraftMotivationTool implements ToolExecutor {
       };
     }
 
-    const context = [
+    const jobContext = [
       `Role: ${jd.title ?? 'Unknown'} at ${jd.company ?? 'Unknown'}`,
       `Key requirements: ${(jd.hardSkills ?? []).slice(0, 5).join(', ')}`,
       params.profile_summary ? `Candidate background: ${params.profile_summary}` : '',
@@ -50,7 +59,7 @@ export class DraftMotivationTool implements ToolExecutor {
       messages: [
         {
           role: 'user',
-          content: `Write a motivation statement for this application:\n${context}`,
+          content: `Write a motivation statement for this application:\n${jobContext}`,
           timestamp: Date.now(),
         },
       ],

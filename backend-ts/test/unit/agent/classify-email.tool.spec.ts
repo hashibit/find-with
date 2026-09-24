@@ -36,13 +36,14 @@ function buildTool() {
 }
 
 const params = { email_capture_id: 'email_01' };
+const ctx = { userId: 'u_01', conversationId: 'conv_01' };
 
 describe('ClassifyEmailTool', () => {
   describe('execute', () => {
     it('returns not found when repo.findOne returns null', async () => {
       const { tool } = buildTool();
 
-      const result = await tool.execute('tc_01', params);
+      const result = await tool.execute('tc_01', params, ctx);
 
       expect(result.content[0].text).toContain('not found');
     });
@@ -51,7 +52,7 @@ describe('ClassifyEmailTool', () => {
       const { tool, repo, crypto } = buildTool();
       repo.findOne.mockResolvedValue(makeEmail());
 
-      await tool.execute('tc_01', params);
+      await tool.execute('tc_01', params, ctx);
 
       expect(crypto.decrypt).toHaveBeenCalledWith('encrypted-body');
     });
@@ -60,7 +61,7 @@ describe('ClassifyEmailTool', () => {
       const { tool, repo, crypto } = buildTool();
       repo.findOne.mockResolvedValue(makeEmail({ bodyText: null }));
 
-      await tool.execute('tc_01', params);
+      await tool.execute('tc_01', params, ctx);
 
       expect(crypto.decrypt).not.toHaveBeenCalled();
     });
@@ -70,7 +71,7 @@ describe('ClassifyEmailTool', () => {
       const email = makeEmail();
       repo.findOne.mockResolvedValue(email);
 
-      await tool.execute('tc_01', params);
+      await tool.execute('tc_01', params, ctx);
 
       expect(repo.save).toHaveBeenCalled();
       expect(email.kind).toBe('INTERVIEW_INVITE');
@@ -80,7 +81,7 @@ describe('ClassifyEmailTool', () => {
       const { tool, repo } = buildTool();
       repo.findOne.mockResolvedValue(makeEmail());
 
-      const result = await tool.execute('tc_01', params);
+      const result = await tool.execute('tc_01', params, ctx);
 
       expect(result.details).toHaveProperty('emailId', 'email_01');
       expect(result.details).toHaveProperty('kind', 'INTERVIEW_INVITE');
@@ -95,7 +96,7 @@ describe('ClassifyEmailTool', () => {
       // structuredComplete is not wrapped in try/catch in the source — an LLM
       // failure propagates out of execute (the job/agent boundary handles it),
       // and nothing is persisted.
-      await expect(tool.execute('tc_01', params)).rejects.toThrow('LLM unavailable');
+      await expect(tool.execute('tc_01', params, ctx)).rejects.toThrow('LLM unavailable');
       expect(repo.save).not.toHaveBeenCalled();
     });
 
@@ -103,7 +104,7 @@ describe('ClassifyEmailTool', () => {
       const { tool, repo } = buildTool();
       repo.findOne.mockResolvedValue(makeEmail());
 
-      const result = await tool.execute('tc_01', params);
+      const result = await tool.execute('tc_01', params, ctx);
 
       expect(result.content[0].text).toContain('invited to interview');
     });

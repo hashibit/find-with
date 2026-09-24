@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { MoreThan, Repository } from 'typeorm';
+import { In, MoreThan, Repository } from 'typeorm';
 import { ulid } from 'ulid';
 import { PinoLogger, InjectPinoLogger } from 'nestjs-pino';
 import type {
@@ -30,6 +30,11 @@ export interface PersistedToolResult {
   result: string;
   isError: boolean;
 }
+
+export type ToolExecutionClaim =
+  | { state: 'NEW' }
+  | { state: 'IN_PROGRESS' }
+  | ({ state: 'DONE' } & PersistedToolResult);
 
 /** Decrypted turn for compression/brief consumers (context-builder). */
 export interface DecryptedTurn {
@@ -164,25 +169,71 @@ export class ConvMessageRepository {
     return id;
   }
 
-  /** Persist one executed invocation — arguments + result atomically. */
+  /** Claim a tool call before its side effect starts. The unique DB key closes races across workers. */
+  async claimToolCall(
+    conversationId: string,
+    assistantId: string,
+    rec: Omit<ToolExecutionRecord, 'result' | 'isError'>,
+  ): Promise<ToolExecutionClaim> {
+    const existing = await this.toolCallRepo.findOne({
+      where: { conversationId, toolCallId: rec.toolCallId },
+    });
+    if (existing) {
+      if (existing.status === 'PROCESSING') return { state: 'IN_PROGRESS' };
+      const result = await this.decryptText(existing.encryptedResult);
+      return result === null
+        ? { state: 'IN_PROGRESS' }
+        : { state: 'DONE', result, isError: existing.isError };
+    }
+
+    try {
+      await this.toolCallRepo.save(
+        this.toolCallRepo.create({
+          id: ulid(),
+          conversationId,
+          assistantId,
+          toolCallId: rec.toolCallId,
+          toolName: rec.toolName,
+          seq: rec.seq,
+          encryptedArguments: await this.crypto.encrypt(JSON.stringify(rec.arguments)),
+          encryptedResult: null,
+          isError: false,
+          status: 'PROCESSING',
+        }),
+      );
+      return { state: 'NEW' };
+    } catch {
+      // Another worker may have won the unique claim between findOne and save.
+      return { state: 'IN_PROGRESS' };
+    }
+  }
+
+  async completeToolCall(
+    conversationId: string,
+    toolCallId: string,
+    result: string,
+    isError: boolean,
+  ): Promise<void> {
+    await this.toolCallRepo.update(
+      { conversationId, toolCallId },
+      {
+        encryptedResult: await this.crypto.encrypt(result),
+        isError,
+        status: isError ? 'FAILED' : 'SUCCEEDED',
+      },
+    );
+  }
+
+  /** Backward-compatible helper for callers that already have the result. */
   async saveToolCall(
     conversationId: string,
     assistantId: string,
     rec: ToolExecutionRecord,
   ): Promise<void> {
-    await this.toolCallRepo.save(
-      this.toolCallRepo.create({
-        id: ulid(),
-        conversationId,
-        assistantId,
-        toolCallId: rec.toolCallId,
-        toolName: rec.toolName,
-        seq: rec.seq,
-        encryptedArguments: await this.crypto.encrypt(JSON.stringify(rec.arguments)),
-        encryptedResult: await this.crypto.encrypt(rec.result),
-        isError: rec.isError,
-      }),
-    );
+    const claim = await this.claimToolCall(conversationId, assistantId, rec);
+    if (claim.state === 'NEW') {
+      await this.completeToolCall(conversationId, rec.toolCallId, rec.result, rec.isError);
+    }
   }
 
   /** Return a previously persisted result so a retried model turn is side-effect free. */
@@ -191,7 +242,7 @@ export class ConvMessageRepository {
     toolCallId: string,
   ): Promise<PersistedToolResult | null> {
     const row = await this.toolCallRepo.findOne({ where: { conversationId, toolCallId } });
-    if (!row) return null;
+    if (!row || row.status === 'PROCESSING' || !row.encryptedResult) return null;
     const result = await this.decryptText(row.encryptedResult);
     return result === null ? null : { result, isError: row.isError };
   }
@@ -204,7 +255,7 @@ export class ConvMessageRepository {
    * dropped.
    */
   async findRecentForContext(conversationId: string, limit: number): Promise<Message[]> {
-    const { messages } = await this.loadTurns(conversationId);
+    const { messages } = await this.loadTurns(conversationId, limit);
     if (messages.length <= limit) return messages;
 
     // Keep the most recent `limit` messages, aligned to a USER boundary so
@@ -222,18 +273,38 @@ export class ConvMessageRepository {
     return turns;
   }
 
-  private async loadTurns(conversationId: string): Promise<{
+  private async loadTurns(
+    conversationId: string,
+    speakerLimit?: number,
+  ): Promise<{
     turns: DecryptedTurn[];
     messages: Message[];
   }> {
     const rows = await this.repo.find({
       where: { conversationId, archived: false },
-      order: { createdAt: 'ASC', id: 'ASC' },
+      order: { createdAt: speakerLimit ? 'DESC' : 'ASC', id: speakerLimit ? 'DESC' : 'ASC' },
+      ...(speakerLimit ? { take: speakerLimit } : {}),
     });
-    const callRows = await this.toolCallRepo.find({
-      where: { conversationId },
-      order: { seq: 'ASC', id: 'ASC' },
+    const chronologicalRows = [...rows].sort((a, b) => {
+      const byCreatedAt = a.createdAt.getTime() - b.createdAt.getTime();
+      return byCreatedAt || a.id.localeCompare(b.id);
     });
+    const selectedRows = speakerLimit
+      ? chronologicalRows.slice(Math.max(0, chronologicalRows.length - speakerLimit))
+      : chronologicalRows;
+    const firstUserIndex = selectedRows.findIndex((row) => row.role === 'USER');
+    const alignedRows = speakerLimit
+      ? selectedRows[0]?.role === 'ASSISTANT' && firstUserIndex >= 0
+        ? selectedRows.slice(firstUserIndex)
+        : selectedRows
+      : selectedRows;
+    const assistantIds = alignedRows.filter((row) => row.role === 'ASSISTANT').map((row) => row.id);
+    const callRows = assistantIds.length
+      ? await this.toolCallRepo.find({
+          where: { conversationId, assistantId: In(assistantIds) },
+          order: { seq: 'ASC', id: 'ASC' },
+        })
+      : [];
 
     const callsByAssistant = new Map<string, PersistedCall[]>();
     for (const row of callRows) {
@@ -247,7 +318,7 @@ export class ConvMessageRepository {
     const turns: DecryptedTurn[] = [];
     const messages: Message[] = [];
 
-    for (const row of rows) {
+    for (const row of alignedRows) {
       if (row.role === 'USER') {
         const text = await this.decryptText(row.encryptedText);
         if (text === null) continue;
@@ -364,6 +435,7 @@ export class ConvMessageRepository {
   }
 
   private async decryptCall(row: ConvToolCall): Promise<PersistedCall | null> {
+    if (row.status === 'PROCESSING' || !row.encryptedResult) return null;
     const argsRaw = await this.decryptText(row.encryptedArguments);
     const resultText = await this.decryptText(row.encryptedResult);
     if (argsRaw === null || resultText === null) return null;

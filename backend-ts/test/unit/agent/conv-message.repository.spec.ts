@@ -66,11 +66,24 @@ function makeRepo() {
 
   const toolCallRepo = {
     create: vi.fn().mockImplementation((data: ConvToolCall) => data),
+    findOne: vi
+      .fn()
+      .mockImplementation(
+        async (options?: { where?: { toolCallId?: string } }) =>
+          toolCalls.find((call) => call.toolCallId === options?.where?.toolCallId) ?? null,
+      ),
     save: vi.fn().mockImplementation(async (data: ConvToolCall) => {
       data.createdAt = new Date(T0 + clock++);
       toolCalls.push(data);
       return data;
     }),
+    update: vi
+      .fn()
+      .mockImplementation(async (where: { toolCallId?: string }, patch: Partial<ConvToolCall>) => {
+        const call = toolCalls.find((item) => item.toolCallId === where.toolCallId);
+        if (call) Object.assign(call, patch);
+        return { affected: call ? 1 : 0 };
+      }),
     find: vi.fn().mockImplementation(async () => [...toolCalls]),
   };
 
@@ -107,7 +120,7 @@ function assistantMessage(content: AssistantMessage['content']): AssistantMessag
 
 describe('ConvMessageRepository', () => {
   it('round-trips user → assistant(thinking+text+toolCall) → toolResult', async () => {
-    const { repo } = makeRepo();
+    const { repo, toolCalls } = makeRepo();
 
     await repo.saveUser(CONV, 'hello there');
     const assistantId = await repo.saveAssistant(
@@ -131,6 +144,8 @@ describe('ConvMessageRepository', () => {
       result: '{"ok":true}',
       isError: false,
     });
+    expect(toolCalls[0]).toMatchObject({ status: 'SUCCEEDED' });
+    expect(toolCalls[0]?.encryptedResult).toBeTruthy();
 
     const msgs = await repo.findRecentForContext(CONV, 30);
 

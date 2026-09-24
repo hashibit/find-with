@@ -14,7 +14,11 @@ export const LLM_PROVIDER = Symbol('LLM_PROVIDER');
  */
 export interface LlmProvider {
   /** Streaming turn with a specific model — used by the agent loop. */
-  streamContextWithModel(model: Model<Api>, context: Context): ReturnType<typeof stream>;
+  streamContextWithModel(
+    model: Model<Api>,
+    context: Context,
+    signal?: AbortSignal,
+  ): ReturnType<typeof stream>;
 
   /** Legacy streaming turn — kept for backward compatibility. */
   streamContext(context: Context): ReturnType<typeof stream>;
@@ -23,7 +27,10 @@ export interface LlmProvider {
   completeContext(context: Context): Promise<string>;
 
   /** One-shot completion with structured output via pi-ai tool constrainedSampling. */
-  structuredComplete<T extends TSchema>(context: Context, outputSchema: T): Promise<StaticDecode<T>>;
+  structuredComplete<T extends TSchema>(
+    context: Context,
+    outputSchema: T,
+  ): Promise<StaticDecode<T>>;
 
   /** Text embedding. */
   embed(text: string): Promise<number[]>;

@@ -22,6 +22,20 @@ export class RestructureConvMessages1788480000000 implements MigrationInterface 
   name = 'RestructureConvMessages1788480000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    const [{ count }] = (await queryRunner.query(
+      `SELECT COUNT(*)::int AS count FROM "conv_messages" WHERE "role" IN ('USER', 'ASSISTANT')`,
+    )) as Array<{ count: number }>;
+    const [{ summaryCount }] = (await queryRunner.query(
+      `SELECT COUNT(*)::int AS "summaryCount" FROM "conv_rolling_summary"`,
+    )) as Array<{ summaryCount: number }>;
+    if (
+      (count > 0 || summaryCount > 0) &&
+      process.env.ALLOW_DESTRUCTIVE_CONV_MIGRATION !== 'true'
+    ) {
+      throw new Error(
+        'Refusing destructive conversation migration: set ALLOW_DESTRUCTIVE_CONV_MIGRATION=true after an explicit backup/approval',
+      );
+    }
     await queryRunner.query(`DELETE FROM "conv_rolling_summary"`);
     await queryRunner.query(`DELETE FROM "conv_messages"`);
 

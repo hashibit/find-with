@@ -7,13 +7,22 @@ const makeJd = (overrides: Record<string, unknown> = {}) =>
     id: 'jd_01',
     title: 'Senior Product Manager',
     company: 'Stripe',
-    hardSkills: ['product strategy', 'roadmapping', 'data analysis', 'SQL', 'stakeholder management'],
+    hardSkills: [
+      'product strategy',
+      'roadmapping',
+      'data analysis',
+      'SQL',
+      'stakeholder management',
+    ],
     ...overrides,
   }) as any;
 
 function buildTool() {
   const jdRepo = {
     findOne: vi.fn().mockResolvedValue(null),
+  };
+  const radarRepo = {
+    findOne: vi.fn().mockResolvedValue({ id: 'r_01', userId: 'u_01', parsedJdId: 'jd_01' }),
   };
   const llm = {
     completeContext: vi
@@ -23,18 +32,19 @@ function buildTool() {
       ),
   };
 
-  const tool = new DraftMotivationTool(jdRepo as any, llm as any);
-  return { tool, jdRepo, llm };
+  const tool = new DraftMotivationTool(jdRepo as any, radarRepo as any, llm as any);
+  return { tool, jdRepo, radarRepo, llm };
 }
 
 const params = { parsed_jd_id: 'jd_01' };
+const ctx = { userId: 'u_01', conversationId: 'conv_01' };
 
 describe('DraftMotivationTool', () => {
   describe('execute', () => {
     it('returns not found message when jdRepo.findOne returns null', async () => {
       const { tool } = buildTool();
 
-      const result = await tool.execute('tc_01', params);
+      const result = await tool.execute('tc_01', params, ctx);
 
       expect(result.content[0].text.toLowerCase()).toMatch(/not found|could not find/);
     });
@@ -43,7 +53,7 @@ describe('DraftMotivationTool', () => {
       const { tool, jdRepo, llm } = buildTool();
       jdRepo.findOne.mockResolvedValue(makeJd());
 
-      await tool.execute('tc_01', params);
+      await tool.execute('tc_01', params, ctx);
 
       expect(llm.completeContext).toHaveBeenCalled();
     });
@@ -52,7 +62,7 @@ describe('DraftMotivationTool', () => {
       const { tool, jdRepo } = buildTool();
       jdRepo.findOne.mockResolvedValue(makeJd());
 
-      const result = await tool.execute('tc_01', params);
+      const result = await tool.execute('tc_01', params, ctx);
 
       expect(result.details).toHaveProperty('draft');
       expect(result.details).toHaveProperty('parsedJdId', 'jd_01');
@@ -62,7 +72,7 @@ describe('DraftMotivationTool', () => {
       const { tool, jdRepo } = buildTool();
       jdRepo.findOne.mockResolvedValue(makeJd());
 
-      const result = await tool.execute('tc_01', params);
+      const result = await tool.execute('tc_01', params, ctx);
 
       expect(result.content[0].text).toContain("Stripe's infrastructure mission");
     });
@@ -71,10 +81,14 @@ describe('DraftMotivationTool', () => {
       const { tool, jdRepo, llm } = buildTool();
       jdRepo.findOne.mockResolvedValue(makeJd());
 
-      await tool.execute('tc_01', {
-        parsed_jd_id: 'jd_01',
-        profile_summary: '5 years PM at fintech startups',
-      });
+      await tool.execute(
+        'tc_01',
+        {
+          parsed_jd_id: 'jd_01',
+          profile_summary: '5 years PM at fintech startups',
+        },
+        ctx,
+      );
 
       const promptContent = llm.completeContext.mock.calls[0][0].messages[0].content as string;
       expect(promptContent).toContain('5 years PM at fintech startups');
@@ -84,7 +98,7 @@ describe('DraftMotivationTool', () => {
       const { tool, jdRepo, llm } = buildTool();
       jdRepo.findOne.mockResolvedValue(makeJd());
 
-      await tool.execute('tc_01', params);
+      await tool.execute('tc_01', params, ctx);
 
       const promptContent = llm.completeContext.mock.calls[0][0].messages[0].content as string;
       expect(promptContent).not.toContain('Candidate background');
@@ -95,7 +109,7 @@ describe('DraftMotivationTool', () => {
       jdRepo.findOne.mockResolvedValue(makeJd());
       llm.completeContext.mockResolvedValue('  Specific motivation text here.  ');
 
-      const result = await tool.execute('tc_01', params);
+      const result = await tool.execute('tc_01', params, ctx);
 
       expect(result.details['draft']).toBe('Specific motivation text here.');
     });

@@ -31,9 +31,12 @@ export class SetConversationDensityTool implements ToolExecutor {
   async execute(
     _toolCallId: string,
     params: { density: Static<typeof DensityEnum>; reason: string },
-    context: { conversationId: string },
+    context: { conversationId: string; userId: string },
   ): Promise<{ content: Array<{ type: 'text'; text: string }>; details: Record<string, unknown> }> {
-    await this.repo.update({ id: context.conversationId }, { effectiveDensity: params.density });
+    await this.repo.update(
+      { id: context.conversationId, userId: context.userId },
+      { effectiveDensity: params.density },
+    );
 
     const messages: Record<string, string> = {
       ENGAGED: "Got it. I'll be more proactive from here.",

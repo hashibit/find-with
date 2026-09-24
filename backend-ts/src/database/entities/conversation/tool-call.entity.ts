@@ -7,6 +7,7 @@ import { BaseEntity } from '../base.entity.js';
  * reassembly never depends on row order.
  * Design record: docs/tech/conv-messages-restructure.md
  */
+@Index('UQ_conv_tool_calls_conversation_call', ['conversationId', 'toolCallId'], { unique: true })
 @Entity('conv_tool_calls')
 export class ConvToolCall extends BaseEntity {
   @Index()
@@ -36,9 +37,12 @@ export class ConvToolCall extends BaseEntity {
   encryptedArguments: Buffer;
 
   // PII — tool result text.
-  @Column({ type: 'bytea' })
-  encryptedResult: Buffer;
+  @Column({ type: 'bytea', nullable: true })
+  encryptedResult: Buffer | null;
 
   @Column({ type: 'boolean' })
   isError: boolean;
+
+  @Column({ type: 'varchar', length: 20, default: 'SUCCEEDED' })
+  status: 'PROCESSING' | 'SUCCEEDED' | 'FAILED';
 }

@@ -151,16 +151,28 @@ export class AgentService {
     if (userMessage.length > AgentService.MAX_USER_MESSAGE) {
       throw new BadRequestException(`Message exceeds ${AgentService.MAX_USER_MESSAGE} characters`);
     }
-    const subject = new Subject<AgentSseEvent>();
-    void this.runAgentLoop(subject, {
-      conversationId,
-      userId,
-      userMessage,
-      conversationKind: conversationKind ?? null,
-      anchorId,
-      clientMessageId: clientMessageId ?? null,
+    return new Observable<AgentSseEvent>((subscriber) => {
+      const subject = new Subject<AgentSseEvent>();
+      const abortController = new AbortController();
+      const subjectSubscription = subject.subscribe(subscriber);
+      void this.runAgentLoop(
+        subject,
+        {
+          conversationId,
+          userId,
+          userMessage,
+          conversationKind: conversationKind ?? null,
+          anchorId,
+          clientMessageId: clientMessageId ?? null,
+        },
+        abortController.signal,
+      );
+
+      return () => {
+        abortController.abort();
+        subjectSubscription.unsubscribe();
+      };
     });
-    return subject.asObservable();
   }
 
   private async runAgentLoop(
@@ -173,13 +185,22 @@ export class AgentService {
       anchorId?: string | null;
       clientMessageId?: string | null;
     },
+    signal: AbortSignal,
   ): Promise<void> {
     const { conversationId, userId, userMessage } = opts;
-    // Look up conversation kind from DB if not provided — keeps controller synchronous
-    const conversationKind =
-      opts.conversationKind ??
-      (await this.convRepo.findOne({ where: { id: conversationId }, select: ['kind'] }))?.kind ??
-      'FREE_CHAT';
+    if (signal.aborted) return;
+    // Resolve the conversation and ownership once before reading history or
+    // executing any model-provided tool.
+    const conversation = await this.convRepo.findOne({
+      where: { id: conversationId, userId },
+      select: ['id', 'kind', 'anchorId'],
+    });
+    if (!conversation) {
+      subject.next({ data: JSON.stringify({ kind: 'error', message: 'Conversation not found' }) });
+      subject.complete();
+      return;
+    }
+    const conversationKind = conversation.kind ?? opts.conversationKind ?? 'FREE_CHAT';
     const toolCtx: ToolContext = { userId, conversationId };
 
     try {
@@ -215,7 +236,7 @@ export class AgentService {
         conversationId,
         userId,
         conversationKind,
-        opts.anchorId,
+        conversation.anchorId ?? opts.anchorId,
       );
 
       // Attach scene-filtered tools for the LLM to see
@@ -233,13 +254,15 @@ export class AgentService {
 
       let iteration = 0;
       while (iteration++ < MAX_ITERATION) {
+        if (signal.aborted) return;
         // 3. Stream LLM turn - use fallback model if error threshold exceeded
         const model =
           this.shouldFailover() && this.fallbackModel ? this.fallbackModel : this.writeModel;
 
-        const s = this.llm.streamContextWithModel(model, context);
+        const s = this.llm.streamContextWithModel(model, context, signal);
 
         for await (const event of s) {
+          if (signal.aborted) return;
           if (event.type === 'text_delta') {
             subject.next({
               data: JSON.stringify({ kind: 'text_delta', delta: event.delta, conversationId }),
@@ -281,7 +304,16 @@ export class AgentService {
 
         for (const [seq, call] of toolCalls.entries()) {
           if (call.type !== 'toolCall') continue;
-          const result = await this.executeTool(call.name, call.arguments, call.id, toolCtx);
+          const result = await this.executeTool(
+            call.name,
+            call.arguments,
+            call.id,
+            toolCtx,
+            signal,
+            assistantId,
+            seq,
+          );
+          if (signal.aborted) return;
           subject.next({
             data: JSON.stringify({
               kind: 'tool_result',
@@ -303,14 +335,6 @@ export class AgentService {
           };
 
           context.messages.push(toolResultMsg);
-          await this.saveToolCall(conversationId, assistantId, {
-            toolCallId: call.id,
-            toolName: call.name,
-            seq,
-            arguments: call.arguments,
-            result: resultText,
-            isError: !result.ok,
-          });
         }
       }
 
@@ -323,6 +347,7 @@ export class AgentService {
         completionTokens,
       );
     } catch (err) {
+      if (signal.aborted) return;
       this.logger.error('Agent loop error', err instanceof Error ? err.stack : String(err));
       subject.next({ data: JSON.stringify({ kind: 'error', message: 'Internal agent error' }) });
       subject.complete();
@@ -389,25 +414,37 @@ export class AgentService {
     args: unknown,
     callId: string,
     ctx: ToolContext,
+    signal: AbortSignal,
+    assistantId: string,
+    seq: number,
   ): Promise<{ ok: boolean; data: Record<string, unknown>; error: string }> {
     const executor = this.toolRegistry.get(toolName);
     if (!executor) return { ok: false, data: {}, error: `Unknown tool: ${toolName}` };
 
     try {
-      const previous = await this.convMessages.findToolResult(ctx.conversationId, callId);
-      if (previous) {
-        if (previous.isError) return { ok: false, data: {}, error: previous.result };
+      if (signal.aborted) throw new Error('Agent stream cancelled');
+      const validArgs = this.toolRegistry.validateArguments(toolName, args);
+      const claim = await this.convMessages.claimToolCall(ctx.conversationId, assistantId, {
+        toolCallId: callId,
+        toolName,
+        seq,
+        arguments: validArgs,
+      });
+      if (claim.state === 'DONE') {
+        if (claim.isError) return { ok: false, data: {}, error: claim.result };
         try {
-          return {
-            ok: true,
-            data: JSON.parse(previous.result) as Record<string, unknown>,
-            error: '',
-          };
+          return { ok: true, data: JSON.parse(claim.result) as Record<string, unknown>, error: '' };
         } catch {
-          return { ok: true, data: { text: previous.result }, error: '' };
+          return { ok: true, data: { text: claim.result }, error: '' };
         }
       }
-      const validArgs = this.toolRegistry.validateArguments(toolName, args);
+      if (claim.state === 'IN_PROGRESS') {
+        return {
+          ok: false,
+          data: {},
+          error: 'Tool call is already in progress; do not repeat it.',
+        };
+      }
       // Execute with 90s timeout
       const result = await doWithTimeout(
         executor.execute(callId, validArgs, ctx),
@@ -422,6 +459,12 @@ export class AgentService {
       // ]);
       const text = result.content.map((c) => c.text).join('\n');
       const successResult = { ok: true, data: { text, ...result.details }, error: '' };
+      await this.convMessages.completeToolCall(
+        ctx.conversationId,
+        callId,
+        JSON.stringify(successResult.data),
+        false,
+      );
 
       // Persist asynchronously — off the hot path so tool latency is not inflated
       // by synchronous DB round-trips. Tool results are also persisted to conv_messages.
@@ -441,6 +484,15 @@ export class AgentService {
     } catch (err) {
       this.logger.error(`Tool ${toolName} failed`, err);
       const errorResult = { ok: false, data: {}, error: String(err) };
+
+      if (!signal.aborted) {
+        await this.convMessages.completeToolCall(
+          ctx.conversationId,
+          callId,
+          errorResult.error,
+          true,
+        );
+      }
 
       void this.pendingToolRepo.save(
         this.pendingToolRepo.create({

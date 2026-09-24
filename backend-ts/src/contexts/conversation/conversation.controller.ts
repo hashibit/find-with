@@ -1,23 +1,36 @@
-import { Body, Controller, Get, type MessageEvent, Param, Post, Query, Sse, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Header, Param, Post, Req, Res } from '@nestjs/common';
+import type { Request, Response } from 'express';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Observable, map } from 'rxjs';
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
-import { CurrentUser, type AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
+import {
+  CurrentUser,
+  type AuthenticatedUser,
+} from '../../common/decorators/current-user.decorator.js';
 import { ConversationService } from './conversation.service.js';
 import { AgentService } from '../../agent/agent.service.js';
 import { MEMORY_QUEUE, type MemoryJobData } from '../memory/memory.constants.js';
 
 class CreateConversationDto extends createZodDto(
   z.object({
-    kind: z.enum(['FREE_CHAT', 'ONBOARDING', 'JOB_ANALYSIS', 'GAP_MINING', 'TAILOR_EDIT', 'FOLLOWUP']),
+    kind: z.enum([
+      'FREE_CHAT',
+      'ONBOARDING',
+      'JOB_ANALYSIS',
+      'GAP_MINING',
+      'TAILOR_EDIT',
+      'FOLLOWUP',
+    ]),
     anchorId: z.string().optional(),
   }),
 ) {}
 
-class SendPromptDto extends createZodDto(z.object({ message: z.string() })) {}
+class SendPromptDto extends createZodDto(
+  z.object({ message: z.string(), messageId: z.string().max(64).optional() }),
+) {}
 
 @ApiTags('conversation')
 @ApiBearerAuth()
@@ -59,18 +72,32 @@ export class ConversationController {
     return { ok: true };
   }
 
-  @Sse(':id/prompt')
+  @Post(':id/prompt')
+  @Header('Content-Type', 'text/event-stream')
+  @Header('Cache-Control', 'no-cache, no-transform')
+  @Header('Connection', 'keep-alive')
   @ApiOperation({ summary: 'Send a message — returns SSE stream of agent events' })
-  prompt(
+  async prompt(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
-    @Query('message') message: string,
-    // Client-generated idempotency key — SSE re-sends of the same URL carry
-    // the same messageId and collapse to the already-persisted user message.
-    @Query('messageId') messageId?: string,
-  ): Observable<MessageEvent> {
-    return this.agent
-      .respond(id, user.userId, message, undefined, undefined, messageId)
-      .pipe(map((evt) => ({ data: evt.data }) as MessageEvent));
+    @Body() dto: SendPromptDto,
+    @Req() req: Request,
+    @Res() res: Response,
+  ): Promise<void> {
+    res.flushHeaders();
+    const stream = this.agent.respond(
+      id,
+      user.userId,
+      dto.message,
+      undefined,
+      undefined,
+      dto.messageId,
+    );
+    const subscription = stream.subscribe({
+      next: (evt) => res.write(`data: ${evt.data}\n\n`),
+      error: () => res.end(),
+      complete: () => res.end(),
+    });
+    req.once('close', () => subscription.unsubscribe());
   }
 }

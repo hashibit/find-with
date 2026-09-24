@@ -55,18 +55,18 @@ These changes improve storage privacy and replay structure, but they do not yet 
 - clientMessageId 不再把“只写入 USER、LLM 尚未成功”的失败 turn 误判成已完成；失败请求可以用相同 ID 重试，且不会把用户消息重复塞进上下文。
 - 对应的 Agent 单测为 82/82，全量后端单测为 292/292。
 
-仍未在本轮处理的内容：多进程级工具执行状态机、SSE 取消、完整 memory 并发协调、统一 prompt registry，以及下方列出的授权/安全问题。它们保留在同一份文档中，作为后续工程顺序，而不是本轮 Agent 功能的阻塞项。
+后续一批已继续落地：会话/工具资源归属校验、工具执行状态、SSE 取消、有限窗口回放、POST body prompt transport、破坏性迁移保护和 tool-call 外键清理。仍未处理的是完整 memory 并发协调、prompt registry 收敛、outbox/quota，以及账号删除和输入策略。
 
 ## Findings
 
 ### 1. Tenant and resource authorization
 
-#### A-1 — Agent prompt does not verify conversation ownership
+#### A-1 — Agent prompt does not verify conversation ownership（已修复）
 
 **Severity**: Critical  
 **Files**: `backend-ts/src/contexts/conversation/conversation.controller.ts`, `backend-ts/src/agent/agent.service.ts`, `backend-ts/src/agent/context-builder.service.ts`
 
-The SSE prompt endpoint passes a conversation ID directly to `AgentService`. The Agent loop and context builder do not verify that the conversation belongs to the authenticated user before reading history, writing messages, or executing tools.
+The prompt endpoint previously passed a conversation ID directly to `AgentService`. The Agent loop now resolves `{ id, userId }` before reading history, writing messages, or executing tools; missing or foreign conversations terminate without entering the model loop.
 
 Required change:
 
@@ -75,27 +75,25 @@ Required change:
 - Make context loading and message persistence owner-scoped.
 - Add a two-user integration test.
 
-#### A-2 — Tools do not consistently scope resource queries by user
+#### A-2 — Tools do not consistently scope resource queries by user（主要路径已修复）
 
 **Severity**: Critical  
 **Files**: `backend-ts/src/agent/tools/`
 
-Several tools still trust model-provided IDs:
+The main model-provided resource IDs are now scoped through `ToolContext.userId`:
 
-- `classify-email`: email lookup lacks `userId`.
-- `draft-reply`: email lookup lacks `userId` and decrypts the body.
-- `draft-motivation`: parsed JD lookup lacks ownership validation.
-- `farewell`: radar status update lacks `userId`.
-- `set-conversation-density`: conversation update lacks `userId`.
-- `recompute-match`: secondary JD/match lookups are not fully owner-scoped.
+- `classify-email` and `draft-reply`: email lookup is owner-scoped.
+- `draft-motivation`: parsed JD must be linked to the user's radar item.
+- `farewell` and `set-conversation-density`: writes include the owner predicate.
+- `recompute-match`: match lookup includes the owner predicate; the radar lookup remains the source of JD ownership.
 
 The same pattern exists outside Agent code. For example, application submission and tailoring start do not uniformly verify resource ownership.
 
 Required change: introduce owner-scoped readers such as `findOwnedOrThrow(userId, id)` and require every controller, tool, and queue processor to use them.
 
-#### A-3 — Anchor and queue payloads are not authorization boundaries
+#### A-3 — Anchor and queue payloads are not authorization boundaries（Agent 请求路径已修复）
 
-`anchorId` is resolved to a radar item without checking the current user. Queue processors also need to re-check that the resource owner matches the job payload; enqueue-time validation alone is insufficient.
+`anchorId` is now resolved to a radar item with `userId`, and the Agent uses the verified conversation anchor instead of trusting a request override. Queue processors still need owner checks at job execution time.
 
 IDs must identify resources, not grant access to them.
 
@@ -120,7 +118,7 @@ RECEIVED → PROCESSING → COMPLETED
 
 Duplicate handling should return the existing result only for `COMPLETED`, report in-progress for `PROCESSING`, and retry `FAILED_RETRYABLE` turns.
 
-#### A-5 — Tool side effects can be repeated after persistence failure（已缓解，仍需持久化状态机）
+#### A-5 — Tool side effects can be repeated after persistence failure（已修复基础状态机）
 
 The current order is:
 
@@ -128,7 +126,7 @@ The current order is:
 executeTool() → saveToolCall()
 ```
 
-If a durable tool succeeds but `saveToolCall()` fails, replay can execute it again. This affects draft creation, material creation, status updates, and conversation setting updates. 本轮增加了执行前按 `(conversationId, toolCallId)` 读取已保存结果的短路逻辑，已落库的重试不会重复执行；但 save 失败前的未知结果仍需要完整状态机解决。
+Tool calls now claim a unique `(conversationId, toolCallId)` row as `PROCESSING` before executing, then transition to `SUCCEEDED` or `FAILED`. A completed claim is replayed and an in-progress claim is not executed by a second worker. An abandoned `PROCESSING` claim still needs a lease/reconciliation policy for multi-process recovery.
 
 Required change:
 
@@ -169,9 +167,9 @@ requiresConfirmation: boolean
 
 Runtime policy must enforce this metadata; it cannot depend only on model compliance.
 
-#### A-8 — SSE disconnect does not cancel work
+#### A-8 — SSE disconnect does not cancel work（已修复基础路径）
 
-Closing the browser stream does not visibly cancel the provider request, tool execution, or subsequent memory jobs. The user can leave the page while the Agent continues spending tokens and mutating state.
+The prompt stream now owns an `AbortController`; HTTP disconnect unsubscribes the Agent Observable, propagates the signal into pi-ai, and stops further model/tool events and memory enqueueing. A tool already inside a non-cancellable external call can still finish, after which its result is persisted.
 
 Connect Observable teardown to an `AbortController` and propagate cancellation through the model and tools.
 
@@ -189,29 +187,29 @@ Agent tests: 11 files / 82 tests passed. Full backend unit tests: 32 files / 292
 
 The test double and production contract need to be updated together. Add coverage for first insert, duplicate insert, different content with the same ID, failed-turn retry, and concurrent sends.
 
-#### A-10 — Destructive migration has no runtime guard
+#### A-10 — Destructive migration has no runtime guard（已修复）
 
-`1788480000000-RestructureConvMessages.ts` deletes all rows from `conv_messages` and `conv_rolling_summary`. The design record calls this pre-launch, but the migration cannot distinguish a disposable database from a database containing real user data.
+`1788480000000-RestructureConvMessages.ts` deletes all rows from `conv_messages` and `conv_rolling_summary`. It now fails closed when either table contains data unless the operator explicitly sets `ALLOW_DESTRUCTIVE_CONV_MIGRATION=true` after backup/approval. Empty pre-launch databases continue without the opt-in.
 
 Required change: fail closed unless an explicit operator opt-in is present, or archive/migrate the old data before deletion.
 
-#### A-11 — Tool-call rows have no referential cleanup guarantee
+#### A-11 — Tool-call rows have no referential cleanup guarantee（已修复基础路径）
 
-`conv_tool_calls.assistantId` is a plain varchar. Parent deletion can leave encrypted tool arguments/results behind, which is especially relevant to GDPR purge.
+The follow-up migration removes existing orphan tool-call rows and adds a foreign key from `conv_tool_calls.assistantId` to `conv_messages.id` with cascade delete. Conversation-level purge still needs an end-to-end deletion test across all derived tables.
 
 Either add a foreign key with cascade behavior or add orphan detection, scheduled cleanup, and deletion tests covering messages, tool calls, and summaries together.
 
-#### A-12 — Replay decrypts more history than needed
+#### A-12 — Replay decrypts more history than needed（已修复基础路径）
 
-`ConvMessageRepository.loadTurns()` loads and decrypts all non-archived messages and all tool calls before trimming to the context limit. Long conversations make every Agent turn increasingly expensive.
+Context replay now selects the latest speaker window first, aligns it to a USER boundary, derives the selected assistant IDs, and only loads their tool calls. Full-history loading remains isolated to compression.
 
 Select the latest message window first, derive the required assistant IDs, and load only their tool calls. Keep full-history loading isolated to compression.
 
-#### A-13 — Prompt content is transported through a GET URL
+#### A-13 — Prompt content is transported through a GET URL（已修复）
 
 `ConversationController.prompt()` accepts the full user message as `?message=...`. Sensitive content can enter browser history, proxy logs, analytics, caches, and URL length limits.
 
-Prefer a POST command that creates a turn/job plus a separate SSE subscription, or another streaming transport that accepts a request body.
+The prompt endpoint now accepts a POST body containing `message` and `messageId` while returning the SSE stream. The extension fetch transport was updated accordingly.
 
 ### 4. Context, prompt, and memory quality
 
@@ -342,23 +340,23 @@ At the time of this review, backend, extension, and web type checks still fail i
 
 ### P0 — Release blockers
 
-1. Enforce conversation and resource ownership everywhere.
-2. Make failed turns retryable rather than silently deduplicated.
-3. Make durable tool execution idempotent and recoverable.
-4. Guard or replace the destructive conversation migration.
-5. Restore green tests and fix all package type checks.
+1. ~~Enforce conversation and resource ownership everywhere.~~ Agent request and primary tools completed; queue-wide audit remains.
+2. ~~Make failed turns retryable rather than silently deduplicated.~~ Completed.
+3. Make durable tool execution idempotent and recoverable. Durable claim state completed; stale-claim lease/reconciliation remains.
+4. ~~Guard or replace the destructive conversation migration.~~ Completed with explicit operator opt-in.
+5. Restore green tests and fix all package type checks. Backend tests are green; package type checks still have pre-existing errors.
 
 ### P1 — Reliability and quality
 
-1. Add runtime tool schema validation and side-effect policy.
-2. Bound replay queries before decryption.
-3. Fix material and summary ordering.
+1. Runtime tool schema validation completed; explicit confirmation policy remains.
+2. ~~Bound replay queries before decryption.~~ Completed for Agent context replay.
+3. ~~Fix material and summary ordering.~~ Completed.
 4. Make memory extraction serialized/provenance-aware.
 5. Repair outbox, quota, and general idempotency atomicity.
 
 ### P2 — Product hardening
 
-1. Replace GET prompt transport with a body-based streaming flow.
+1. ~~Replace GET prompt transport with a body-based streaming flow.~~ Completed.
 2. Unify production prompts with the versioned registry.
 3. Add untrusted-data prompt boundaries and current-job context.
 4. Complete account deletion and input/payment policies.
